@@ -390,17 +390,17 @@ const LAYER_GROUPS = [
 ];
 
 const LAYERS = [
-  { id: 'flights', name: 'Air traffic', color: '#ffb347', on: false, count: 0, note: 'OpenSky' },
-  { id: 'services', name: 'Police & state air', color: '#4fa3ff', on: false, count: 0, note: 'adsbdb registry' },
-  { id: 'vessels', name: 'Vessels (AIS)', color: '#4fd6ff', on: false, count: 0, note: 'Digitraffic' },
+  { id: 'flights', name: 'Air traffic', color: '#ffb347', on: false, count: 0, note: 'OpenSky worldwide, topped up by community feeders — transponders, so an aircraft that is not broadcasting is not here' },
+  { id: 'services', name: 'Police & state air', color: '#4fa3ff', on: false, count: 0, note: 'picked out of the same ADS-B feed by registry — police, medical, coastguard and military airframes' },
+  { id: 'vessels', name: 'Vessels (AIS)', color: '#4fd6ff', on: false, count: 0, note: 'Digitraffic covers the Baltic; an aisstream key opens the rest — ships report their own position' },
   { id: 'cables', name: 'Submarine cables', color: '#b58cff', on: false, count: 0, note: 'TeleGeography — fine to watch; ask them before monetising' },
-  { id: 'cameras', name: 'Public cameras', color: '#7dffab', on: true, count: 0, note: 'Digitraffic' },
+  { id: 'cameras', name: 'Public cameras', color: '#7dffab', on: true, count: 0, note: 'Digitraffic, TfL, Trafikverket and Windy merged — a still from the camera, not a live stream' },
   { id: 'names', name: 'Names & borders', color: '#cbd5e1', on: true, count: 0, note: 'Natural Earth lines, CARTO labels \u2014 works over satellite too' },
   { id: 'sar', name: 'Radar backscatter', color: '#8fbcd4', on: false, count: 0, note: 'NASA OPERA Sentinel-1 \u2014 sees through cloud and darkness', noCount: true },
   { id: 'disturb', name: 'Ground disturbance', color: '#e879a0', on: false, count: 0, note: 'NASA OPERA DIST-ALERT \u2014 vegetation lost since a baseline', noCount: true },
   { id: 'water', name: 'Surface water / flood', color: '#38bdf8', on: false, count: 0, note: 'NASA OPERA DSWx \u2014 radar, so cloud does not hide the flood', noCount: true },
-  { id: 'satellites', name: 'Satellites', color: '#ffffff', on: false, count: 0, note: 'CelesTrak' },
-  { id: 'quakes', name: 'Seismic (7 days)', color: '#ff5a5a', on: false, count: 0, note: 'USGS' },
+  { id: 'satellites', name: 'Satellites', color: '#ffffff', on: false, count: 0, note: 'CelesTrak orbital elements, propagated here — 16 000 objects, and most of them are debris' },
+  { id: 'quakes', name: 'Seismic (7 days)', color: '#ff5a5a', on: false, count: 0, note: 'USGS, M2.5+ over the last week — sized by energy, coloured by depth, because shallow ones do the damage' },
   { id: 'fires', name: 'Thermal / fires (24 h)', color: '#ff7a1a', on: false, count: 0, note: 'NASA FIRMS VIIRS — heat, not only wildfire' },
   { id: 'outbreaks', name: 'Disease outbreaks', color: '#c77dff', on: false, count: 0, note: 'WHO international alerts only — national outbreaks are missing' },
   { id: 'volcanoes', name: 'Erupting volcanoes', color: '#ff8c42', on: false, count: 0, note: 'Smithsonian GVP — continuing eruptions, a catalogue not a sensor' },
@@ -2674,7 +2674,11 @@ async function loadBroadcast(force) {
       });
     }
     setCount('broadcast', data.stations.length);
-    log(`radio stations: ${data.stations.length} within ${Math.round(radius)} km \u00b7 Radio Browser`);
+    // The commonest first question about this layer: why is there radio in one
+    // corner of the world and nowhere else. Because it asks about where you are
+    // looking, and a bare count does not say so.
+    log(`radio stations: ${data.stations.length} within ${Math.round(radius)} km `
+      + `of this view \u00b7 move the camera to load elsewhere \u00b7 Radio Browser`);
   } catch (err) {
     log(`station list unavailable (${err.message})`, 'warn');
   }

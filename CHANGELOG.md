@@ -6,6 +6,28 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.89.2 — the oldest layers said the least
+
+Went through the help tabs and the layer notes against what the app actually does
+now, rather than against what it did when they were written.
+
+The tabs held up: five of them, each rendering, ten key fields in SETUP with
+nothing missing, and every layer carrying a note. But six layers had notes that
+were only a source name — `OpenSky`, `Digitraffic`, `USGS`. They are the six
+oldest and, awkwardly, the six most used: aircraft, police air, ships, cameras,
+satellites, earthquakes. They predate the convention the rest of the app follows,
+which is source *and* what the thing is *and* where its limit lies.
+
+They say something now. Aircraft note that a transponder that is not broadcasting
+is not on the map. Cameras note that a frame is a still and not a stream.
+Satellites note that most of sixteen thousand objects are debris.
+
+**And the radio layer explains its own geography.** Asked why there was radio in
+Florida and nowhere else: because the layer fetches around wherever the camera is,
+which the log did not say. The count now reads *"95 stations within 300 km of this
+view · move the camera to load elsewhere"*. It is the first question anybody has
+about that layer and it should not have needed asking.
+
 ## 0.89.1 — the radar was smearing the map
 
 Sent a screenshot of the radar layer switched on over Europe: long diagonal
