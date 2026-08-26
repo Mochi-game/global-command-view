@@ -1,0 +1,151 @@
+{
+  "note": "Submarines do not broadcast AIS and nothing public tracks them. What is public is where they are based. This layer takes you to the piers; the ruler and the imagery date do the rest. Coordinates come from Wikipedia except where noted; the classes are what open sources report as home-ported, not an observation.",
+  "as_of": "2026-08-20",
+  "bases": [
+    {
+      "name": "Rybachiy, Vilyuchinsk",
+      "country": "Russia",
+      "navy": "Pacific Fleet",
+      "lat": 52.9172,
+      "lon": 158.4872,
+      "coord_source": "pier area read from imagery",
+      "classes": "Project 955A Borei-A (SSBN), 949A Antey (SSGN), 971 Shchuka-B (SSN), 885M Yasen-M (SSGN)",
+      "wiki": "Vilyuchinsk"
+    },
+    {
+      "name": "Gadzhiyevo",
+      "country": "Russia",
+      "navy": "Northern Fleet",
+      "lat": 69.2503,
+      "lon": 33.315,
+      "classes": "Project 955/955A Borei (SSBN), 667BDRM Delfin (SSBN)",
+      "wiki": "Gadzhiyevo"
+    },
+    {
+      "name": "Polyarny",
+      "country": "Russia",
+      "navy": "Northern Fleet",
+      "lat": 69.2,
+      "lon": 33.4667,
+      "classes": "Project 877 Paltus (SSK) and support",
+      "wiki": "Polyarny,_Murmansk_Oblast"
+    },
+    {
+      "name": "Naval Base Kitsap – Bangor",
+      "country": "United States",
+      "navy": "US Navy, Pacific",
+      "lat": 47.7244,
+      "lon": -122.72,
+      "classes": "Ohio-class SSBN and SSGN",
+      "wiki": "Naval_Submarine_Base_Bangor"
+    },
+    {
+      "name": "Kings Bay",
+      "country": "United States",
+      "navy": "US Navy, Atlantic",
+      "lat": 30.7817,
+      "lon": -81.535,
+      "classes": "Ohio-class SSBN",
+      "wiki": "Naval_Submarine_Base_Kings_Bay"
+    },
+    {
+      "name": "New London, Groton",
+      "country": "United States",
+      "navy": "US Navy, Atlantic",
+      "lat": 41.398,
+      "lon": -72.087,
+      "classes": "Los Angeles, Virginia and Seawolf-class SSN",
+      "wiki": "Naval_Submarine_Base_New_London"
+    },
+    {
+      "name": "Naval Station Norfolk",
+      "country": "United States",
+      "navy": "US Navy, Atlantic",
+      "lat": 36.945,
+      "lon": -76.3131,
+      "classes": "Virginia and Los Angeles-class SSN, carriers",
+      "wiki": "Naval_Station_Norfolk"
+    },
+    {
+      "name": "Naval Base Guam",
+      "country": "United States",
+      "navy": "US Navy, Pacific",
+      "lat": 13.44,
+      "lon": 144.6525,
+      "classes": "Los Angeles-class SSN, forward deployed",
+      "wiki": "Naval_Base_Guam"
+    },
+    {
+      "name": "HMNB Clyde, Faslane",
+      "country": "United Kingdom",
+      "navy": "Royal Navy",
+      "lat": 56.0661,
+      "lon": -4.8175,
+      "classes": "Vanguard-class SSBN, Astute-class SSN",
+      "wiki": "HMNB_Clyde"
+    },
+    {
+      "name": "Île Longue, Brest",
+      "country": "France",
+      "navy": "Marine nationale",
+      "lat": 48.3064,
+      "lon": -4.5067,
+      "classes": "Triomphant-class SSBN",
+      "wiki": "Île_Longue"
+    },
+    {
+      "name": "Toulon",
+      "country": "France",
+      "navy": "Marine nationale",
+      "lat": 43.1258,
+      "lon": 5.9306,
+      "classes": "Suffren-class SSN, carrier Charles de Gaulle",
+      "wiki": "Toulon"
+    },
+    {
+      "name": "Yulin, Hainan",
+      "country": "China",
+      "navy": "PLAN South Sea Fleet",
+      "lat": 18.2253,
+      "lon": 109.5292,
+      "classes": "Type 094 Jin (SSBN), Type 093 Shang (SSN)",
+      "wiki": "Yulin_Naval_Base"
+    },
+    {
+      "name": "Jianggezhuang, Qingdao",
+      "country": "China",
+      "navy": "PLAN North Sea Fleet",
+      "lat": 36.1108,
+      "lon": 120.5758,
+      "classes": "Type 091/093 SSN, Type 092 SSBN",
+      "wiki": "Jianggezhuang_Naval_Base"
+    },
+    {
+      "name": "Karlskrona",
+      "country": "Sweden",
+      "navy": "Swedish Navy",
+      "lat": 56.1561,
+      "lon": 15.5864,
+      "classes": "Gotland and Södermanland-class SSK",
+      "wiki": "Karlskrona_Naval_Base"
+    },
+    {
+      "name": "Haakonsvern, Bergen",
+      "country": "Norway",
+      "navy": "Royal Norwegian Navy",
+      "lat": 60.3381,
+      "lon": 5.2228,
+      "classes": "Ula-class SSK",
+      "wiki": "Haakonsvern"
+    },
+    {
+      "name": "INS Varsha, Rambilli",
+      "country": "India",
+      "navy": "Indian Navy",
+      "lat": 17.4305,
+      "lon": 82.8773,
+      "classes": "Arihant-class SSBN, under construction",
+      "wiki": "INS_Varsha"
+    }
+  ]
+}

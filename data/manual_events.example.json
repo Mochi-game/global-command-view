@@ -1,0 +1,16 @@
+{
+  "note": "Hand-entered from published reports. Nothing here came from a feed, and the app labels it so. The live file, manual_events.json, is ignored by git because its contents are yours.",
+  "events": [
+    {
+      "id": "example-event",
+      "kind": "outbreak",
+      "title": "Example entry",
+      "place": "Somewhere",
+      "lat": 59.3251,
+      "lon": 18.071,
+      "when": "2026-01-01",
+      "url": "https://example.org/the-report-you-read",
+      "note": "Why you trusted this, and what it does not say."
+    }
+  ]
+}

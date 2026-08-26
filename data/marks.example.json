@@ -1,0 +1,14 @@
+{
+  "note": "Saved camera views. The app writes data/marks.json, which is ignored by git because saved views are personal - they are the places you care about, by name. Copy this to marks.json to start.",
+  "marks": [
+    {
+      "id": "example-1",
+      "name": "Gamla stan",
+      "lon": 18.071,
+      "lat": 59.3251,
+      "height": 900.0,
+      "heading": 0.0,
+      "pitch": -0.6
+    }
+  ]
+}

@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Global Command View</title>
+<link rel="stylesheet" href="https://unpkg.com/cesium@1.132.0/Build/Cesium/Widgets/widgets.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div id="globe"></div>
+<div id="scanlines"></div>
+
+<header id="topbar">
+  <div class="brand">
+    <span class="mark">◎</span>
+    <span>GLOBAL COMMAND VIEW</span>
+    <span id="version" class="ver" title="build running in this tab">v—</span>
+    <span class="sub">open source spatial intelligence</span>
+  </div>
+  <div class="tabs">
+    <button id="tab-help" class="tab">HELP</button>
+    <button id="tab-setup" class="tab">SETUP</button>
+  </div>
+  <div class="readout">
+    <span id="telemetry">VIS:0 SRC:0 DENS:0 0.0ms</span>
+    <span id="clock">--:--:--Z</span>
+    <span id="cursor">--.---- , ---.----</span>
+    <span id="kp-readout" title="planetary K index from NOAA SWPC — geomagnetic activity, 0 to 9"></span>
+    <span id="moon-readout" title="distance and phase, from the same ephemeris Cesium draws it with"></span>
+    <span id="place" title="region under the camera, from OpenStreetMap"></span>
+    <span id="altitude">EYE --- km</span>
+    <span id="safe-badge" hidden>SAFE</span><span id="imagery" title="when the satellite image under the crosshair was taken">IMG ----</span>
+  </div>
+</header>
+
+<div id="classification">UNCLASSIFIED // OPEN SOURCE // PUBLIC FEEDS ONLY</div>
+
+<aside id="panel">
+  <!-- Built from the sections themselves, so adding one cannot leave it
+       unreachable at the bottom of a six-thousand-pixel column. -->
+  <nav id="section-index"></nav>
+  <section class="block">
+    <h2 data-section="layers">Layers</h2>
+    <ul id="layers"></ul>
+  </section>
+
+  <section class="block">
+    <h2 data-section="optics">Optics</h2>
+    <div id="styles" class="chips"></div>
+    <label class="toggle-row">
+      <input type="checkbox" id="lighting" checked>
+      <span>Sun terminator</span>
+    </label>
+    <label class="toggle-row">
+      <input type="checkbox" id="grain" checked>
+      <span>Sensor grain</span>
+    </label>
+  </section>
+
+  <section class="block">
+    <h2 data-section="detection">Detection</h2>
+    <button id="detect" class="mode-btn active">DETECTION ON</button>
+    <label class="slider-row">
+      <span>Density</span>
+      <input type="range" id="density" min="8" max="120" step="4" value="40">
+      <output id="density-out">40</output>
+    </label>
+  </section>
+
+  <section class="block">
+    <h2 data-section="descent">Descent</h2>
+    <button id="ground" class="mode-btn">DROP TO GROUND</button>
+    <button id="standhere" class="mode-btn">STAND HERE · PICK A SPOT</button>
+    <label class="toggle-row">
+      <input type="checkbox" id="buildings" checked>
+      <span>OSM buildings</span>
+    </label>
+    <label class="toggle-row" id="terrain-row" hidden>
+      <input type="checkbox" id="terrain" checked>
+      <span>World terrain</span>
+    </label>
+    <label class="toggle-row" id="photoreal-row" hidden>
+      <input type="checkbox" id="photoreal">
+      <span>Photoreal 3D</span>
+    </label>
+    <!-- A refusal that cannot be fixed by trying again belongs next to the
+         switch, not in a feed that scrolls it away inside two minutes. -->
+    <p id="photoreal-blocked" class="note" hidden></p>
+    <a id="quota" href="https://console.cloud.google.com/google/maps-apis/quotas"
+       target="_blank" rel="noreferrer" hidden></a>
+    <label class="toggle-row">
+      <input type="checkbox" id="streetview" checked>
+      <span>Street-level photos</span>
+    </label>
+  </section>
+
+  <section class="block">
+    <h2 data-section="tracks">Tracks</h2>
+    <label class="toggle-row">
+      <input type="checkbox" id="vectors" checked>
+      <span>Course vector, 10 min</span>
+    </label>
+    <label class="toggle-row">
+      <input type="checkbox" id="wakes">
+      <span>Wake, last 8 reports</span>
+    </label>
+    <div class="readout-line"><span id="track-cost">—</span></div>
+  </section>
+
+  <section class="block">
+    <h2 data-section="tools">Tools</h2>
+    <button id="measure" class="mode-btn">MEASURE DISTANCE</button>
+    <div id="measure-readout" class="readout-line" hidden>
+      <span id="measure-total">0 m</span>
+      <span id="measure-legs">no legs</span>
+    </div>
+  </section>
+
+  <section class="block">
+    <h2 data-section="recon">Recon</h2>
+    <p class="adds">
+      Registry lookups. Everything here is published by the registries
+      themselves &mdash; nothing touches the target, and private addresses are
+      refused.
+    </p>
+    <div class="recon-row">
+      <select id="recon-kind">
+        <option value="dns">DNS &rarr; A record</option>
+        <option value="geo">IP &rarr; location</option>
+        <option value="ports">IP &rarr; open ports</option>
+        <option value="whois">IP &rarr; RDAP owner</option>
+        <option value="net">IP &rarr; network / ASN</option>
+      </select>
+      <input type="text" id="recon-target" placeholder="svt.se or 8.8.8.8">
+      <button id="recon-go" class="chip">LOOK UP</button>
+    </div>
+    <pre id="recon-out"></pre>
+  </section>
+
+  <section class="block">
+    <h2 data-section="own">Own entries</h2>
+    <p class="adds">
+      Things you read about that no feed carries. Fly to the spot first &mdash;
+      the camera gives the position. Drawn in amber and always labelled
+      hand-entered.
+    </p>
+    <input type="text" id="own-title" placeholder="what happened" maxlength="80">
+    <input type="text" id="own-place" placeholder="where (in words)" maxlength="120">
+    <input type="text" id="own-url" placeholder="link to the source (required)">
+    <textarea id="own-detail" placeholder="detail, optional" rows="2" maxlength="1200"></textarea>
+    <button id="own-add" class="chip">ADD AT THIS VIEW</button>
+    <ul id="own-list"></ul>
+  </section>
+
+  <section class="block">
+    <h2 data-section="marks">Marks</h2>
+    <div class="mark-add">
+      <input type="text" id="mark-name" placeholder="name this view" maxlength="40">
+      <button id="mark-save" class="chip">MARK</button>
+    </div>
+    <ul id="marks"></ul>
+  </section>
+
+  <section class="block">
+    <h2 data-section="costs">Google spend</h2>
+    <div id="meters"></div>
+    <a id="meters-link" href="https://console.cloud.google.com/google/maps-apis/metrics"
+       target="_blank" rel="noreferrer">GOOGLE'S OWN FIGURE</a>
+  </section>
+
+  <section class="block">
+    <h2 data-section="broadcast">Broadcast</h2>
+    <label class="toggle-row">
+      <input type="checkbox" id="safe">
+      <span>Commercial-safe sources</span>
+    </label>
+    <p id="safe-note" class="adds"></p>
+    <label class="toggle-row">
+      <input type="checkbox" id="tour">
+      <span>Auto tour the briefing</span>
+    </label>
+    <label class="toggle-row">
+      <input type="checkbox" id="autooptics" checked>
+      <span>Match optics to the event</span>
+    </label>
+    <label class="toggle-row">
+      <input type="checkbox" id="handover" checked>
+      <span>Hand over below the NASA ceiling</span>
+    </label>
+    <div class="slider-row">
+      <label for="tilt">View angle</label>
+      <input type="range" id="tilt" min="-90" max="-12" step="1" value="-40">
+      <output id="tilt-out">40&deg;</output>
+    </div>
+    <div class="slider-row">
+      <label for="dayback">Imagery day</label>
+      <input type="range" id="dayback" min="0" max="21" step="1" value="0">
+      <output id="dayback-out">today</output>
+    </div>
+    <button id="present" class="mode-btn">PRESENT · HIDE THE PANEL</button>
+    <p class="adds">P toggles it, Esc leaves. The tour keeps running either way.</p>
+  </section>
+
+  <section class="block">
+    <h2 data-section="briefing">Briefing</h2>
+    <div class="brief-head">
+      <button id="brief-refresh" class="chip">REFRESH</button>
+      <span id="brief-when"></span>
+    </div>
+    <ol id="brief-list"></ol>
+  </section>
+
+  <section class="block">
+    <h2 data-section="jump-to">Jump to</h2>
+    <div id="places" class="chips"></div>
+  </section>
+
+  <section class="block grow">
+    <h2 data-section="feed-log">Feed log</h2>
+    <ol id="log"></ol>
+  </section>
+
+  <a id="coffee" href="https://buymeacoffee.com/myriskdashk" target="_blank" rel="noreferrer">
+    <span>&#9749;</span><span>If you like it, buy me a coffee</span>
+  </a>
+
+
+
+  <footer class="sources">
+    Public feeds: OpenSky Network · Digitraffic (AIS &amp; road cameras) ·
+    TeleGeography submarine cable map · CARTO / OSM / Esri imagery
+  </footer>
+</aside>
+
+<!-- Overlays live outside the panel on purpose: inside it they positioned
+     themselves against the panel rather than the window, and the stage was
+     hidden along with the panel in presentation mode. -->
+<div id="stage" hidden>
+  <div id="stage-title">GLOBAL COMMAND VIEW</div>
+  <div id="stage-lower">
+    <span id="stage-kind"></span>
+    <span id="stage-head"></span>
+    <span id="stage-why"></span>
+  </div>
+  <div id="stage-mark"></div>
+</div>
+<div id="legend" hidden></div>
+
+<!-- Outside the detail card on purpose: the card is emptied every time
+     something else is clicked, and an audio element emptied out of the DOM
+     stops playing. This survives. -->
+<div id="nowplaying" hidden>
+  <div class="np-head">
+    <span class="np-tag">ON AIR</span>
+    <span id="np-name"></span>
+    <button id="np-stop" title="stop">&times;</button>
+  </div>
+  <audio id="np-audio" controls preload="none"></audio>
+  <span id="np-where"></span>
+</div>
+
+<section id="detail" hidden>
+  <button id="detail-close" aria-label="Close">×</button>
+  <h3 id="detail-title">—</h3>
+  <p id="detail-kind" class="kind">—</p>
+  <div id="detail-views" class="views" hidden>
+    <button id="view-prev" class="chip">‹</button>
+    <span id="view-label">1 / 1</span>
+    <button id="view-next" class="chip">›</button>
+  </div>
+  <img id="detail-image" alt="" hidden title="Click to enlarge">
+  <button id="follow" class="mode-btn" hidden>FOLLOW</button>
+  <button id="project" class="mode-btn" hidden>PROJECT ONTO GROUND</button>
+
+  <div id="calibration" hidden>
+    <h4>Calibration</h4>
+    <label class="slider-row"><span>Heading</span>
+      <input type="range" id="cal-heading" min="0" max="359" step="1" value="0">
+      <output id="cal-heading-out">0&deg;</output></label>
+    <label class="slider-row"><span>Field</span>
+      <input type="range" id="cal-fov" min="15" max="120" step="1" value="55">
+      <output id="cal-fov-out">55&deg;</output></label>
+    <label class="slider-row"><span>Range</span>
+      <input type="range" id="cal-range" min="40" max="1200" step="10" value="260">
+      <output id="cal-range-out">260 m</output></label>
+    <div class="chips">
+      <button id="cal-save" class="chip">SAVE CAL</button>
+      <button id="cal-reset" class="chip">RESET</button>
+    </div>
+  </div>
+  <dl id="detail-fields"></dl>
+</section>
+
+<div id="standing" hidden>
+  <span class="tag">EYES ON</span>
+  <span id="standing-where">—</span>
+  <span id="standing-look">HDG ---°</span>
+  <span class="hint">drag to look · arrows to walk and turn · scroll to zoom · Esc to leave</span>
+  <label class="gsv-toggle"><input type="checkbox" id="gsv" checked>Street View</label>
+</div>
+
+<!-- Google's own 3D renderer. It cannot share Cesium's canvas, so it sits over
+     it and the two hand the camera to each other. -->
+<div id="map3d" hidden></div>
+
+<div id="gsv-panel" hidden>
+  <!-- The interactive panorama, not a still. Street View Static content may not
+       be shown next to a map under the EEA terms; this product may. -->
+  <div id="gsv-pano"></div>
+  <div class="gsv-foot">
+    <span id="gsv-note"></span>
+    <button id="gsv-expand" class="chip">EXPAND</button>
+  </div>
+</div>
+
+
+<div id="guide" hidden>
+  <div class="guide-panel">
+    <header class="guide-head">
+      <button class="guide-tab active" data-tab="use">HOW TO USE</button>
+      <button class="guide-tab" data-tab="keys">ACCOUNTS &amp; KEYS</button>
+      <button class="guide-tab" data-tab="sources">SOURCES &amp; LICENCES</button>
+      <button class="guide-tab" data-tab="limits">LIMITS &amp; FALLBACKS</button>
+      <button class="guide-tab" data-tab="about">WHAT THIS IS</button>
+      <button id="guide-close" aria-label="Close">×</button>
+    </header>
+
+    <section class="guide-body" id="guide-use">
+      <h3>What this is</h3>
+      <p>
+        A live picture of the world built only from public feeds: aircraft, ships,
+        satellites, submarine cables, road cameras, earthquakes. Everything is
+        labelled with where it came from, and everything that is a guess says so.
+      </p>
+
+      <h3>1 · Moving around</h3>
+      <ul>
+        <li><b>Drag</b> to turn the globe, <b>scroll</b> to zoom.</li>
+        <li><b>Middle-drag</b>, or <b>Ctrl-drag</b>, to tilt the camera.</li>
+        <li><b>Jump to</b> in the left panel has preset views. Click a section
+          heading to fold it away when the panel gets crowded.</li>
+      </ul>
+
+      <h3>2 · Layers</h3>
+      <p>
+        Each row in <b>Layers</b> is a feed with a live count. Click to switch it
+        off. Most layers only load what is in view, so panning somewhere new
+        fetches that area rather than the whole planet.
+      </p>
+      <p>Everything starts <b>off</b> except names and borders and the public
+        cameras, and a layer that is off is not fetched at all &mdash; switching
+        it on is what loads it. That keeps the start quiet and the bill small.</p>
+
+      <p><b>Ground change</b> is the group worth knowing about. Radar
+        backscatter, ground disturbance and surface water all come from NASA's
+        OPERA products at about 30&nbsp;m, and the radar ones are the only layers
+        here that see through cloud and darkness &mdash; which is usually exactly
+        when something is happening. They lag by a couple of days, because a
+        swath has to be flown and processed, and each one prints its own date in
+        the feed. This is imagery of something that happened, not a live view.</p>
+
+      <p><b>Data centres &amp; dams</b> are queried live from OpenStreetMap for
+        whatever is on screen, so they need you to zoom in; at world scale the
+        feed says so rather than drawing an empty map that reads as
+        &ldquo;there are no dams&rdquo;. Most dams in OpenStreetMap have no name
+        and the card says <i>unnamed</i> rather than guessing one.</p>
+
+      <p><b>Rocket launches</b> are a schedule, not a fact. The status is printed
+        untranslated &mdash; Go, TBD, Hold &mdash; and anything not Go is drawn
+        dim, because half of spaceflight slips to the right.</p>
+
+      <p>
+        To isolate one thing — say police helicopters — switch off the layers
+        around it. <b>Police &amp; state air</b> and <b>Capital ships</b> are
+        separate layers exactly for that.
+      </p>
+
+      <h3>3 · Detection mode</h3>
+      <p>
+        <b>DETECTION ON</b> puts a reticle and a designator on contacts:
+        <code>SAT-37218</code>, <code>MIL-GAF942</code>, <code>POL-BPO317</code>,
+        <code>SEA-265068000</code>. The <b>Density</b> slider sets how many are
+        labelled. The screen is divided into cells and each cell surrenders its
+        most central contact, so labels spread out instead of piling up.
+      </p>
+
+      <h3>4 · Optics</h3>
+      <ul>
+        <li><b>OPS</b> — dark cartographic base, best for reading positions.</li>
+        <li><b>SATELLITE</b> — aerial imagery.</li>
+        <li><b>THERMAL</b>, <b>NIGHT VIS</b>, <b>FLIR</b> — sensor emulations.</li>
+        <li><b>CRT</b> — a real post-process pass: barrel distortion, scan lines,
+          chromatic separation.</li>
+      </ul>
+
+      <h3>5 · Clicking things</h3>
+      <p>
+        Any contact opens a card. Aircraft carry a photograph of the airframe and,
+        when the flight is scheduled, the route drawn on the globe — solid from the
+        origin to where it is now, dashed onward. Ships carry a photograph from
+        Wikimedia Commons where one exists. Cameras carry their live image; click
+        the image for a full-screen viewer with scroll-to-zoom.
+      </p>
+      <p>Click the <b>ISS</b> in the satellite layer and the card lists its
+        next passes over wherever the camera is pointed &mdash; start time, how
+        high it climbs, how long it lasts and how close it gets. Worked out from
+        the same orbit the dot on screen is drawn from, so the two agree by
+        construction. Nothing below ten degrees is listed: lower than that it is
+        behind whatever is on your horizon, and printing it would be a promise
+        the sky does not keep.</p>
+
+      <p>A <b>calibrated camera</b> also gets a cone on the ground showing what
+        it can see. Only calibrated ones: the feeds carry a position and nothing
+        else, so for any other camera the direction would be invented. Set it
+        with PROJECT ONTO GROUND and the calibration sliders, and the cone
+        appears as you save.</p>
+
+      <p>
+        Moving contacts get a <b>FOLLOW</b> button: the camera locks on and stays
+        locked while you orbit around it. Cameras get <b>PROJECT ONTO GROUND</b>,
+        which paints the live frame onto the map — aim it with the calibration
+        sliders, since no camera feed publishes which way it points.
+      </p>
+
+      <h3>6 · Going down to the ground</h3>
+      <ul>
+        <li><b>DROP TO GROUND</b> dives to roughly 300 m.</li>
+        <li><b>STAND HERE</b> then a click puts you on the spot at eye height.
+          Drag turns your head, the wheel is a zoom lens, Esc lifts you out.</li>
+        <li><b>OSM buildings</b> are extruded footprints with real heights — grey
+          boxes, not photogrammetry.</li>
+        <li><b>Street-level photos</b> are the little arrows on the ground, real
+          photographs from KartaView. Click one to open it.</li>
+      </ul>
+
+      <h3>7 · Measuring and marking</h3>
+      <p>
+        <b>MEASURE DISTANCE</b> turns clicks into legs with a running total,
+        measured on the ellipsoid. It is how you tell a 170 m submarine from a
+        110 m one. <b>MARK</b> saves the whole camera — position, height, heading
+        and pitch — under a name, so you return to the view and not just the spot.
+        Marks are kept in a file on the server and survive everything.
+      </p>
+
+      <h3>8 · Reading the top bar</h3>
+      <ul>
+        <li><code>VIS / SRC / DENS</code> — contacts labelled, contacts visible,
+          label density, and how long a detection pass took.</li>
+        <li><code>EYE</code> — camera height.</li>
+        <li><code>IMG</code> — <b>when the satellite image under you was taken</b>,
+          with its resolution. Hover for the provider and age; it turns warm past
+          two years. The map always looks live and never is.</li>
+      </ul>
+
+      <h3>What is real and what is not</h3>
+      <ul>
+        <li><b>Real observations:</b> aircraft, ships on AIS, cameras, earthquakes,
+          cable routes, satellite orbits.</li>
+        <li><b>Modelled:</b> nothing. A simulated traffic layer was removed in
+          0.49 — it was labelled honestly, but a moving dot that is not a car is
+          decoration, and there is no feed of where cars actually are.</li>
+        <li><b>Estimated:</b> capital ships. Carriers do not broadcast; those are
+          last-reported operating areas from the USNI weekly tracker, drawn with a
+          ring showing the uncertainty and dated on the card.</li>
+        <li><b>Not tracked at all:</b> submarines. The layer marks where they are
+          based. Fly there, read the imagery date, and measure what is at the pier.</li>
+      </ul>
+    </section>
+
+    <section class="guide-body" id="guide-keys" hidden>
+      <p>
+        The app works with no accounts at all. Each key below adds coverage that
+        the free-for-all sources do not reach. Paste one in and press <b>Save</b> —
+        it is written to <code>keys.json</code> beside the app and takes effect
+        immediately, no restart.
+      </p>
+      <p class="guide-note">
+        Keys are stored in plain text on this machine and are never sent anywhere
+        except to the service they belong to. The page never shows a key back to
+        you once saved — only whether one is set.
+      </p>
+      <div id="key-rows"></div>
+
+    </section>
+
+    <section class="guide-body" id="guide-sources" hidden>
+      <p>
+        Every feed this app draws from, and what its licence allows. The short
+        version: <b>giving this away is fine, selling it is not</b> — several
+        sources permit non-commercial use only.
+      </p>
+      <p class="guide-note">
+        A voluntary tip is not a sale. A payment somebody <i>has to</i> make to
+        get the app or unlock a feature is, whatever it is called — and that
+        breaks the terms below. Keep every feature free for everyone and the
+        coffee stays a thank-you.
+      </p>
+      <div id="source-rows"></div>
+    </section>
+
+    <section class="guide-body" id="guide-limits" hidden>
+      <p>
+        Every feed here is free, and free comes with edges. This is what the
+        edges look like from the inside, so that a layer reading zero can be
+        told apart from a layer that is broken.
+      </p>
+
+      <h3>When a count says zero</h3>
+      <ul>
+        <li><b>Air traffic at global zoom.</b> OpenSky is the only source that
+          answers for the whole planet, and its free tier is a daily credit
+          allowance. When it is spent the server logs
+          <i>opensky quota spent, falling back to adsb.fi</i> and switches. The
+          fallback can only be asked in circles around wherever you are looking
+          — eight of 250 nm — which covers almost nothing from 24 000 km up.
+          <b>Zoom in and the aircraft come back:</b> the same moment a global
+          view showed 0, Europe showed 1 468. The quota resets by itself.</li>
+        <li><b>Anything, when you are zoomed in.</b> Contacts outside the view
+          are hidden on purpose — thirty thousand of them at once is what made
+          the app stutter. The counts are what is in frame, not what exists.</li>
+        <li><b>Vessels outside the Baltic.</b> Digitraffic is Finnish and covers
+          the Baltic properly. Worldwide AIS comes from aisstream, which has been
+          connected and silent for a long stretch — their own issue tracker says
+          so. The feed log states which source answered.</li>
+      </ul>
+
+      <h3>What each key costs, and what runs out</h3>
+      <ul>
+        <li><b>Cesium ion</b> — terrain and 3D buildings. Community tier is free
+          and licensed for <i>personal, non-commercial</i> use. No metering that
+          matters here.</li>
+        <li><b>OpenAQ</b> &mdash; air quality. Free key, generous limits.
+          Without it the layer says so in the feed rather than drawing
+          nothing.</li>
+        <li><b>Global Fishing Watch</b> &mdash; fishing, encounters and
+          transponder gaps. Free token, but granted by hand rather than
+          instantly, so expect a wait.</li>
+        <li><b>TomTom</b> &mdash; measured traffic flow. Free tier. Restrict the
+          key by referrer the way the Google one is: the browser fetches the
+          tiles directly, so the key reaches the page.</li>
+        <li><b>NASA OPERA, Launch Library, OpenStreetMap</b> &mdash; no account
+          at all. Nothing to run out.</li>
+        <li><b>Google photoreal 3D</b> — billed per <i>root tile request</i>,
+          which is one per session however far you fly afterwards.
+          <b>1 000 free a month.</b> The switch asks for exactly one, the first
+          time it goes on.<br>
+          <b>Lost to the EEA terms.</b> Google does not serve satellite
+          tiles or photorealistic 3D tiles to projects billed to an address in
+          the European Economic Area, and answers <code>403</code>. A project
+          created <b>on or after 8 July 2025</b> with EEA billing is not
+          eligible for the exemption at all. One created before that date keeps
+          it only while it is <i>not materially modified</i> &mdash; and
+          enabling another Maps Platform service in the console counts, Street
+          View among them. Google document no way back from either. Note the
+          date that matters is the <b>Cloud project&rsquo;s</b>, not this
+          app&rsquo;s. World terrain and worldwide 3D buildings from Cesium ion
+          are unaffected.</li>
+        <li><b>Google Street View</b> — billed per image.
+          <b>10 000 free a month.</b> The metadata check that decides whether a
+          panorama exists at all is free and unlimited, so it is always asked
+          first: a spot with no coverage costs nothing. The view steps in 45°
+          rather than following the mouse, and a spot already visited is reused
+          rather than bought twice.</li>
+        <li><b>Windy webcams</b> — the free tier stops paging at about 1 050 of
+          their 70 000, and is licensed for link-and-embed only.</li>
+        <li><b>OpenSky</b> — daily credits, as above.</li>
+        <li><b>Trafikverket, Digitraffic, aisstream</b> — free, no meaningful
+          cap.</li>
+      </ul>
+      <p class="guide-note">
+        <b>Google spend</b> in the panel shows what is left rather than what is
+        spent, amber at 80 per cent and red at the cap. It counts what this app
+        asked for; the console linked beneath it is the authority.
+      </p>
+
+      <h3>Ceilings you will notice</h3>
+      <ul>
+        <li><b>NASA imagery stops at 300 m a pixel.</b> FIRE IR and SMOKE come
+          from GIBS, which publishes to zoom level 9 — one screen pixel per
+          image pixel at about 340 km up. Below roughly 140 km the app hands the
+          globe to the sharper commercial mosaic and says so, then gives the
+          false colour back above 280 km. In commercial-safe mode it refuses to
+          hand over, because nothing sharper here has an unambiguous licence.</li>
+        <li><b>Esri imagery stops at level 19</b>, about 30 cm. Level 20 exists
+          in a few places and returns grey elsewhere, so it is not used.</li>
+        <li><b>Street View is 640 × 640</b> and no larger. Asking for 2048
+          returns 640 without mentioning it.</li>
+        <li><b>Overpass buildings</b> come from public mirrors with very few
+          slots. When they all refuse, the app stops asking for five minutes
+          rather than holding the server hostage, and says so.</li>
+        <li><b>Place names</b> come from Nominatim at one request a second, by
+          their terms. A briefing gives it six seconds and then goes out with
+          some rows unlabelled — a missing place beats a briefing that never
+          arrives.</li>
+      </ul>
+
+      <h3>What a number means before you say it aloud</h3>
+      <ul>
+        <li><b>Thermal detections are not wildfires.</b> A gas flare, a volcano,
+          a steel works and a farmer burning stubble all read the same from
+          orbit, and the bulk feed has no field that separates them. The layer is
+          called <i>Thermal</i> for that reason. Fire fronts in the briefing are
+          clustered and ranked by total power, so one hot pixel cannot top the
+          list.</li>
+        <li><b>“No international alert” is not “nobody knows”.</b> GDACS alerts
+          above a threshold in hectares. A local fire service almost certainly
+          knows about a fire GDACS has never heard of.</li>
+        <li><b>Outbreak markers sit on country centroids</b>, because that is the
+          resolution WHO publishes at. The dot is not where the cases are. The
+          date is when WHO published, never when the outbreak ended.</li>
+        <li><b>Aviation radio is mostly out of reach, and the app says which
+          part.</b> Tower and approach are VHF around 118&ndash;137 MHz; the
+          KiwiSDR network stops at 30 MHz, so those receivers physically cannot
+          hear a control tower. What they <i>can</i> hear is oceanic HF &mdash;
+          Shanwick and Gander working aircraft across the Atlantic, and the VOLMET
+          weather loops &mdash; and the tuning presets cover it. For VHF the
+          airport card links to LiveATC, who carry it.</li>
+        <li><b>Listening is legal; it is the only part that is.</b> In the United
+          States, receiving unencrypted radio is lawful under federal law &mdash;
+          the wiretap statute exempts communications readily accessible to the
+          general public, which is what an unencrypted transmission is. Several
+          states restrict <i>using</i> a scanner in a vehicle or while committing
+          an offence, so the state matters. Recording, rebroadcasting and
+          publishing are separate questions from listening, and none of this is
+          legal advice.</li>
+        <li><b>The disease layer only sees international escalation.</b> WHO
+          publishes Disease Outbreak News when something crosses a threshold of
+          international concern. An outbreak a national agency is handling never
+          reaches it — in August 2026 there were 27 measles cases across nine
+          Swedish regions, traced to one festival, and nothing about it appears on
+          this globe. <b>An empty map of Europe is not an empty Europe.</b> There
+          is no open, keyless, real-time feed of national outbreaks to add; for
+          those, ask the country's own agency, or ECDC for Europe.</li>
+        <li><b>A nearby alert may be a different event.</b> When a fire cluster
+          matches an alert 149 km away, the distance is shown rather than
+          smoothed over.</li>
+        <li><b>Quakes are ranked by magnitude across seven days</b>, so a large
+          old one can outrank a fresh smaller one. Every row carries its age.</li>
+        <li><b>Carriers are estimates</b> from a weekly published tracker, drawn
+          with an uncertainty ring and dated. Submarines are not tracked at all —
+          that layer marks bases.</li>
+      </ul>
+
+      <h3>What is deliberately not here</h3>
+      <p>
+        This app was built alongside a much larger open-source project in the
+        same field, and most of what that project reads openly is now read here
+        too &mdash; with our own client code, so this stays MIT. These are the
+        ones that did not make it, and why. A gap with a reason is worth more
+        than a feature that half works.</p>
+      <ul>
+        <li><b>Telegram channel scraping.</b> Technically simple and left out on
+          purpose: it means republishing war footage from channels with agendas,
+          geoparsed by guesswork onto a map. The honesty this app is built
+          around does not survive that.</li>
+        <li><b>Shodan device search.</b> Deliberately not drawn as a map. A
+          chart of individually located exposed cameras and control systems, on
+          a public stream, is a targeting aid rather than a picture of the
+          world. The keyless half &mdash; open ports and known vulnerabilities
+          for one address you type in &mdash; is in the Recon panel already, and
+          a per-country count would be the honest way to draw the rest.</li>
+        <li><b>Copernicus EGMS millimetre subsidence.</b> Ground sinking a few
+          millimetres a year, which is how you see a mine or an aquifer give
+          way before anything is visible. It wants an account and a different
+          kind of tiling than anything here does. A real gap, not a principle.</li>
+        <li><b>Finnish train positions.</b> Digitraffic's train endpoint answers
+          406 to every Accept header tried, while the same host's ships and
+          cameras work. Absent rather than broken.</li>
+        <li><b>Scanner <i>audio</i>.</b> The OpenMHZ system list loads and the
+          layer draws; playing the recorded calls in-page is what does not, and
+          each system's own page is one click away on the card.</li>
+      </ul>
+
+      <h3>If something looks wrong</h3>
+      <ul>
+        <li><b>Read the feed log</b> at the bottom of the panel. Every failure
+          writes a line there in plain words, including which source answered and
+          why one refused.</li>
+        <li><b>Check the version chip</b> beside the title. If it reads
+          <code>v—</code> the app did not finish starting, and nothing on screen
+          can be trusted.</li>
+        <li><b>Run the check.</b> <code>Check Global Command View</code> in the
+          project folder reads the files, calls every feed and says what broke.
+          A green result means it boots and every source answers — not that the
+          picture is right. That still needs your eyes.</li>
+        <li><b>Do not minimise the window while recording.</b> Browsers throttle
+          hidden windows, and the globe then stops streaming tiles. Keep it
+          visible behind OBS, or on a second screen.</li>
+      </ul>
+    </section>
+
+    <section class="guide-body" id="guide-about" hidden>
+      <h3>The argument</h3>
+      <p>An open-source globe is easy to make impressive and hard to make honest.
+        Anything at all can be drawn as a moving dot. The question nobody asks of
+        a dashboard is the only one that matters: <b>is that dot a measurement, a
+        guess, or a decoration?</b></p>
+
+      <p>This app answers it everywhere it can &mdash; in the layer note, in the
+        feed log, and on the card when you click a thing. Those answers use four
+        words, and they mean specific things.</p>
+
+      <h3>The four kinds of thing on this globe</h3>
+      <ul>
+        <li><b>Measured.</b> A sensor or a transponder reported it and the app is
+          passing it on. An aircraft broadcasting ADS-B, a ship on AIS, a
+          seismograph, a radar swath. The position is as good as the instrument.</li>
+        <li><b>Inferred.</b> A model turned measurements into a conclusion.
+          Satellite positions propagated from orbital elements, a vessel's
+          behaviour read out of its track, internet outages deduced from three
+          methods agreeing. Right most of the time, and wrong in ways that look
+          just as confident.</li>
+        <li><b>An area, not a point.</b> Known to be somewhere in a region and
+          drawn at its centre with a ring the size of the region. Carriers, whose
+          weekly tracker names a sea. Outbreak reports that name a country. The
+          ring is the honest part &mdash; without it the dot would be a lie.</li>
+        <li><b>Hand-entered.</b> Somebody read it and typed it in, with a source
+          link. No feed saw it. Own entries, and the catalogue layers where a
+          curator, not a sensor, decided the thing was worth listing.</li>
+      </ul>
+
+      <h3>Things this deliberately does not do</h3>
+      <p>It does not smooth a gap into a line, invent a heading for a camera that
+        never reported one, or animate a vehicle that no feed can see. Simulated
+        traffic was built here once and taken out the next day, because a moving
+        dot that is not a car is worse than no dot at all: it looks like
+        information.</p>
+      <p>When a source is silent the feed says which one and why. <b>A count of
+        zero means the feed answered and had nothing</b> &mdash; it never means
+        the app gave up quietly.</p>
+
+      <h3>Where it runs</h3>
+      <p>On your machine. One Python file serving a browser page, no account
+        needed for most of it, no telemetry, and no server but the one on your
+        own disk. What leaves your computer are requests to the public feeds
+        listed under SOURCES &amp; LICENCES, and nothing else.</p>
+
+      <p class="note">A fuller description, with screenshots, lives in
+        <b>Global Command View.html</b> next to the app folder.</p>
+    </section>
+  </div>
+</div>
+
+<div id="lightbox" hidden>
+  <img id="lightbox-image" alt="">
+  <div id="lightbox-hud">
+    <span id="lightbox-title">—</span>
+    <span id="lightbox-zoom">100%</span>
+    <span class="hint">scroll to zoom · drag to pan · esc to close</span>
+  </div>
+</div>
+
+<div id="boot">
+  <div class="boot-inner">
+    <span class="mark">◎</span>
+    <p>acquiring feeds…</p>
+  </div>
+</div>
+
+<script>window.CESIUM_BASE_URL = 'https://unpkg.com/cesium@1.132.0/Build/Cesium/';</script>
+<script src="https://unpkg.com/cesium@1.132.0/Build/Cesium/Cesium.js"></script>
+<script src="https://unpkg.com/satellite.js@5.0.0/dist/satellite.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

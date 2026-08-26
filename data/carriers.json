@@ -1,0 +1,119 @@
+{
+  "source": "USNI News Fleet and Marine Tracker",
+  "url": "https://news.usni.org/2026/08/17/usni-news-fleet-and-marine-tracker-aug-17-2026",
+  "as_of": "2026-08-17",
+  "note": "Approximate positions of capital ships, as published weekly by the U.S. Naval Institute from Navy and public reporting. Carriers do not broadcast AIS; these are last-reported operating areas, not live tracks. Refresh by reading the newest tracker and editing this file.",
+  "ships": [
+    {
+      "hull": "CVN-72",
+      "name": "USS Abraham Lincoln",
+      "class": "Nimitz",
+      "kind": "carrier",
+      "area": "Arabian Sea",
+      "status": "Carrier Strike Group 3, Operation Epic Fury · 272 days deployed, relief by the George Washington group expected",
+      "lat": 18.0,
+      "lon": 62.0,
+      "uncertainty_km": 450,
+      "wiki": "USS_Abraham_Lincoln_(CVN-72)"
+    },
+    {
+      "hull": "CVN-77",
+      "name": "USS George H.W. Bush",
+      "class": "Nimitz",
+      "kind": "carrier",
+      "area": "Arabian Sea",
+      "status": "deployed in the Arabian Sea with the Boxer ARG · still listed there 20 August",
+      "lat": 15.5,
+      "lon": 64.5,
+      "uncertainty_km": 500,
+      "wiki": "USS_George_H.W._Bush"
+    },
+    {
+      "hull": "CVN-73",
+      "name": "USS George Washington",
+      "class": "Nimitz",
+      "kind": "carrier",
+      "area": "Arabian Sea",
+      "status": "arrived in the CENTCOM area 19 August per CENTCOM, with CG-62 and DDG-86 · expected to relieve the Abraham Lincoln strike group",
+      "lat": 16.0,
+      "lon": 61.0,
+      "uncertainty_km": 650,
+      "wiki": "USS_George_Washington_(CVN-73)",
+      "as_of": "2026-08-20",
+      "source": "USNI News",
+      "url": "https://news.usni.org/2026/08/20/carrier-uss-george-washington-now-in-the-middle-east"
+    },
+    {
+      "hull": "CVN-70",
+      "name": "USS Carl Vinson",
+      "class": "Nimitz",
+      "kind": "carrier",
+      "area": "off San Diego",
+      "status": "departed San Diego on Monday, per ship spotters",
+      "lat": 32.4,
+      "lon": -117.6,
+      "uncertainty_km": 400,
+      "wiki": "USS_Carl_Vinson"
+    },
+    {
+      "hull": "CVN-79",
+      "name": "USS John F. Kennedy",
+      "class": "Ford",
+      "kind": "carrier",
+      "area": "Newport News, Virginia",
+      "status": "returned Saturday from acceptance trials",
+      "lat": 36.98,
+      "lon": -76.43,
+      "uncertainty_km": 8,
+      "wiki": "USS_John_F._Kennedy_(CVN-79)"
+    },
+    {
+      "hull": "LHD-4",
+      "name": "USS Boxer",
+      "class": "Wasp",
+      "kind": "amphibious assault",
+      "area": "Arabian Sea",
+      "status": "Boxer ARG with the 11th Marine Expeditionary Unit",
+      "lat": 20.0,
+      "lon": 60.0,
+      "uncertainty_km": 450,
+      "wiki": "USS_Boxer_(LHD-4)"
+    },
+    {
+      "hull": "LHA-7",
+      "name": "USS Tripoli",
+      "class": "America",
+      "kind": "amphibious assault",
+      "area": "Sasebo, Japan",
+      "status": "in port",
+      "lat": 33.16,
+      "lon": 129.72,
+      "uncertainty_km": 6,
+      "wiki": "USS_Tripoli_(LHA-7)"
+    },
+    {
+      "hull": "LHD-8",
+      "name": "USS Makin Island",
+      "class": "Wasp",
+      "kind": "amphibious assault",
+      "area": "off San Diego",
+      "status": "departed San Diego on Friday, per ship spotters",
+      "lat": 32.2,
+      "lon": -118.2,
+      "uncertainty_km": 500,
+      "wiki": "USS_Makin_Island_(LHD-8)"
+    },
+    {
+      "hull": "LHD-2",
+      "name": "USS Essex",
+      "class": "Wasp",
+      "kind": "amphibious assault",
+      "area": "San Diego",
+      "status": "arrived 14 August",
+      "lat": 32.68,
+      "lon": -117.18,
+      "uncertainty_km": 6,
+      "wiki": "USS_Essex_(LHD-2)"
+    }
+  ]
+}

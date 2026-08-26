@@ -1,0 +1,10 @@
+.cache/
+__pycache__/
+keys.json
+
+# Yours, not the app's. marks.json holds saved views by name, which for a
+# real user means the coordinates of real homes; usage.json is a running
+# tally of what you have spent at Google. Examples of both ship instead.
+data/marks.json
+data/usage.json
+data/manual_events.json

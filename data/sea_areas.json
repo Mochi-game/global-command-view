@@ -1,0 +1,755 @@
+{
+  "note": "Centres and extents of the areas USNI name in the Fleet and Marine Tracker. The tracker says 'In the Arabian Sea' and never a position, so a ship placed from it is drawn at the centre of that area with a ring covering the whole of it. The ring is the claim: an area is not a position. Ports get small rings because a ship at a pier really is somewhere. Geography, so not anyone's data.",
+  "areas": {
+    "adriatic sea": {
+      "lat": 43.0,
+      "lon": 15.0,
+      "radius_km": 250,
+      "kind": "sea"
+    },
+    "aegean sea": {
+      "lat": 38.5,
+      "lon": 25.0,
+      "radius_km": 250,
+      "kind": "sea"
+    },
+    "amami oshima and yokoate island": {
+      "lat": 28.6,
+      "lon": 129.3,
+      "radius_km": 120,
+      "kind": "sea"
+    },
+    "andaman sea": {
+      "lat": 10.0,
+      "lon": 96.0,
+      "radius_km": 400,
+      "kind": "sea"
+    },
+    "antarctic": {
+      "lat": -70.0,
+      "lon": 0.0,
+      "radius_km": 2000,
+      "kind": "sea"
+    },
+    "arabian gulf": {
+      "lat": 26.5,
+      "lon": 52.0,
+      "radius_km": 350,
+      "kind": "sea"
+    },
+    "arabian sea": {
+      "lat": 15.0,
+      "lon": 63.0,
+      "radius_km": 700,
+      "kind": "sea"
+    },
+    "arafura sea": {
+      "lat": -9.5,
+      "lon": 135.0,
+      "radius_km": 450,
+      "kind": "sea"
+    },
+    "atlantic": {
+      "lat": 25.0,
+      "lon": -45.0,
+      "radius_km": 2200,
+      "kind": "sea"
+    },
+    "atlantic ocean": {
+      "lat": 25.0,
+      "lon": -45.0,
+      "radius_km": 2200,
+      "kind": "sea"
+    },
+    "bahrain": {
+      "lat": 26.21,
+      "lon": 50.61,
+      "radius_km": 10,
+      "kind": "port"
+    },
+    "baltic sea": {
+      "lat": 57.5,
+      "lon": 19.5,
+      "radius_km": 400,
+      "kind": "sea"
+    },
+    "banda sea": {
+      "lat": -5.5,
+      "lon": 127.5,
+      "radius_km": 350,
+      "kind": "sea"
+    },
+    "barents sea": {
+      "lat": 74.0,
+      "lon": 38.0,
+      "radius_km": 700,
+      "kind": "sea"
+    },
+    "bay of bengal": {
+      "lat": 15.0,
+      "lon": 88.0,
+      "radius_km": 600,
+      "kind": "sea"
+    },
+    "bering sea": {
+      "lat": 58.0,
+      "lon": -177.0,
+      "radius_km": 800,
+      "kind": "sea"
+    },
+    "black sea": {
+      "lat": 43.3,
+      "lon": 34.0,
+      "radius_km": 400,
+      "kind": "sea"
+    },
+    "bremerton washington": {
+      "lat": 47.55,
+      "lon": -122.65,
+      "radius_km": 6,
+      "kind": "port"
+    },
+    "california operating area": {
+      "lat": 32.8,
+      "lon": -118.6,
+      "radius_km": 320,
+      "kind": "sea"
+    },
+    "california operating areas": {
+      "lat": 32.8,
+      "lon": -118.6,
+      "radius_km": 320,
+      "kind": "sea"
+    },
+    "caribbean": {
+      "lat": 15.0,
+      "lon": -73.0,
+      "radius_km": 700,
+      "kind": "sea"
+    },
+    "caribbean sea": {
+      "lat": 15.0,
+      "lon": -73.0,
+      "radius_km": 700,
+      "kind": "sea"
+    },
+    "celebes sea": {
+      "lat": 3.5,
+      "lon": 122.0,
+      "radius_km": 350,
+      "kind": "sea"
+    },
+    "central mediterranean": {
+      "lat": 36.0,
+      "lon": 15.0,
+      "radius_km": 450,
+      "kind": "sea"
+    },
+    "chesapeake bay": {
+      "lat": 37.6,
+      "lon": -76.1,
+      "radius_km": 90,
+      "kind": "sea"
+    },
+    "coral sea": {
+      "lat": -16.0,
+      "lon": 152.0,
+      "radius_km": 700,
+      "kind": "sea"
+    },
+    "diego garcia": {
+      "lat": -7.31,
+      "lon": 72.41,
+      "radius_km": 15,
+      "kind": "port"
+    },
+    "east china sea": {
+      "lat": 29.0,
+      "lon": 125.0,
+      "radius_km": 450,
+      "kind": "sea"
+    },
+    "east of okinawa japan": {
+      "lat": 26.34,
+      "lon": 129.2,
+      "radius_km": 200,
+      "kind": "sea"
+    },
+    "eastern atlantic": {
+      "lat": 35.0,
+      "lon": -20.0,
+      "radius_km": 1200,
+      "kind": "sea"
+    },
+    "eastern mediterranean": {
+      "lat": 34.0,
+      "lon": 30.0,
+      "radius_km": 450,
+      "kind": "sea"
+    },
+    "eastern mediterranean sea": {
+      "lat": 34.0,
+      "lon": 30.0,
+      "radius_km": 450,
+      "kind": "sea"
+    },
+    "eastern pacific": {
+      "lat": 10.0,
+      "lon": -105.0,
+      "radius_km": 1500,
+      "kind": "sea"
+    },
+    "english channel": {
+      "lat": 50.2,
+      "lon": -0.5,
+      "radius_km": 150,
+      "kind": "sea"
+    },
+    "everett washington": {
+      "lat": 47.98,
+      "lon": -122.22,
+      "radius_km": 6,
+      "kind": "port"
+    },
+    "greenland sea": {
+      "lat": 75.0,
+      "lon": -5.0,
+      "radius_km": 600,
+      "kind": "sea"
+    },
+    "guam": {
+      "lat": 13.44,
+      "lon": 144.66,
+      "radius_km": 12,
+      "kind": "port"
+    },
+    "gulf coast": {
+      "lat": 28.5,
+      "lon": -90.0,
+      "radius_km": 300,
+      "kind": "sea"
+    },
+    "gulf of aden": {
+      "lat": 12.5,
+      "lon": 47.5,
+      "radius_km": 350,
+      "kind": "sea"
+    },
+    "gulf of alaska": {
+      "lat": 56.0,
+      "lon": -145.0,
+      "radius_km": 600,
+      "kind": "sea"
+    },
+    "gulf of mexico": {
+      "lat": 25.0,
+      "lon": -90.0,
+      "radius_km": 700,
+      "kind": "sea"
+    },
+    "gulf of oman": {
+      "lat": 24.8,
+      "lon": 58.5,
+      "radius_km": 250,
+      "kind": "sea"
+    },
+    "gulf of thailand": {
+      "lat": 10.0,
+      "lon": 101.5,
+      "radius_km": 350,
+      "kind": "sea"
+    },
+    "hawaii": {
+      "lat": 20.8,
+      "lon": -157.0,
+      "radius_km": 300,
+      "kind": "sea"
+    },
+    "hawaiian operating area": {
+      "lat": 21.0,
+      "lon": -158.0,
+      "radius_km": 400,
+      "kind": "sea"
+    },
+    "hawaiian operating areas": {
+      "lat": 21.0,
+      "lon": -158.0,
+      "radius_km": 400,
+      "kind": "sea"
+    },
+    "hong kong": {
+      "lat": 22.29,
+      "lon": 114.17,
+      "radius_km": 15,
+      "kind": "port"
+    },
+    "honshu japan": {
+      "lat": 36.0,
+      "lon": 140.5,
+      "radius_km": 300,
+      "kind": "sea"
+    },
+    "houston texas": {
+      "lat": 29.72,
+      "lon": -95.03,
+      "radius_km": 20,
+      "kind": "port"
+    },
+    "indian ocean": {
+      "lat": 5.0,
+      "lon": 72.0,
+      "radius_km": 1800,
+      "kind": "sea"
+    },
+    "ionian sea": {
+      "lat": 38.0,
+      "lon": 18.5,
+      "radius_km": 250,
+      "kind": "sea"
+    },
+    "jacksonville operating area": {
+      "lat": 30.4,
+      "lon": -80.2,
+      "radius_km": 260,
+      "kind": "sea"
+    },
+    "japan": {
+      "lat": 35.0,
+      "lon": 137.0,
+      "radius_km": 500,
+      "kind": "sea"
+    },
+    "java sea": {
+      "lat": -5.5,
+      "lon": 111.0,
+      "radius_km": 450,
+      "kind": "sea"
+    },
+    "kiel germany": {
+      "lat": 54.33,
+      "lon": 10.14,
+      "radius_km": 10,
+      "kind": "port"
+    },
+    "kingston jamaica": {
+      "lat": 17.97,
+      "lon": -76.79,
+      "radius_km": 10,
+      "kind": "port"
+    },
+    "kure japan": {
+      "lat": 34.23,
+      "lon": 132.56,
+      "radius_km": 8,
+      "kind": "port"
+    },
+    "la guaira venezuela": {
+      "lat": 10.6,
+      "lon": -66.93,
+      "radius_km": 10,
+      "kind": "port"
+    },
+    "la perouse strait": {
+      "lat": 45.75,
+      "lon": 142.0,
+      "radius_km": 60,
+      "kind": "sea"
+    },
+    "labrador sea": {
+      "lat": 57.0,
+      "lon": -53.0,
+      "radius_km": 500,
+      "kind": "sea"
+    },
+    "laem chabang thailand": {
+      "lat": 13.08,
+      "lon": 100.88,
+      "radius_km": 10,
+      "kind": "port"
+    },
+    "manama bahrain": {
+      "lat": 26.21,
+      "lon": 50.61,
+      "radius_km": 10,
+      "kind": "port"
+    },
+    "manila philippines": {
+      "lat": 14.58,
+      "lon": 120.96,
+      "radius_km": 15,
+      "kind": "port"
+    },
+    "mayport fla": {
+      "lat": 30.39,
+      "lon": -81.42,
+      "radius_km": 8,
+      "kind": "port"
+    },
+    "mayport florida": {
+      "lat": 30.39,
+      "lon": -81.42,
+      "radius_km": 8,
+      "kind": "port"
+    },
+    "mediterranean": {
+      "lat": 36.0,
+      "lon": 18.0,
+      "radius_km": 900,
+      "kind": "sea"
+    },
+    "mediterranean sea": {
+      "lat": 36.0,
+      "lon": 18.0,
+      "radius_km": 900,
+      "kind": "sea"
+    },
+    "miyako strait": {
+      "lat": 24.8,
+      "lon": 125.3,
+      "radius_km": 80,
+      "kind": "sea"
+    },
+    "new orleans": {
+      "lat": 29.93,
+      "lon": -90.06,
+      "radius_km": 15,
+      "kind": "port"
+    },
+    "new york city": {
+      "lat": 40.68,
+      "lon": -74.03,
+      "radius_km": 15,
+      "kind": "port"
+    },
+    "new zealand": {
+      "lat": -41.0,
+      "lon": 174.0,
+      "radius_km": 300,
+      "kind": "sea"
+    },
+    "newport news": {
+      "lat": 36.98,
+      "lon": -76.43,
+      "radius_km": 8,
+      "kind": "port"
+    },
+    "newport news virginia": {
+      "lat": 36.98,
+      "lon": -76.43,
+      "radius_km": 8,
+      "kind": "port"
+    },
+    "norfolk virginia": {
+      "lat": 36.95,
+      "lon": -76.33,
+      "radius_km": 8,
+      "kind": "port"
+    },
+    "north atlantic": {
+      "lat": 45.0,
+      "lon": -35.0,
+      "radius_km": 1800,
+      "kind": "sea"
+    },
+    "north sea": {
+      "lat": 56.5,
+      "lon": 3.0,
+      "radius_km": 350,
+      "kind": "sea"
+    },
+    "norwegian sea": {
+      "lat": 67.0,
+      "lon": 5.0,
+      "radius_km": 700,
+      "kind": "sea"
+    },
+    "okinawa japan": {
+      "lat": 26.34,
+      "lon": 127.8,
+      "radius_km": 40,
+      "kind": "port"
+    },
+    "osumi strait": {
+      "lat": 30.9,
+      "lon": 130.9,
+      "radius_km": 60,
+      "kind": "sea"
+    },
+    "pacific": {
+      "lat": 0.0,
+      "lon": -150.0,
+      "radius_km": 3000,
+      "kind": "sea"
+    },
+    "pacific ocean": {
+      "lat": 0.0,
+      "lon": -150.0,
+      "radius_km": 3000,
+      "kind": "sea"
+    },
+    "pearl harbor": {
+      "lat": 21.35,
+      "lon": -157.96,
+      "radius_km": 8,
+      "kind": "port"
+    },
+    "pearl harbor hawaii": {
+      "lat": 21.35,
+      "lon": -157.96,
+      "radius_km": 8,
+      "kind": "port"
+    },
+    "persian gulf": {
+      "lat": 26.5,
+      "lon": 52.0,
+      "radius_km": 350,
+      "kind": "sea"
+    },
+    "philippine sea": {
+      "lat": 18.0,
+      "lon": 132.0,
+      "radius_km": 900,
+      "kind": "sea"
+    },
+    "phuket thailand": {
+      "lat": 7.88,
+      "lon": 98.39,
+      "radius_km": 15,
+      "kind": "port"
+    },
+    "portsmouth england": {
+      "lat": 50.8,
+      "lon": -1.09,
+      "radius_km": 8,
+      "kind": "port"
+    },
+    "puget sound": {
+      "lat": 47.8,
+      "lon": -122.5,
+      "radius_km": 60,
+      "kind": "sea"
+    },
+    "red sea": {
+      "lat": 20.0,
+      "lon": 38.5,
+      "radius_km": 600,
+      "kind": "sea"
+    },
+    "rota spain": {
+      "lat": 36.62,
+      "lon": -6.35,
+      "radius_km": 8,
+      "kind": "port"
+    },
+    "san diego": {
+      "lat": 32.68,
+      "lon": -117.18,
+      "radius_km": 12,
+      "kind": "port"
+    },
+    "sasebo japan": {
+      "lat": 33.16,
+      "lon": 129.72,
+      "radius_km": 6,
+      "kind": "port"
+    },
+    "scarborough shoal": {
+      "lat": 15.15,
+      "lon": 117.76,
+      "radius_km": 40,
+      "kind": "sea"
+    },
+    "sea of japan": {
+      "lat": 40.0,
+      "lon": 135.0,
+      "radius_km": 500,
+      "kind": "sea"
+    },
+    "sea of okhotsk": {
+      "lat": 54.0,
+      "lon": 149.0,
+      "radius_km": 700,
+      "kind": "sea"
+    },
+    "shimoda japan": {
+      "lat": 34.67,
+      "lon": 138.94,
+      "radius_km": 8,
+      "kind": "port"
+    },
+    "singapore": {
+      "lat": 1.26,
+      "lon": 103.82,
+      "radius_km": 20,
+      "kind": "port"
+    },
+    "solomon islands": {
+      "lat": -9.0,
+      "lon": 160.0,
+      "radius_km": 300,
+      "kind": "sea"
+    },
+    "souda bay": {
+      "lat": 35.49,
+      "lon": 24.13,
+      "radius_km": 8,
+      "kind": "port"
+    },
+    "souda bay crete": {
+      "lat": 35.49,
+      "lon": 24.13,
+      "radius_km": 8,
+      "kind": "port"
+    },
+    "souda bay greece": {
+      "lat": 35.49,
+      "lon": 24.13,
+      "radius_km": 8,
+      "kind": "port"
+    },
+    "south atlantic": {
+      "lat": -25.0,
+      "lon": -20.0,
+      "radius_km": 1800,
+      "kind": "sea"
+    },
+    "south china sea": {
+      "lat": 13.0,
+      "lon": 114.0,
+      "radius_km": 800,
+      "kind": "sea"
+    },
+    "south pacific": {
+      "lat": -20.0,
+      "lon": -170.0,
+      "radius_km": 2500,
+      "kind": "sea"
+    },
+    "southern atlantic": {
+      "lat": -25.0,
+      "lon": -20.0,
+      "radius_km": 1800,
+      "kind": "sea"
+    },
+    "southern california operating area": {
+      "lat": 32.8,
+      "lon": -118.6,
+      "radius_km": 320,
+      "kind": "sea"
+    },
+    "southern indian ocean": {
+      "lat": -30.0,
+      "lon": 80.0,
+      "radius_km": 1500,
+      "kind": "sea"
+    },
+    "southwest japan": {
+      "lat": 31.5,
+      "lon": 130.5,
+      "radius_km": 300,
+      "kind": "sea"
+    },
+    "split croatia": {
+      "lat": 43.5,
+      "lon": 16.44,
+      "radius_km": 8,
+      "kind": "port"
+    },
+    "st thomas": {
+      "lat": 18.34,
+      "lon": -64.93,
+      "radius_km": 10,
+      "kind": "port"
+    },
+    "strait of malacca": {
+      "lat": 2.5,
+      "lon": 101.0,
+      "radius_km": 150,
+      "kind": "sea"
+    },
+    "sulu sea": {
+      "lat": 8.5,
+      "lon": 120.0,
+      "radius_km": 250,
+      "kind": "sea"
+    },
+    "tanjung priok north jakarta indonesia": {
+      "lat": -6.1,
+      "lon": 106.88,
+      "radius_km": 10,
+      "kind": "port"
+    },
+    "tasman sea": {
+      "lat": -38.0,
+      "lon": 160.0,
+      "radius_km": 700,
+      "kind": "sea"
+    },
+    "timor sea": {
+      "lat": -11.0,
+      "lon": 128.0,
+      "radius_km": 400,
+      "kind": "sea"
+    },
+    "tsushima strait": {
+      "lat": 34.4,
+      "lon": 129.4,
+      "radius_km": 80,
+      "kind": "sea"
+    },
+    "virginia capes operating area": {
+      "lat": 36.9,
+      "lon": -75.2,
+      "radius_km": 260,
+      "kind": "sea"
+    },
+    "vladivostok russia": {
+      "lat": 43.1,
+      "lon": 131.87,
+      "radius_km": 15,
+      "kind": "port"
+    },
+    "wellington new zealand": {
+      "lat": -41.28,
+      "lon": 174.78,
+      "radius_km": 10,
+      "kind": "port"
+    },
+    "western atlantic": {
+      "lat": 32.0,
+      "lon": -70.0,
+      "radius_km": 1200,
+      "kind": "sea"
+    },
+    "western mediterranean": {
+      "lat": 39.0,
+      "lon": 5.0,
+      "radius_km": 450,
+      "kind": "sea"
+    },
+    "western pacific": {
+      "lat": 20.0,
+      "lon": 140.0,
+      "radius_km": 2000,
+      "kind": "sea"
+    },
+    "yellow sea": {
+      "lat": 35.5,
+      "lon": 123.5,
+      "radius_km": 300,
+      "kind": "sea"
+    },
+    "yokosuka japan": {
+      "lat": 35.29,
+      "lon": 139.66,
+      "radius_km": 6,
+      "kind": "port"
+    },
+    "zeebrugge belgium": {
+      "lat": 51.33,
+      "lon": 3.2,
+      "radius_km": 8,
+      "kind": "port"
+    }
+  }
+}
