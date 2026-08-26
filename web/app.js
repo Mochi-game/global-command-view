@@ -375,7 +375,7 @@ const LAYERS = [
   { id: 'radio', name: 'Shortwave receivers', color: '#7dd3fc', on: false, count: 0, note: 'KiwiSDR — open receivers you can listen through' },
   { id: 'scanners', name: 'Police & fire radio', color: '#60a5fa', on: false, count: 0, note: 'OpenMHZ — United States only, recorded by volunteers' },
   { id: 'aprs', name: 'Amateur radio (APRS)', color: '#a78bfa', on: false, count: 0, note: 'APRS-IS — operators broadcasting their own positions' },
-  { id: 'airports', name: 'Airports & ATC', color: '#fcd34d', on: false, count: 0, note: 'OurAirports — click through to LiveATC for the tower' },
+  { id: 'airports', name: 'Airports & ATC', color: '#fcd34d', on: false, count: 0, note: 'OurAirports — LiveATC for the tower, and that is mostly North America' },
   { id: 'weather', name: 'Severe weather (US)', color: '#f472b6', on: false, count: 0, note: 'NWS — United States only, no open feed covers the rest' },
   { id: 'plants', name: 'Power stations', color: '#a3e635', on: false, count: 0, note: 'WRI — 35 000 stations, sized by capacity' },
   { id: 'launches', name: 'Rocket launches', color: '#fb923c', on: false, count: 0, note: 'Launch Library — scheduled, and a schedule slips' },
@@ -1798,6 +1798,12 @@ function describePicked(type, ref) {
         + 'link or not at all.'],
       ['Note', 'coverage is wherever a volunteer has put a receiver, so a large '
         + 'airport may have several feeds and a medium one none.'],
+      // Reported from use: American towers play, European ones mostly do not.
+      // Worth saying on the card rather than letting the link look broken.
+      ['Where it works', 'in practice this is North America. Most of Europe '
+        + 'restricts rebroadcasting air traffic control, so European airports '
+        + 'usually have no feed however large they are — the link will open and '
+        + 'find nothing. That is the law where the airport is, not a fault here.'],
     ]);
   } else if (type === 'aprs') {
     const mins = Math.round(ref.ago_s / 60);

@@ -6,6 +6,21 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.88.1 — where LiveATC actually works
+
+Reported from use: the tower link plays in the United States and finds nothing in
+Europe. That is true, and it is not a fault in the link. Most of Europe restricts
+rebroadcasting air traffic control, so European airports usually have no feed
+however large they are, while American ones have several.
+
+The layer note said "click through to LiveATC for the tower" and left you to
+discover the rest by clicking. It now says the coverage is mostly North America,
+and the card says why: it is the law where the airport is.
+
+This is the same qualification the weather layer has carried since it was built.
+An unqualified link that quietly works in one hemisphere is the kind of thing this
+app is supposed to catch.
+
 ## 0.88.0 — the going-live check
 
 A full pass over everything, because the next step is a live stream and a fault
