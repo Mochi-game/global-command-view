@@ -6,6 +6,25 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.89.0 — the old name is out of the code
+
+Spotted in the README on GitHub: `window.godsEye`. Not just a line of prose —
+that is the actual global the app exposes, and it carried a name this project
+dropped long ago. Six places in the code, and thirteen stored settings whose keys
+all began `gev`, from the same name.
+
+The global is `window.gcv` now. The settings were the careful half: renaming a
+storage key is two characters and would have **silently thrown away whatever
+anybody had set** — safe mode, their marks, a calibrated camera, which sections
+they keep folded. The old names are carried across once at startup and then
+removed, so nobody notices anything happened.
+
+Testing that found the bug in it. The migration sat next to the layer groups, and
+`safeMode` reads its key a hundred lines earlier — so commercial-safe mode, and
+only that, came back off for anybody who had it on. It runs before the first read
+now. Verified by planting `gev-safe=1` and reloading: the setting survives and
+the switch comes up ticked.
+
 ## 0.88.2 — for somebody who has never installed Python
 
 Asked whether a stranger downloading the ZIP gets a decent explanation, given

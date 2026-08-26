@@ -215,5 +215,5 @@ web/app.js      globe, layers, polling, picking, tools
 data/           curated files: sea areas, carriers, submarine bases
 ```
 
-`window.godsEye` exposes `{ viewer, scene, flights, vessels, layers, collections }`
+`window.gcv` exposes `{ viewer, scene, flights, vessels, layers, collections }`
 in the browser console.

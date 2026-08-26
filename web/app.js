@@ -232,7 +232,39 @@ const SAFE_IMAGERY = {
   blueMarble: 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/BlueMarble_ShadedRelief_Bathymetry/default/default/GoogleMapsCompatible_Level8/{z}/{y}/{x}.jpeg',
 };
 
-let safeMode = localStorage.getItem('gev-safe') === '1';
+/*
+ * Settings written before the app was renamed.
+ *
+ * Every stored key used to start `gev`, from a name this project no longer
+ * carries. Renaming them is a two-line change and would have silently thrown
+ * away whatever anybody had set - safe mode, their marks, a calibrated camera,
+ * which sections they keep folded. So the old names are copied across once and
+ * then removed, and nobody notices anything happened.
+ *
+ * This can go once no browser anywhere still holds a `gev` key, which is a date
+ * nobody can know, so it stays. It costs one pass over localStorage at boot.
+ */
+(function carryOldSettingsOver() {
+  try {
+    const moved = [];
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const old = localStorage.key(i);
+      if (!old || !old.startsWith('gev')) continue;
+      const now = 'gcv' + old.slice(3);
+      // An existing new-style value wins: it is the one being used.
+      if (localStorage.getItem(now) === null) {
+        localStorage.setItem(now, localStorage.getItem(old));
+        moved.push(now);
+      }
+      localStorage.removeItem(old);
+    }
+    if (moved.length) console.info('carried %d setting(s) over from the old name', moved.length);
+  } catch (_) {
+    // A browser with storage blocked has nothing to carry over either.
+  }
+})();
+
+let safeMode = localStorage.getItem('gcv-safe') === '1';
 
 // How many days back the GIBS-backed imagery is asked for. This is the whole
 // argument for the layer below: a burn scar seen today is a brown patch, and a
@@ -344,6 +376,7 @@ const SCALE = {
  * Grouping by what a thing *is* rather than where it came from: somebody hunting
  * for aviation radio is thinking "radio", not "OurAirports".
  */
+
 const LAYER_GROUPS = [
   { name: 'Radio', ids: ['broadcast', 'radio', 'scanners', 'airports', 'aprs'] },
   { name: 'Moving', ids: ['flights', 'services', 'vessels', 'trains', 'capital', 'fishing'] },
@@ -948,7 +981,7 @@ async function loadCables() {
         color: Cesium.Color.fromCssColorString('#e0c3ff').withAlpha(0.9),
         id: { type: 'landing', ref: feature.properties },
         scaleByDistance: new Cesium.NearFarScalar(1e5, 2.2, 2e7, 0.6),
-      }).godsEyeAt = [lon, lat];
+      }).gcvAt = [lon, lat];
     }
     log(`cables: ${geo.features.length} landing points`);
   } catch (err) {
@@ -3562,7 +3595,7 @@ function cullStatic() {
   for (const collection of [collections.cameras, collections.landings]) {
     for (let i = 0; i < collection.length; i++) {
       const primitive = collection.get(i);
-      const at = primitive.godsEyeAt;
+      const at = primitive.gcvAt;
       if (at) primitive.show = inView(at[0], at[1]);
     }
   }
@@ -3842,7 +3875,7 @@ function addField(key, value) {
 
 const projection = { station: null, cfg: null, refresh: null };
 const CAL_DEFAULT = { heading: 0, fov: 55, range: 260 };
-const CAL_STORE = 'gev.camera.calibration';
+const CAL_STORE = 'gcv.camera.calibration';
 
 function loadCalibrations() {
   try {
@@ -3875,14 +3908,14 @@ function footprint(station, cfg) {
 function drawProjection() {
   const { station, cfg } = projection;
   if (!station) return;
-  viewer.entities.removeById('gev-projection');
-  viewer.entities.removeById('gev-projection-edge');
+  viewer.entities.removeById('gcv-projection');
+  viewer.entities.removeById('gcv-projection-edge');
 
   const ring = footprint(station, cfg);
   const image = $('#detail-image').src || station.image;
 
   viewer.entities.add({
-    id: 'gev-projection',
+    id: 'gcv-projection',
     polygon: {
       hierarchy: Cesium.Cartesian3.fromDegreesArray(ring),
       material: new Cesium.ImageMaterialProperty({
@@ -3903,7 +3936,7 @@ function drawProjection() {
   });
 
   viewer.entities.add({
-    id: 'gev-projection-edge',
+    id: 'gcv-projection-edge',
     polyline: {
       positions: Cesium.Cartesian3.fromDegreesArrayHeights(
         ring.concat(ring.slice(0, 2)).flatMap((v, i) => (i % 2 ? [v, 1.5] : [v]))
@@ -3933,8 +3966,8 @@ function startProjection(station) {
 
 function stopProjection() {
   clearInterval(projection.refresh);
-  viewer.entities.removeById('gev-projection');
-  viewer.entities.removeById('gev-projection-edge');
+  viewer.entities.removeById('gcv-projection');
+  viewer.entities.removeById('gcv-projection-edge');
   projection.station = null;
   $('#calibration').hidden = true;
   $('#project').classList.remove('active');
@@ -4112,7 +4145,7 @@ $('#measure').onclick = toggleRuler;
  * rather than a spot on a map.
  */
 
-const MARK_STORE = 'gev.marks';
+const MARK_STORE = 'gcv.marks';
 const markPoints = scene.primitives.add(new Cesium.PointPrimitiveCollection());
 const markLabels = scene.primitives.add(new Cesium.LabelCollection({ scene }));
 
@@ -4731,7 +4764,7 @@ let scopeStage = null;
 function setCrt(enabled) {
   if (enabled && !crtStage) {
     crtStage = scene.postProcessStages.add(
-      new Cesium.PostProcessStage({ name: 'gev_crt', fragmentShader: CRT_SHADER })
+      new Cesium.PostProcessStage({ name: 'gcv_crt', fragmentShader: CRT_SHADER })
     );
   }
   if (crtStage) crtStage.enabled = !!enabled;
@@ -4741,7 +4774,7 @@ function setScope(mode) {
   if (mode && !scopeStage) {
     scopeStage = scene.postProcessStages.add(
       new Cesium.PostProcessStage({
-        name: 'gev_scope',
+        name: 'gcv_scope',
         fragmentShader: SCOPE_SHADER,
         uniforms: { u_flir: () => (currentStyle === 'flir' ? 1.0 : 0.0) },
       })
@@ -4860,7 +4893,7 @@ function addCameraStation(station) {
     scaleByDistance: SCALE.camera,
     id: { type: 'camera', ref: station },
     show: safeCameraAllowed(station),
-  }).godsEyeAt = [station.lon, station.lat];
+  }).gcvAt = [station.lon, station.lat];
 }
 
 /* ------------------------------------------------------------ world terrain */
@@ -4890,7 +4923,7 @@ async function enableIon() {
     // 3D renderer, which that refusal never applied to, so any remembered block
     // is stale and is cleared rather than honoured.
     localStorage.removeItem(PHOTOREAL_REFUSED);
-    localStorage.removeItem('gev-photoreal-blocked');
+    localStorage.removeItem('gcv-photoreal-blocked');
     showQuota();
     renderMeters();
   }
@@ -5067,14 +5100,14 @@ async function countRootRequest() {
  * rewriting the wording never reached anybody already blocked - they kept seeing
  * the first draft, cached, for as long as the browser remembered it.
  */
-const PHOTOREAL_REFUSED = 'gev-photoreal-refused';
+const PHOTOREAL_REFUSED = 'gcv-photoreal-refused';
 
 function blockPhotoreal(code) {
   // Always written. A first attempt at this only stored on the first refusal, so
   // recalling one from the older key erased that key without replacing it, and
   // the switch came back on the next launch as if nothing had happened.
   localStorage.setItem(PHOTOREAL_REFUSED, code);
-  localStorage.removeItem('gev-photoreal-blocked');   // the old prose-shaped key
+  localStorage.removeItem('gcv-photoreal-blocked');   // the old prose-shaped key
   const row = $('#photoreal-row');
   const note = $('#photoreal-blocked');
   if (row) row.hidden = true;
@@ -6138,7 +6171,7 @@ function safeCameraAllowed(station) {
 }
 
 function applySafeMode(announce) {
-  localStorage.setItem('gev-safe', safeMode ? '1' : '0');
+  localStorage.setItem('gcv-safe', safeMode ? '1' : '0');
   $('#safe').checked = safeMode;
   $('#safe-badge').hidden = !safeMode;
   $('#safe-note').textContent = safeMode
@@ -6359,7 +6392,7 @@ setInterval(updateMoonReadout, 600_000);
  * setting the flights respect, and it is remembered.
  */
 
-let viewPitch = Number(localStorage.getItem('gev-pitch'));
+let viewPitch = Number(localStorage.getItem('gcv-pitch'));
 if (!Number.isFinite(viewPitch) || viewPitch > -12 || viewPitch < -90) viewPitch = -40;
 
 /** The orientation every flight should arrive at, keeping the present heading. */
@@ -6396,7 +6429,7 @@ function applyTilt() {
 
 $('#tilt').oninput = (e) => {
   viewPitch = Number(e.target.value);
-  localStorage.setItem('gev-pitch', String(viewPitch));
+  localStorage.setItem('gcv-pitch', String(viewPitch));
   $('#tilt-out').textContent = viewPitch <= -89 ? 'straight down'
     : `${Math.abs(viewPitch)}\u00b0`;
   applyTilt();
@@ -7256,7 +7289,7 @@ function dropToGround() {
  * drop the optic back to OPS, which looked like the infrared layer and its key
  * had vanished of their own accord.
  */
-let currentStyle = localStorage.getItem('gev-style') || 'ops';
+let currentStyle = localStorage.getItem('gcv-style') || 'ops';
 if (!IMAGERY[currentStyle]) currentStyle = 'ops';
 
 /** Switch optics. Split out of the button so the tour can call it too. */
@@ -7271,7 +7304,7 @@ function selectStyle(key, byHandover) {
   }
   const spec = IMAGERY[key];
   currentStyle = key;
-  localStorage.setItem('gev-style', key);
+  localStorage.setItem('gcv-style', key);
   rebuildImagery();
   $('#globe').classList.toggle('heat', !!spec.heat);
   setCrt(spec.crt);
@@ -7694,8 +7727,8 @@ document.addEventListener('keydown', (e) => {
 });
 
 // First run on this machine: open the guide rather than leaving a blank globe.
-if (!localStorage.getItem('gev.seen')) {
-  localStorage.setItem('gev.seen', '1');
+if (!localStorage.getItem('gcv.seen')) {
+  localStorage.setItem('gcv.seen', '1');
   setTimeout(() => openGuide('use'), 2500);
 }
 
@@ -7707,7 +7740,7 @@ if (!localStorage.getItem('gev.seen')) {
  * are personal and should not reset on every reload.
  */
 
-const FOLD_STORE = 'gev.folded';
+const FOLD_STORE = 'gcv.folded';
 // Everything but the two you actually read on arrival. The index above makes
 // the rest one click away, which is better than scrolling past them.
 const FOLD_DEFAULT = [
@@ -7808,8 +7841,8 @@ renderStyles();
 renderPlaces();
 applyVisibility();
 
-// Handy for the browser console: godsEye.viewer.camera.flyTo(...), godsEye.flights, ...
-window.godsEye = { viewer, scene, flights, vessels, satellites, layers: LAYERS, collections };
+// Handy for the browser console: gcv.viewer.camera.flyTo(...), gcv.flights, ...
+window.gcv = { viewer, scene, flights, vessels, satellites, layers: LAYERS, collections };
 
 scene.canvas.addEventListener('webglcontextlost', (e) => {
   e.preventDefault();
