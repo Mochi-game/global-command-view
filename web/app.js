@@ -6887,6 +6887,14 @@ window.addEventListener('keydown', (e) => {
  * The list interleaves the kinds rather than merging them into one order,
  * because megawatts, magnitudes and feet do not compare. A single ranking would
  * be a comparison nobody made.
+ *
+ * Earthquakes are ranked by magnitude alone and not by how recent they are.
+ * That was raised and decided rather than overlooked: the headline is regularly
+ * a large quake several days old, which looks stale beside a fresh small one.
+ * It stays, because the magnitude is the thing that matters about an earthquake
+ * and weighting for freshness would push a M4 this morning above a M7 that
+ * flattened somewhere on Tuesday. The card carries the time, so recency is one
+ * glance away without the ranking pretending to know which you meant.
  */
 
 /**
