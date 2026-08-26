@@ -5824,6 +5824,11 @@ const OPERA = [
   },
 ];
 
+// Roughly a country in view. Above this the bands are swath outlines and
+// nothing readable, so the layer holds its fire.
+const OPERA_MIN_LEVEL = 5;
+const OPERA_HINT_M = 1_200_000;
+
 const operaLayers = new Map();   // id -> Cesium.ImageryLayer
 
 /** The date to ask an OPERA product for: the day slider, plus its own lag. */
@@ -5845,10 +5850,20 @@ function showOpera(spec, on) {
       })
     );
     layer.alpha = spec.alpha;
+    // These are 30 m products. Seen from orbit height the swaths draw as broad
+    // diagonal bands across a continent - you are reading where the satellite
+    // flew, not what it measured, and it looks like damage to the map rather
+    // than information on it. Below this level the layer stays off and says so.
+    layer.minimumTerrainLevel = OPERA_MIN_LEVEL;
     operaLayers.set(spec.id, layer);
     const layerName = LAYERS.find((l) => l.id === spec.id);
     log(`${layerName ? layerName.name.toLowerCase() : spec.id}: NASA OPERA, ${day} `
       + `\u00b7 30 m, radar sees through cloud and night`);
+    // Turned on from too far out it draws nothing, and silence reads as broken.
+    if (scene.camera.positionCartographic.height > OPERA_HINT_M) {
+      log(`${layerName ? layerName.name.toLowerCase() : spec.id}: too far out to `
+        + `draw · zoom in to about a country and it appears`, 'warn');
+    }
   }
   if (layer) layer.show = on;
 }
@@ -7336,6 +7351,10 @@ function renderStyles() {
 const PLACES = [
   { name: 'GLOBE', lon: 12, lat: 30, height: 24_000_000 },
   { name: 'PALM', lon: 55.14, lat: 25.11, height: 9_000 },
+  // Close enough that the radar and ground-change layers actually draw, which
+  // is where they were being tested from and kept being flown to by hand.
+  { name: 'STOCKHOLM', lon: 18.07, lat: 59.33, height: 40_000 },
+  { name: 'GOTHENBURG', lon: 11.97, lat: 57.71, height: 40_000 },
   { name: 'GULF OF FINLAND', lon: 24.9, lat: 59.8, height: 260_000 },
   { name: 'LONDON', lon: -0.1, lat: 51.5, height: 90_000 },
   { name: 'ENGLISH CHANNEL', lon: 1.4, lat: 50.6, height: 400_000 },

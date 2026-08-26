@@ -6,6 +6,22 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.89.1 — the radar was smearing the map
+
+Sent a screenshot of the radar layer switched on over Europe: long diagonal
+grey and magenta bands across everything from Scotland to Kazakhstan. That is
+real data — each band is one Sentinel-1 pass — but at eighteen hundred kilometres
+up you are reading *where the satellite flew*, not what it measured, and it looks
+like damage to the map rather than information on it.
+
+These are thirty-metre products. They hold their fire now until the camera is
+inside about a country, and say so when switched on from further out, because a
+layer that draws nothing and says nothing reads as broken in the other direction.
+
+**Jump to gained Stockholm and Gothenburg.** Both were being flown to by hand
+every time anything needed checking, which is a good sign a preset is missing,
+and both sit at a height where the ground-change layers actually draw.
+
 ## 0.89.0 — the old name is out of the code
 
 Spotted in the README on GitHub: `window.godsEye`. Not just a line of prose —
