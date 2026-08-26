@@ -9,6 +9,23 @@ launches. Thirty-four layers.
 simulated, nothing is smoothed, and when a feed has nothing to say the app says
 that rather than drawing an empty map.
 
+![Everything on at once: the night side of Earth with satellite designators,
+fire clusters, submarine cables, and the layer panel counting each
+feed](docs/globe.jpg)
+
+*Twelve thousand six hundred aircraft, twenty-four thousand ships, 4 143 public
+cameras, 724 submarine cables. Detection mode is naming contacts — SAT-69021
+HELIOS, MIL-PAT100, a Starlink shell drawn from live orbital elements. Every
+number in the panel is what that feed actually returned.*
+
+![A Street View panorama opened over the app's own 3D buildings, with a public
+road camera beside it](docs/street-level.jpg)
+
+*The panorama is embedded and walkable — the arrows walk and the globe follows.
+Beside it, a public road camera twelve kilometres away with PROJECT ONTO GROUND
+ready to paint its live frame onto the map. In the panel, the meters: 27 of
+1 000 free 3D sessions and 366 of 10 000 Street View views used this month.*
+
 ---
 
 ## Getting it running
