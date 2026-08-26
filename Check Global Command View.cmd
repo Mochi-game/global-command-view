@@ -1,41 +1,50 @@
 @echo off
-title Global Command View - check
+title Global Command View - self check
 cd /d "%~dp0"
-
+set "PY="
+for %%C in (py python python3) do (
+  if not defined PY (
+    %%C -c "import sys; sys.exit(0 if sys.version_info >= (3,9) else 1)" >nul 2>&1 && set "PY=%%C"
+  )
+)
+if not defined PY goto :nopython
 echo.
-echo   Global Command View - check
+echo   Global Command View - self check
 echo   ---------------------------------------------
-echo   Reads the files, then calls every feed.
+echo   Reads the files, calls every feed, says what broke.
+echo   A green result means it boots and every source answers,
+echo   not that the picture is right. That still needs your eyes.
 echo.
-
-rem Prefer the server that is already up: testing the one actually in use beats
-rem testing a fresh copy of it. If nothing is listening, smoke.py starts its own
-rem on a free port and shuts it down afterwards.
-set PORTARG=
-netstat -ano | findstr /R /C:"LISTENING" | findstr /C:":8820 " >nul 2>&1
-if not errorlevel 1 (
-  echo   Found the app running on 8820 - checking that one.
-  echo.
-  set PORTARG=--port 8820
-)
-
-python "%~dp0smoke.py" --quick %PORTARG%
-set RESULT=%ERRORLEVEL%
-
+set "PORTARG="
+if not "%~1"=="" set "PORTARG=--port %~1"
+%PY% "%~dp0smoke.py" %PORTARG%
 echo.
-if "%RESULT%"=="0" (
-  echo   ---------------------------------------------
-  echo   Nothing broken. It boots and every feed answers.
-  echo.
-  echo   This does not say the picture looks right - that
-  echo   still needs your eyes. Open the app and check the
-  echo   briefing has entries and the optics switch.
-) else (
-  echo   ---------------------------------------------
-  echo   Something is wrong. The lines above name it.
-  echo   Do not record until it is clear.
-)
+pause
+exit /b 0
 
+:nopython
 echo.
-echo   Press any key to close.
-pause >nul
+echo   ---------------------------------------------------------------
+echo    This needs Python, and it is not installed yet.
+echo   ---------------------------------------------------------------
+echo.
+echo    Python is free and takes about two minutes. Get it from:
+echo.
+echo        https://www.python.org/downloads/
+echo.
+echo    On the first screen of the installer there is a checkbox at the
+echo    bottom that says "Add python.exe to PATH".
+echo.
+echo        TICK THAT BOX. Nothing here works without it, and it is off
+echo        by default. If you miss it, run the installer again and
+echo        choose Modify.
+echo.
+echo    Then close this window and double-click this file again.
+echo.
+echo    Already installed? Then Windows cannot see it, which is the same
+echo    missing checkbox. Re-run the installer and choose Modify.
+echo.
+echo   ---------------------------------------------------------------
+echo.
+pause
+exit /b 1

@@ -6,6 +6,31 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.88.2 — for somebody who has never installed Python
+
+Asked whether a stranger downloading the ZIP gets a decent explanation, given
+some of them will never have had Python on the machine. They did not.
+
+Double-clicking the start script without Python did one of two unhelpful things:
+printed `'python' is not recognized`, or opened the Microsoft Store, and then
+closed itself after three seconds. Either way the reader learns nothing and has
+no time to read it.
+
+Both scripts now look for Python before doing anything, trying the `py` launcher
+first — plain `python` on a machine without Python is a Windows App Execution
+Alias that opens the Store, which looks like the script did something bewildering
+rather than nothing. If nothing suitable is found they print where to get it, and
+**pause**, so the window stays until it is read.
+
+The message spends most of its words on one checkbox: *Add python.exe to PATH*,
+at the bottom of the first installer screen, off by default, and the single
+reason a correctly installed Python is invisible to Windows. It also answers the
+follow-up — "I already installed it" — with the same cause.
+
+The README leads with the double-click path for somebody who has never done this,
+and says plainly that no Python needs to be known: nothing here is edited or
+compiled, the file is run the way an application is.
+
 ## 0.88.1 — where LiveATC actually works
 
 Reported from use: the tower link plays in the United States and finds nothing in

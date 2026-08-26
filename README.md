@@ -13,23 +13,36 @@ that rather than drawing an empty map.
 
 ## Getting it running
 
-You need **Python 3.9 or newer** and a browser. That is the whole dependency
-list — no `pip install`, no npm, no build step. The globe engine loads from a CDN,
+**Windows, and you have never installed anything like this:** download the ZIP,
+right-click it, choose **Extract All**, then double-click
+**`Start Global Command View.cmd`** inside. If Python is missing it will tell you
+so and wait, rather than flashing a window at you.
+
+**Everything else:** `python server.py`, then open <http://localhost:8820>.
+
+`--port 8821` moves it if something already holds the port; `--no-open` skips the
+browser. **`Stop Global Command View.cmd`** shuts the server down, and closing the
+window does too.
+
+There is **no configuration step, no account, and nothing to install beyond
+Python.** No `pip install`, no npm, no build. The globe engine loads from a CDN,
 so the first run needs internet.
 
-**Windows:** double-click **`Start Global Command View.cmd`**. It starts the
-server and opens your browser. **`Stop Global Command View.cmd`** shuts it down.
+### If you do not have Python
 
-**Anywhere:**
+You need **Python 3.9 or newer**. It is free, from
+<https://www.python.org/downloads/>, and takes about two minutes.
 
-```bash
-python server.py
-```
+> **On the first screen of the Windows installer there is a checkbox at the bottom
+> reading "Add python.exe to PATH". Tick it.** It is off by default and nothing
+> here works without it — Windows will not be able to find Python even though it
+> is installed. If you miss it, run the installer again and choose **Modify**.
 
-Then open <http://localhost:8820>. Add `--port 8821` if something already holds
-the port, and `--no-open` if you do not want a browser window.
+On macOS and most Linux distributions Python is already there. Check with
+`python3 --version`.
 
-That is it. **There is no configuration step and no account to create.**
+You do not need to know any Python. Nothing here is edited or compiled; the file
+is run, the same way an application is.
 
 ### What you get with no keys at all
 
