@@ -278,11 +278,32 @@ function gibsDay() {
   return new Date(ms).toISOString().slice(0, 10);
 }
 
+/*
+ * Sentinel-2 revisits the same ground every five days or so, which means asking
+ * for one date gives you a few diagonal strips of imagery and nothing else -
+ * a layer that looks broken rather than one that is empty. So the slider's day
+ * is the *end* of a window reaching back far enough to have caught a pass.
+ *
+ * The cost of that is honest and worth stating: what comes back may be stitched
+ * from up to two overflights a few days apart, so it is very nearly a snapshot
+ * rather than exactly one. Still the opposite of the cloudless mosaic, which
+ * averages a year and keeps nothing that happened.
+ */
+const SENTINEL_WINDOW_DAYS = 10;
+
+function sentinelWindow() {
+  const end = gibsDay();
+  const start = new Date(Date.parse(end) - SENTINEL_WINDOW_DAYS * 86400_000)
+    .toISOString().slice(0, 10);
+  return start + '/' + end;
+}
+
 function makeImageryLayer(key) {
   const spec = IMAGERY[key];
   // Already NASA, or already openly licensed: nothing to substitute in either
   // mode. Only the styles whose terms are the problem get swapped.
-  const url = spec.gibs ? spec.url.replace('{gibsDay}', gibsDay())
+  const url = spec.cdse ? spec.url.replace('{window}', sentinelWindow())
+    : spec.gibs ? spec.url.replace('{gibsDay}', gibsDay())
     : spec.openLicence ? spec.url
     : !safeMode ? spec.url
     : key === 'ops' ? SAFE_IMAGERY.blueMarble
@@ -6698,7 +6719,7 @@ function renderLegend() {
 }
 
 function styleIsDated(key) {
-  return !!IMAGERY[key].gibs || safeMode;
+  return !!IMAGERY[key].gibs || !!IMAGERY[key].cdse || safeMode;
 }
 
 function rebuildImagery() {
@@ -7732,6 +7753,19 @@ const SERVICES = [
       'Restrict the key by referrer to this address, the way the Google one is. The browser fetches the tiles directly, so the key reaches the page.',
     ],
   },
+  {
+    name: 'Copernicus Data Space',
+    adds: 'Sentinel-2 <i>on a given day</i>, at 10 m. The Sentinel layer already here is the EOX cloudless mosaic - a year of passes averaged into a basemap with no clouds, no smoke, no ships and no flood in it. This is the other kind: one acquisition, with whatever was in the air still in it. A sediment plume, the edge of a burn scar, a flooded field, an algal bloom.',
+    url: 'https://dataspace.copernicus.eu/',
+    fields: ['copernicus'],
+    steps: [
+      'Register at dataspace.copernicus.eu. Free, and the account is instant.',
+      'From your dashboard, open the <b>Configuration Utility</b> — that is the part that makes OGC endpoints, and it is what produces an instance id. I have not clicked through it myself, so if the wording has moved, look for whatever creates a WMS or WMTS configuration.',
+      'Inside that configuration, add the visualisations you want: true colour, false colour, NDVI, whatever suits. The app asks your instance what it holds and builds one style button per answer, so it shows exactly what you set up and never a button that fetches nothing.',
+      'Paste the instance id below and reload. The new styles appear beside SENTINEL 10M and follow the imagery-day slider.',
+      'Two honest limits. The free tier is <b>10,000 processing units a month</b> and they do not roll over, so this is a layer to visit one place with rather than fly around on. And Sentinel-2 passes every five days or so, which is why the app asks for a ten-day window ending on the slider day — what comes back may be stitched from two passes rather than one.',
+    ],
+  },
 ];
 
 async function renderKeyRows() {
@@ -7982,10 +8016,222 @@ function updateFoldTallies() {
 setInterval(updateFoldTallies, 1500);
 updateFoldTallies();
 
+/* ----------------------------------------------------------- performance */
+
+/*
+ * A switch for hardware that is not this one.
+ *
+ * The globe renders continuously by default: sixty times a second whether or not
+ * anything has changed. On a desktop with a discrete card that is invisible. On
+ * a thin laptop with integrated graphics it is a warm fan and a flat battery
+ * while a stationary globe is repainted over and over for no reason - and with
+ * the layers this app starts with, nothing on screen is moving at all.
+ *
+ * So the main saving is not lower quality, it is not drawing what has not
+ * changed. Cesium already asks for a frame when the camera moves or a tile
+ * arrives; what it cannot know about is our own animation, so anything that
+ * moves under its own steam pumps the renderer itself, at a rate chosen here
+ * rather than by the monitor.
+ *
+ * The rest is ordinary thrift: coarser terrain, no fog, no atmosphere, and the
+ * two Cesium ion products - terrain and buildings - switched off, since those
+ * are the heaviest things the app can put on screen.
+ */
+
+let thrifty = localStorage.getItem('gcv-thrifty') === '1';
+let thriftyPump = null;
+
+// Only these move on their own. Everything else changes when the camera does,
+// which Cesium already notices without being told.
+const MOVING_LAYERS = ['flights', 'services', 'vessels', 'satellites'];
+
+function somethingIsMoving() {
+  return MOVING_LAYERS.some((id) => (LAYERS.find((l) => l.id === id) || {}).on)
+    || !!followed;
+}
+
+function pumpRenderer() {
+  clearInterval(thriftyPump);
+  thriftyPump = null;
+  if (!thrifty) return;
+  // 20 a second rather than 60: a third of the drawing for animation that is
+  // still smooth to look at. Only runs while something actually moves.
+  thriftyPump = setInterval(() => {
+    if (somethingIsMoving()) scene.requestRender();
+  }, 50);
+}
+
+function applyThrifty(announce) {
+  localStorage.setItem('gcv-thrifty', thrifty ? '1' : '0');
+  $('#thrifty').checked = thrifty;
+  $('#thrifty-note').textContent = thrifty
+    ? 'Draws only when something changes, caps animation at 20 a second, and '
+      + 'drops fog, atmosphere, terrain detail and 3D buildings. Meant for '
+      + 'laptops and integrated graphics. Nothing here changes what the data says.'
+    : 'Off: continuous rendering at whatever rate the screen allows. Fine on a '
+      + 'desktop with its own graphics card; switch this on if the globe feels '
+      + 'heavy or the fan is loud.';
+
+  if (thrifty) {
+    scene.requestRenderMode = true;
+    // How far the simulated clock may drift before a frame is drawn anyway.
+    scene.maximumRenderTimeChange = 1.0;
+    viewer.targetFrameRate = 30;
+    scene.fog.enabled = false;
+    scene.skyAtmosphere.show = false;
+    scene.globe.showGroundAtmosphere = false;
+    // Cesium's default is 2. Four asks for roughly half the terrain tiles.
+    scene.globe.maximumScreenSpaceError = 4;
+    if (ionBuildings) ionBuildings.show = false;
+    if ($('#grain').checked) {
+      $('#grain').checked = false;
+      $('#scanlines').classList.add('off');
+    }
+  } else {
+    scene.requestRenderMode = false;
+    viewer.targetFrameRate = undefined;
+    scene.fog.enabled = true;
+    scene.skyAtmosphere.show = true;
+    scene.globe.showGroundAtmosphere = true;
+    scene.globe.maximumScreenSpaceError = 2;
+    if (ionBuildings) ionBuildings.show = $('#buildings').checked && !$('#photoreal').checked;
+  }
+
+  pumpRenderer();
+  scene.requestRender();
+  if (announce) {
+    log(thrifty
+      ? 'performance mode ON · drawing only on change, animation capped at 20/s'
+      : 'performance mode OFF · continuous rendering, full atmosphere');
+  }
+}
+
+$('#thrifty').onchange = (e) => {
+  thrifty = e.target.checked;
+  applyThrifty(true);
+};
+
+/*
+ * Offer the switch to the people who need it, rather than wait to be found.
+ *
+ * Someone on a thin laptop does not necessarily know that a globe can be told
+ * to draw less; they know it feels heavy, and heavy things get closed. So the
+ * app watches its own frame interval and says something once - after the first
+ * few seconds, which are always slow while tiles arrive, and never again in the
+ * same session. A hint that repeats is nagging, and nagging gets ignored.
+ *
+ * Measured, not guessed: this is the real gap between frames, not the cost of
+ * one function inside them.
+ */
+const SLOW_FRAME_MS = 33;        // below roughly 30 a second
+const SLOW_SAMPLE = 120;         // frames to judge on
+let slowFrames = [], slowSaid = false, slowWatchFrom = 0;
+
+scene.postRender.addEventListener(() => {
+  if (slowSaid || thrifty) return;
+  const now = performance.now();
+  if (!slowWatchFrom) { slowWatchFrom = now; return; }
+  // The first eight seconds are terrain and imagery arriving. Judging then
+  // would flag every machine, including the fast ones.
+  if (now - slowWatchFrom < 8000) return;
+
+  slowFrames.push(now);
+  if (slowFrames.length < SLOW_SAMPLE) return;
+
+  const gaps = [];
+  for (let i = 1; i < slowFrames.length; i++) gaps.push(slowFrames[i] - slowFrames[i - 1]);
+  gaps.sort((a, b) => a - b);
+  const median = gaps[gaps.length >> 1];
+  slowFrames = [];
+
+  if (median > SLOW_FRAME_MS) {
+    slowSaid = true;
+    log(`this is drawing at about ${Math.round(1000 / median)} a second · `
+      + 'Performance mode under Broadcast will lighten it', 'warn');
+  }
+});
+
+/* ------------------------------------------------------------ copernicus */
+
+/*
+ * Sentinel-2 on a given day, at 10 m, from the user's own Copernicus instance.
+ *
+ * SENTINEL 10M already in this list is EOX's cloudless mosaic: a year of passes
+ * averaged into a basemap with no clouds, no smoke, no ships and no flood in it.
+ * Useful, and the wrong tool for asking what happened. These are the other kind
+ * - an actual acquisition, with whatever was in the air still in it.
+ *
+ * Which visualisations exist is not decided here. A Copernicus configuration
+ * holds whatever the operator set up in their dashboard, so the server asks the
+ * instance and this builds a style per answer. Guessing at names would produce
+ * buttons that fetch nothing, which is worse than no button.
+ */
+
+async function loadCopernicus() {
+  let caps;
+  try {
+    caps = await getJSON('/api/copernicus');
+  } catch (err) {
+    log(`copernicus: could not ask the instance (${err.message})`, 'warn');
+    return;
+  }
+  if (caps.needs_key) return;                 // not set up; the Setup tab says how
+  if (caps.error) {
+    log(`copernicus: ${caps.error}`, 'warn');
+    return;
+  }
+  if (!caps.layers || !caps.layers.length) {
+    log('copernicus: the instance is reachable but has no visualisations configured', 'warn');
+    return;
+  }
+
+  // Web Mercator is the only projection the globe's tile pipeline takes. If the
+  // instance offers none, say which it does offer rather than fetch blank tiles.
+  const matrix = (caps.matrixSets || []).find((m) => /WebMercator|3857/.test(m));
+  if (!matrix) {
+    log('copernicus: this instance offers no web mercator tile matrix set '
+      + `(${(caps.matrixSets || []).join(', ') || 'none listed'})`, 'warn');
+    return;
+  }
+
+  const base = 'https://sh.dataspace.copernicus.eu/ogc/wmts/'
+    + encodeURIComponent(caps.instance);
+  let added = 0;
+  for (const layer of caps.layers) {
+    const key = 'cdse_' + layer.id.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+    if (IMAGERY[key]) continue;
+    IMAGERY[key] = {
+      label: layer.title.toUpperCase().slice(0, 18),
+      url: base
+        + '?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile'
+        + '&LAYER=' + encodeURIComponent(layer.id)
+        + '&TILEMATRIXSET=' + encodeURIComponent(matrix)
+        + '&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}'
+        + '&FORMAT=image/jpeg&TIME={window}',
+      // Copernicus Sentinel data is free to use, commercial use included, so
+      // long as the modification is declared. That makes these usable in
+      // commercial-safe mode, which the sharp Esri imagery is not.
+      credit: 'Contains modified Copernicus Sentinel data — '
+            + 'Copernicus Data Space Ecosystem',
+      max: 16,
+      cdse: true,
+      openLicence: true,
+      tune: { brightness: 1.03, contrast: 1.08, saturation: 1.04, hue: 0.0, gamma: 1.0 },
+    };
+    added++;
+  }
+  if (!added) return;
+  renderStyles();
+  log(`copernicus: ${added} dated Sentinel visualisation(s) · `
+    + `${SENTINEL_WINDOW_DAYS}-day window, 10 m`);
+}
+
 /* ------------------------------------------------------------------ boot */
 
 renderLayerList();
 renderStyles();
+loadCopernicus();
+applyThrifty(false);
 renderPlaces();
 applyVisibility();
 

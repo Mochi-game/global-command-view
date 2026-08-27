@@ -6,6 +6,49 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.91.0 — a switch for hardware that is not this one
+
+Asked how this behaves for people who are not running it on a strong desktop.
+Worth measuring rather than guessing, so: the per-frame loop costs 0.123 ms for
+11,640 objects, about 0.7 percent of a 60 Hz budget. It is not the bottleneck,
+and it culls to the view and skips layers that are off before doing any work.
+Terrain and buildings turn out to be gated behind a Cesium ion key, so a first
+run without one is already light. One thing I had assumed was wrong and is
+corrected here: useBrowserRecommendedResolution is true by default, so Cesium
+already renders at CSS pixels and a high-DPI screen was never paying four times.
+
+What was real: the globe redraws continuously, sixty times a second, whether or
+not anything has changed - and with the layers this app starts with, nothing on
+screen is moving at all. On a laptop that is a loud fan and a flat battery
+spent repainting a stationary picture.
+
+**Performance mode**, under Broadcast. The saving is not lower quality, it is
+not drawing what has not changed. Cesium already asks for a frame when the
+camera moves or a tile lands; what it cannot know about is our own animation,
+so anything that moves under its own steam pumps the renderer at twenty a
+second instead of sixty. Fog, atmosphere and 3D buildings come off and terrain
+is asked for at roughly half the detail. Nothing in it changes what the data
+says.
+
+The app also times its own frames now - the real gap between them, not the cost
+of one function inside them - and if it is drawing below about thirty a second
+once the tiles have settled it says so once and points at the switch. Once. A
+hint that repeats is nagging.
+
+**Dated Sentinel-2, at 10 m**, from a Copernicus instance. The Sentinel layer
+already here is the EOX cloudless mosaic: a year of passes averaged into a
+basemap with no clouds, no smoke, no ships and no flood in it. Sharp, and
+undated. NASA's daily imagery is dated and 375 m, where a sediment plume is a
+brown smudge. Nothing here was both. This is.
+
+Which visualisations exist is not decided in this repo. A Copernicus
+configuration holds whatever its owner set up, so the server asks the instance
+what it offers and builds one style button per answer. Guessing at layer names
+would produce buttons that fetch nothing, which is worse than no button. Needs
+a free account; the Setup tab carries the steps and the two limits worth
+knowing - 10,000 processing units a month that do not roll over, and a five-day
+revisit that is why the request asks for a ten-day window rather than a date.
+
 ## 0.90.2 — two feeds checked without being able to run them
 
 The air quality and fishing layers have never run against a live API, because

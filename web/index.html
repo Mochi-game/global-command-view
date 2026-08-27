@@ -178,6 +178,11 @@
     </label>
     <p id="safe-note" class="adds"></p>
     <label class="toggle-row">
+      <input type="checkbox" id="thrifty">
+      <span>Performance mode</span>
+    </label>
+    <p id="thrifty-note" class="adds"></p>
+    <label class="toggle-row">
       <input type="checkbox" id="tour">
       <span>Auto tour the briefing</span>
     </label>
@@ -409,6 +414,13 @@
         <li><b>THERMAL</b>, <b>NIGHT VIS</b>, <b>FLIR</b> — sensor emulations.</li>
         <li><b>CRT</b> — a real post-process pass: barrel distortion, scan lines,
           chromatic separation.</li>
+        <li><b>SENTINEL 10M</b> &mdash; sharp, and <i>not</i> dated. It is a
+          cloudless mosaic composited from a year of passes, so it has no clouds,
+          no smoke, no ships and no flood in it. A basemap, not a look.</li>
+        <li>Any style from your own <b>Copernicus</b> instance &mdash; the
+          opposite trade. One acquisition at 10 m, with whatever was in the air
+          still in it, following the imagery-day slider. Needs a free account;
+          the Setup tab has the steps and the two limits worth knowing.</li>
       </ul>
 
       <h3>5 · Clicking things</h3>
@@ -705,6 +717,32 @@
           hidden windows, and the globe then stops streaming tiles. Keep it
           visible behind OBS, or on a second screen.</li>
       </ul>
+
+      <h3>If it feels heavy</h3>
+      <p>
+        The globe redraws continuously by default &mdash; sixty times a second
+        whether or not anything has changed. On a desktop with its own graphics
+        card that costs nothing you would notice. On a laptop with integrated
+        graphics it is a loud fan and a flat battery, often while nothing on
+        screen is moving at all.
+      </p>
+      <p>
+        <b>Performance mode</b>, under Broadcast, stops that. The main saving is
+        not lower quality: it is not drawing what has not changed. Anything that
+        moves under its own steam &mdash; aircraft, vessels, satellites, a
+        followed contact &mdash; still animates, at twenty frames a second rather
+        than sixty. Fog, atmosphere and 3D buildings come off, and terrain is
+        asked for at roughly half the detail.
+      </p>
+      <p>
+        Nothing in it changes what the data says. It changes how often the
+        picture is painted, and how much scenery is painted with it.
+      </p>
+      <p>
+        The app also times its own frames. If it is drawing below about thirty a
+        second once the tiles have settled, it says so in the feed log, once, and
+        points at the switch. It will not ask twice.
+      </p>
     </section>
 
     <section class="guide-body" id="guide-about" hidden>

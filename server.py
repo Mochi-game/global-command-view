@@ -34,10 +34,11 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "0.90.2"
+VERSION = "0.91.0"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -778,6 +779,7 @@ def bump_usage(raw):
 ALLOWED_KEYS = (
     "windy", "trafikverket", "opensky_client_id", "opensky_client_secret",
     "aisstream", "cesium_ion", "google_maps", "openaq", "gfw", "tomtom",
+    "copernicus",
 )
 
 
@@ -3279,6 +3281,102 @@ def tomtom_key():
     return json.dumps({"key": key, "source": "TomTom Traffic Flow"}).encode(), "memory"
 
 
+# ---------------------------------------------------------------- copernicus
+
+# Sentinel-2 as it was on a given day, at 10 m.
+#
+# The app already carries Sentinel-2, but EOX's cloudless mosaic is composited
+# from a year of passes: no clouds, no smoke, no ships, no flood. It is a
+# basemap. This is the other thing - one acquisition, with whatever was in the
+# air that week still in it. That is the difference between a map and a look.
+#
+# What it can show is decided by the user, not by this file. A Copernicus
+# instance is configured in their dashboard and holds whatever visualisations
+# they set up there - true colour, false colour, NDVI, moisture. Rather than
+# guess at names that may not exist, this asks the instance what it has and
+# hands the real list over. A layer nobody configured never appears.
+
+COPERNICUS_WMTS = "https://sh.dataspace.copernicus.eu/ogc/wmts/%s"
+COPERNICUS_TTL = 6 * 3600
+
+
+def copernicus():
+    """The instance id, plus whatever visualisations it actually offers."""
+    instance = KEYS.get("copernicus", "")
+    if not instance:
+        return json.dumps({
+            "layers": [],
+            "needs_key": "copernicus",
+            "how": "free at dataspace.copernicus.eu - create a configuration in the "
+                   "Sentinel Hub dashboard and put its instance id in keys.json "
+                   "as copernicus",
+        }).encode(), "no key"
+
+    hit = _mem_get("copernicus_caps")
+    if hit and time.time() - hit[0] < COPERNICUS_TTL:
+        return hit[1], "memory"
+
+    url = (COPERNICUS_WMTS % urllib.parse.quote(instance, safe="")
+           + "?SERVICE=WMTS&REQUEST=GetCapabilities")
+    try:
+        with urllib.request.urlopen(
+                urllib.request.Request(url, headers={"User-Agent": USER_AGENT}),
+                timeout=TIMEOUT) as resp:
+            xml = resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as exc:
+        detail = ("the instance id was refused" if exc.code in (401, 403, 404)
+                  else "HTTP %d" % exc.code)
+        log("copernicus: %s" % detail)
+        return json.dumps({"layers": [], "error": detail}).encode(), "error"
+    except Exception as exc:  # noqa: BLE001
+        log("copernicus: %s" % exc)
+        return json.dumps({"layers": [], "error": str(exc)}).encode(), "error"
+
+    # Namespaces vary between servers, so this reads local tag names rather than
+    # binding to one spelling of the WMTS schema.
+    layers, matrix_sets = [], []
+    try:
+        root = xml_tree.fromstring(xml)
+    except Exception as exc:  # noqa: BLE001
+        log("copernicus: capabilities would not parse (%s)" % exc)
+        return json.dumps({
+            "layers": [],
+            "error": "the instance answered, but not with readable capabilities",
+        }).encode(), "error"
+
+    def tag(el):
+        return el.tag.rsplit("}", 1)[-1]
+
+    for el in root.iter():
+        name = tag(el)
+        if name == "Layer":
+            ident = title = ""
+            for child in el:
+                if tag(child) == "Identifier":
+                    ident = (child.text or "").strip()
+                elif tag(child) == "Title":
+                    title = (child.text or "").strip()
+            if ident:
+                layers.append({"id": ident, "title": title or ident})
+        elif name == "TileMatrixSet" and len(el) == 0:
+            text = (el.text or "").strip()
+            if text and text not in matrix_sets:
+                matrix_sets.append(text)
+
+    # Web Mercator is the only projection the globe's tile pipeline takes.
+    mercator = [m for m in matrix_sets if "WebMercator" in m or "3857" in m]
+
+    data = json.dumps({
+        "instance": instance,
+        "layers": layers,
+        "matrixSets": mercator or matrix_sets,
+        "source": "Copernicus Data Space Ecosystem, Sentinel Hub OGC",
+    }).encode()
+    _mem_put("copernicus_caps", data)
+    log("copernicus: %d visualisation(s) offered by this instance" % len(layers))
+    return data, "network"
+
+
 # --------------------------------------------------------------------- search
 
 # One box that takes whatever you have: a coordinate off a kneeboard, an ICAO
@@ -5289,6 +5387,8 @@ class Handler(SimpleHTTPRequestHandler):
                 if len(box) != 4:
                     return self._send(400, b'{"error":"bbox=w,s,e,n required"}')
                 data, source = aprs_stations(tuple(float(v) for v in box))
+            elif name == "copernicus":
+                data, source = copernicus()
             elif name == "search":
                 data, source = search(query.get("q", [""])[0])
             elif name == "geocode":
