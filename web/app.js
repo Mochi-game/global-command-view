@@ -7861,6 +7861,7 @@ const SOURCE_LICENCES = [
   ['Wikidata', 'entity graph, heads of state', 'CC0', 'free'],
   ['CelesTrak', 'orbital elements, satellite catalogue', 'free with attribution', 'free'],
   ['EOX s2cloudless', 'Sentinel-2 10 m cloudless mosaic', 'CC BY 4.0, attribution required', 'free'],
+  ['Copernicus Data Space', 'Sentinel-2 on a given day at 10 m, from your own instance', 'free and open, commercial use included, attribution required: contains modified Copernicus Sentinel data', 'free'],
   ['Smithsonian GVP', 'volcanic eruptions', 'attribution required', 'free'],
   ['KiwiSDR network', 'open shortwave receivers', 'per-receiver, volunteer run', 'free'],
   ['APRS-IS', 'amateur radio positions', 'read-only, unverified login', 'free'],
@@ -7882,7 +7883,29 @@ const SOURCE_LICENCES = [
   ['NASA FIRMS', 'active fire / thermal detections', 'open data, attribution requested', 'free'],
   ['TeleGeography', 'submarine cable map', 'CC BY-SA 4.0 for the map; the data feed this uses is pointed at commercial licensing', 'ask them'],
   ['USNI News', 'fleet positions', 'facts cited, editorial not reproduced', 'free'],
+  ['Google Maps Platform', 'photorealistic 3D and Street View panoramas', 'commercial terms: a monthly free allowance, then billed. Neither free-for-anything nor non-commercial - read the terms and watch the spend panel', 'paid'],
 ];
+
+/*
+ * What the badge on a source row is allowed to say.
+ *
+ * This was a binary - free, or NON-COMM - and the binary was wrong about
+ * Google, whose terms permit commercial use and bill for it. That is a
+ * different answer from "you may not sell this", and it is the wrong warning to
+ * give somebody deciding what may go in a monetised video.
+ *
+ * Every value used in SOURCE_LICENCES needs an entry here. The smoke test
+ * checks that, because widening this map is exactly the sort of change that
+ * silently relabels seven rows nobody was looking at.
+ */
+const BADGE = {
+  free: ['free', 'ANY USE'],
+  'free key': ['free', 'ANY USE'],
+  'free token': ['free', 'ANY USE'],
+  'non-commercial': ['nc', 'NON-COMM'],
+  paid: ['paid', 'PAID USE'],
+  'ask them': ['nc', 'ASK THEM'],
+};
 
 function renderSourceRows() {
   const host = $('#source-rows');
@@ -7892,7 +7915,12 @@ function renderSourceRows() {
     row.className = 'source-row';
     row.innerHTML =
       `<b>${name}</b><span class="what">${what} — ${licence}</span>` +
-      `<span class="use ${use === 'free' ? 'free' : 'nc'}">${use === 'free' ? 'ANY USE' : 'NON-COMM'}</span>`;
+      // Three states, not two. A binary here said NON-COMM about Google, whose
+      // terms allow commercial use and charge for it - which is a different
+      // thing, and the wrong warning to give somebody deciding what they may
+      // put in a monetised video.
+      `<span class="use ${BADGE[use] ? BADGE[use][0] : 'nc'}">`
+      + `${BADGE[use] ? BADGE[use][1] : 'CHECK IT'}</span>`;
     host.append(row);
   }
 }

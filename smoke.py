@@ -192,6 +192,45 @@ def check_keys_documented(app_js, report):
                     % len(declared))
 
 
+def check_badges(app_js, report):
+    """A source row whose licence badge has nothing to say.
+
+    The badge was widened from two states to three, and doing that quietly
+    relabelled seven rows to a fallback because their value was not in the new
+    map: NON-COMM became CHECK IT on sources whose terms had not changed. A
+    licence badge that drifts is worse than no badge, because somebody reads it
+    before deciding what they are allowed to sell.
+    """
+    start = app_js.find("const SOURCE_LICENCES")
+    if start == -1:
+        report.fail("sources", "SOURCE_LICENCES not found")
+        return
+    block = app_js[start:app_js.index("\n];", start)]
+
+    used = set()
+    for line in block.split("\n"):
+        line = line.strip()
+        if not line.startswith("['"):
+            continue
+        quoted = re.findall(r"'([^']*)'", line)
+        if len(quoted) >= 4:
+            used.add(quoted[-1])
+
+    at = app_js.find("const BADGE = {")
+    if at == -1:
+        report.fail("sources", "BADGE map not found")
+        return
+    badge = app_js[at:app_js.index("};", at)]
+    known = set(re.findall(r"^\s*'?([a-z -]+?)'?:", badge, re.M))
+
+    orphan = sorted(u for u in used if u not in known)
+    if orphan:
+        report.fail("sources", "licence values with no badge, so they fall back: %s"
+                    % ", ".join(orphan))
+    else:
+        report.note("source badges: all %d licence values have one" % len(used))
+
+
 def check_cache(report):
     """The disk cache inside the ceilings it claims to keep.
 
@@ -497,6 +536,7 @@ def main():
     check_placeholders(app_js, report)
     check_grouped(app_js, report)
     check_keys_documented(app_js, report)
+    check_badges(app_js, report)
     check_commas(app_js, report)
     check_cache(report)
     check_ids(app_js, index_html, report)

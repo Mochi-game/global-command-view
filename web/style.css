@@ -567,6 +567,7 @@ h2 .tally {
 .source-row .use { text-align: right; letter-spacing: 0.1em; font-size: 10px; }
 .source-row .use.free { color: #7dffab; }
 .source-row .use.nc { color: var(--amber); }
+.source-row .use.paid { color: #8ab4ff; }
 
 #coffee {
   display: flex;

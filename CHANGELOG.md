@@ -6,6 +6,33 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.91.5 — two missing sources, and a badge that could only say two things
+
+Noticed that Copernicus was not in SOURCES & LICENCES. It was not, and neither
+was Google Maps Platform - photorealistic 3D and Street View, listed nowhere,
+while "Google DNS" for registry lookups was. Both are there now, 49 rows.
+
+Adding Google exposed the real problem. The badge was a binary: ANY USE, or
+NON-COMM. Google is neither. Their terms permit commercial use and bill for it
+beyond a monthly allowance, which is a different answer from "you may not sell
+this" - and it is the wrong warning to give somebody deciding what may go into
+a monetised video. There is now a third state, PAID USE.
+
+Widening it broke seven rows. Values the old code handled - `free key`,
+`free token`, `non-commercial` - were absent from the new map and fell through
+to a fallback, so NON-COMM silently became CHECK IT on four sources whose terms
+had not changed, and three free-with-a-key sources lost their ANY USE. Found by
+reading the rendered rows rather than the diff, which would not have shown it.
+
+A licence badge that drifts is worse than no badge, because somebody reads it
+before deciding what they may sell. So this is now tested: every licence value
+in SOURCE_LICENCES must have a BADGE entry, and the smoke test names the ones
+that do not. It caught a hyphen bug in its own pattern on the first run, which
+is the right kind of first result.
+
+Fifth time in this codebase a second copy of a list has drifted from the first.
+Two of those classes are now under test.
+
 ## 0.91.4 — it runs on a Mac, and now it starts like one
 
 Asked whether this can be installed on a Mac. The server always could: it is
