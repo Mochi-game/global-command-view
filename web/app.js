@@ -7372,6 +7372,35 @@ function renderStyles() {
  * Those are different kinds of answer and the difference belongs on screen.
  */
 
+/*
+ * Push wherever the Cesium camera is now into Google's 3D view.
+ *
+ * While photoreal is on, the globe underneath is hidden. Anything that moves the
+ * Cesium camera - the search box, a Jump to preset, a mark - therefore moved a
+ * camera nobody could see, and the screen sat still while the app insisted it
+ * had flown somewhere. Reported as "I put in coordinates and now I cannot go to
+ * globe or palm", which is exactly what that looks like from the outside.
+ *
+ * Anything that moves the camera calls this afterwards. When 3D is off it costs
+ * one comparison and returns.
+ */
+function carryCameraInto3D() {
+  if (!map3d || $('#map3d').hidden) return;
+  const target = cameraTarget();
+  const at = Cesium.Cartographic.fromCartesian(target);
+  map3d.center = {
+    lat: Cesium.Math.toDegrees(at.latitude),
+    lng: Cesium.Math.toDegrees(at.longitude),
+    altitude: at.height || 0,
+  };
+  map3d.range = Math.max(120,
+    Cesium.Cartesian3.distance(viewer.camera.position, target));
+  map3d.tilt = Math.min(89, Math.max(0,
+    90 + Cesium.Math.toDegrees(viewer.camera.pitch)));
+  map3d.heading = (Cesium.Math.toDegrees(viewer.camera.heading) + 360) % 360;
+  mirrorLayers();
+}
+
 async function flyToQuery(text) {
   const said = $('#find-said');
   const query = (text || '').trim();
@@ -7407,6 +7436,9 @@ async function flyToQuery(text) {
     destination: Cesium.Cartesian3.fromDegrees(found.lon, found.lat, found.height || 20000),
     orientation: { heading: 0, pitch: Cesium.Math.toRadians(-60), roll: 0 },
     duration: 2.2,
+    // The globe is hidden while photoreal is on, so the flight has to be handed
+    // over at the end or nothing visible happens at all.
+    complete: carryCameraInto3D,
   });
   log(`find: ${found.label} · ${how} · `
     + `${found.lat.toFixed(4)}, ${found.lon.toFixed(4)}`);
@@ -7452,6 +7484,9 @@ function renderPlaces() {
           ? { heading: 0, pitch: Cesium.Math.toRadians(-90), roll: 0 }
           : flightOrientation(),
         duration: 2.2,
+        // Hand the flight over to Google's view when photoreal is on, or the
+        // preset moves a camera hidden behind it and the screen sits still.
+        complete: carryCameraInto3D,
       });
       setTimeout(pollFlights, 2600);
     };

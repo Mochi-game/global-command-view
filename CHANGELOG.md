@@ -6,6 +6,28 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.90.1 — moving the camera nobody could see
+
+Reported an hour after the search box shipped: put in a coordinate, and now
+Jump to does nothing either. Neither globe nor palm.
+
+Both worked. The screen did not, because photoreal 3D was on.
+
+While it is, Cesium's globe is hidden behind Google's element. The search box and
+every Jump to preset move the Cesium camera, and with the globe hidden that is a
+camera nobody can see: the app flies somewhere, says so in the feed, and the
+screen sits still. Which reads exactly as "the buttons stopped working".
+
+Anything that moves the camera now hands the new position over to the 3D view
+when it finishes. Verified with photoreal on: search 67.8548, 20.5236 and the
+Google view lands on Kiruna at 67.886, 20.524, tilt 30 degrees — ninety minus the
+sixty of pitch the search flies with.
+
+Worth naming the shape of it. The bug was not in the search or in the presets. It
+was in an assumption both of them inherited from before there were two renderers:
+that moving the camera is the same as changing the view. It has not been true
+since photoreal went in, and everything written since has quietly assumed it.
+
 ## 0.90.0 — a box that takes you anywhere
 
 Asked for: type a coordinate the way a flight simulator writes it, or a town, or
