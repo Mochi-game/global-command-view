@@ -35,7 +35,14 @@ right-click it, choose **Extract All**, then double-click
 **`Start Global Command View.cmd`** inside. If Python is missing it will tell you
 so and wait, rather than flashing a window at you.
 
-**Everything else:** `python server.py`, then open <http://localhost:8820>.
+**macOS:** download the ZIP, unpack it, then double-click
+**`Start Global Command View.command`** inside. If double-clicking does nothing,
+the executable bit did not survive the download — open Terminal in that folder
+and run `chmod +x "Start Global Command View.command"` once, then it works from
+then on. The same file runs on Linux.
+
+**Anything else, or if you would rather type it:** `python3 server.py`, then
+open <http://localhost:8820>. Ctrl+C stops it.
 
 `--port 8821` moves it if something already holds the port; `--no-open` skips the
 browser. **`Stop Global Command View.cmd`** shuts the server down, and closing the
@@ -44,6 +51,10 @@ window does too.
 There is **no configuration step, no account, and nothing to install beyond
 Python.** No `pip install`, no npm, no build. The globe engine loads from a CDN,
 so the first run needs internet.
+
+The server itself is plain cross-platform Python — only the launchers differ.
+The `.cmd` files and `stop.ps1` are for Windows, the `.command` file is for
+macOS and Linux, and `python3 server.py` works everywhere without either.
 
 ### If you do not have Python
 

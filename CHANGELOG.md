@@ -6,6 +6,40 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.91.4 — it runs on a Mac, and now it starts like one
+
+Asked whether this can be installed on a Mac. The server always could: it is
+plain Python, `webbrowser.open` rather than `os.startfile`, `os.path.join`
+throughout, no registry, no drive letters. Only the launchers were Windows -
+two `.cmd` files and a `.ps1` - so a Mac user had a terminal command where
+everyone else had a double-click.
+
+There is now a `.command` launcher, which macOS opens in Terminal when
+double-clicked and which works on Linux as a shell script. It does what the
+Windows one does: finds a Python new enough, runs the server from its own
+folder, and explains itself if Python is missing instead of vanishing. On macOS
+the advice it gives is `xcode-select --install`, which is the shortest route to
+python3 there.
+
+Two things that would have broken it, both caught before anyone met them:
+
+The executable bit does not survive every zip download, and a `.command` file
+without it does nothing when double-clicked. It is set in the repository, and
+the README says to run `chmod +x` once if a download loses it.
+
+More seriously, git was going to hand out that file with Windows line endings,
+because it is written on Windows and nothing said otherwise. A shell script with
+CRLF does not run at all - the interpreter reads the trailing carriage return as
+part of its own path and reports `bad interpreter: /bin/sh^M`. Every Mac user
+would have hit that. There is now a `.gitattributes` pinning `.command`, `.sh`
+and `.py` to LF and the Windows launchers to CRLF, since that is the same
+failure in the other direction, and the stored blob was checked rather than
+assumed.
+
+Untested on real hardware: I have no Mac. The shell syntax is checked, the
+Python detection is exercised, and the line endings and file mode are verified
+in the repository - but nobody has double-clicked it on macOS yet.
+
 ## 0.91.3 — how to move it, and a check for the drift that keeps happening
 
 Asked for the move-to-another-machine instructions to be written down where

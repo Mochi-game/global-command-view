@@ -1,0 +1,21 @@
+# Line endings.
+#
+# The launcher for macOS and Linux is a shell script, and a shell script with
+# Windows line endings does not run: the interpreter reads the trailing carriage
+# return as part of its own path and reports "bad interpreter: /bin/sh^M". This
+# repository is written on Windows, where git would otherwise hand out CRLF on
+# checkout and break that file for everyone it is meant for.
+#
+# So text is normalised, and the files where the ending is load-bearing are
+# pinned explicitly rather than left to a guess.
+
+* text=auto
+
+*.command text eol=lf
+*.sh      text eol=lf
+*.py      text eol=lf
+
+# Windows launchers want CRLF: a .cmd file with LF endings can mis-parse in
+# cmd.exe, which is the same failure in the other direction.
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
