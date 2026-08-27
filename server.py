@@ -38,7 +38,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "0.92.0"
+VERSION = "0.92.1"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -3016,6 +3016,25 @@ def incidents(south, west, north, east):
             "needs_key": "tomtom",
             "how": "free tier at developer.tomtom.com - put it in keys.json as tomtom",
         }).encode(), "no key"
+
+    # A box has to be a box before anything else is asked of it. A view
+    # rectangle that crosses the antimeridian comes back with west greater than
+    # east, and the width test below then compares a negative number against six
+    # and lets it through - after which TomTom answers 400 and the feed log says
+    # the layer is unavailable, which is not what happened. Reported as jams
+    # flickering in and out while zooming over Sweden.
+    if not all(math.isfinite(v) for v in (south, west, north, east)):
+        return json.dumps({
+            "incidents": [],
+            "error": "the view did not resolve to a box",
+        }).encode(), "refused"
+    if west > east or south > north:
+        return json.dumps({
+            "incidents": [],
+            "too_wide": True,
+            "note": "the view wraps the globe - zoom in, incidents are a "
+                    "street-level answer",
+        }).encode(), "refused"
 
     # A whole-country box comes back as tens of thousands of roadworks and is
     # neither drawable nor useful, so this is refused rather than truncated.

@@ -17,8 +17,11 @@ function log(message, level) {
   const list = $('#log');
   const li = document.createElement('li');
   if (level) li.className = level;
+  // The Z matters. Without it a reader on CEST sees 15:26 against a wall clock
+  // reading 17:26 and concludes the app has been frozen for two hours - which
+  // is exactly what happened. The HUD clock has always said Z; this did not.
   const t = new Date().toISOString().slice(11, 19);
-  li.innerHTML = `<span class="t">${t}</span>${message}`;
+  li.innerHTML = `<span class="t">${t}Z</span>${message}`;
   list.prepend(li);
   while (list.children.length > 60) list.lastChild.remove();
 }

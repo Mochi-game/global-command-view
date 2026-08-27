@@ -6,6 +6,30 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.92.1 — a box that was not a box, and a clock that would not say which
+
+Two reports from the same screenshot of the feed log.
+
+**Traffic jams flickering.** The log alternated between counting incidents and
+saying the layer was unavailable with HTTP 400. Both were true. A view rectangle
+that wraps the globe comes back with west greater than east, and the width test
+was `east - west > 6.0` — which for a wrapped box is a negative number, never
+greater than six, so it passed. TomTom then answered 400 for a bbox that runs
+backwards, and the log reported the layer as unavailable when what had actually
+happened was that the app asked an impossible question.
+
+A box is now checked for being a box before anything is asked of it:
+non-finite values are refused with a plain reason, and a wrapped or inverted
+rectangle is refused as too wide, which is the message that was always meant for
+it. Verified against the five cases that used to fail.
+
+**The log would not say what time it was.** Its timestamps were UTC, unlabelled.
+The HUD clock beside them has always printed a Z. So a reader on CEST saw
+15:26 in the log against a wall clock reading 17:26 and concluded the app had
+been frozen for two hours — which is what was reported, and a reasonable thing
+to conclude. The log now prints the Z as well. One character, and the two clocks
+on screen now agree about what they are measuring.
+
 ## 0.92.0 — Sweden, off a key that was already here
 
 The inventory found that Trafikverket's key had been doing exactly one job since
