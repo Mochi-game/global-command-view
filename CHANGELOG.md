@@ -6,6 +6,41 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.91.1 — the Copernicus layer, run for the first time
+
+Written blind in 0.91.0 and now run against a real instance, which is the only
+way some of this could have been found.
+
+**The tile matrix set was wrong.** The code took the first web mercator set the
+instance offered. A real instance offers `PopularWebMercator512` first and
+`PopularWebMercator256` second, and the 512 set numbers its tiles differently at
+the same zoom - feeding it the row and column Cesium computes returns 400. Now
+256 is asked for by name. It costs four times the requests for the same ground,
+and requests are the quota anyone meets first, but a working layer beats a cheap
+broken one.
+
+**The labels were cut mid-word.** A chip is about eighteen characters and the
+titles are longer: COLOR INFRARED (VE, NATURAL COLOR (TRU, VEGETATION INDEX -.
+That reads as a bug rather than as a name. Parentheticals are dropped, since
+they qualify rather than name; a title carrying its own abbreviation after a
+dash uses the abbreviation, so "Vegetation Index - NDVI" is NDVI; and what is
+still too long is cut on a word boundary.
+
+**The quota figure was wrong.** Written as 10,000 processing units from a search
+result, corrected against a dashboard to 30,000 processing units and 30,000
+requests for a General user account. Requests is the limit anyone meets first.
+
+**The Setup card now describes the real path**, which matters because the
+obvious route is the wrong one: registering leaves you in an account console
+that handles logins and OAuth clients and holds nothing you need. The Sentinel
+Hub dashboard is a separate application, and Configuration Utility is inside
+that.
+
+Verified end to end bar one link: the instance answered with ten visualisations,
+all ten became styles with readable names, and the URL the app builds returns a
+real 256 by 256 JPEG over Gothenburg. What could not be checked here is Cesium
+painting it, since this browser pane does not render while hidden.
+
 ## 0.91.0 — a switch for hardware that is not this one
 
 Asked how this behaves for people who are not running it on a strong desktop.
@@ -46,8 +81,14 @@ configuration holds whatever its owner set up, so the server asks the instance
 what it offers and builds one style button per answer. Guessing at layer names
 would produce buttons that fetch nothing, which is worse than no button. Needs
 a free account; the Setup tab carries the steps and the two limits worth
-knowing - 10,000 processing units a month that do not roll over, and a five-day
-revisit that is why the request asks for a ten-day window rather than a date.
+knowing - a General user account shows 30,000 processing units and 30,000
+requests a month, neither rolling over, and a five-day revisit that is why the
+request asks for a ten-day window rather than a date.
+
+The quota figure here was first written as 10,000 from a search result, and
+corrected against a real dashboard. Requests, not processing units, is likely
+the limit anyone meets first: every map tile is one request, and a screenful of
+globe is twenty or thirty.
 
 ## 0.90.2 — two feeds checked without being able to run them
 

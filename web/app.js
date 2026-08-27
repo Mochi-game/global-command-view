@@ -7756,14 +7756,17 @@ const SERVICES = [
   {
     name: 'Copernicus Data Space',
     adds: 'Sentinel-2 <i>on a given day</i>, at 10 m. The Sentinel layer already here is the EOX cloudless mosaic - a year of passes averaged into a basemap with no clouds, no smoke, no ships and no flood in it. This is the other kind: one acquisition, with whatever was in the air still in it. A sediment plume, the edge of a burn scar, a flooded field, an algal bloom.',
-    url: 'https://dataspace.copernicus.eu/',
+    url: 'https://shapps.dataspace.copernicus.eu/dashboard/',
     fields: ['copernicus'],
     steps: [
-      'Register at dataspace.copernicus.eu. Free, and the account is instant.',
-      'From your dashboard, open the <b>Configuration Utility</b> — that is the part that makes OGC endpoints, and it is what produces an instance id. I have not clicked through it myself, so if the wording has moved, look for whatever creates a WMS or WMTS configuration.',
-      'Inside that configuration, add the visualisations you want: true colour, false colour, NDVI, whatever suits. The app asks your instance what it holds and builds one style button per answer, so it shows exactly what you set up and never a button that fetches nothing.',
-      'Paste the instance id below and reload. The new styles appear beside SENTINEL 10M and follow the imagery-day slider.',
-      'Two honest limits. The free tier is <b>10,000 processing units a month</b> and they do not roll over, so this is a layer to visit one place with rather than fly around on. And Sentinel-2 passes every five days or so, which is why the app asks for a ten-day window ending on the slider day — what comes back may be stitched from two passes rather than one.',
+      'Register at <b>dataspace.copernicus.eu</b>. Free, and the account is instant.',
+      'Then go to <b>shapps.dataspace.copernicus.eu/dashboard/</b>. This is the part people miss: the account console you land in after registering handles logins and OAuth clients, and has nothing you need. The Sentinel Hub dashboard is a separate app at that address, and it is where the instance lives.',
+      'In its left menu: <b>Dashboard</b>, <b>Configuration Utility</b>, <b>My Collections</b>, <b>Usage</b>, <b>Copernicus Browser</b>. You want <b>Configuration Utility</b>.',
+      'Create a new configuration from a <b>Sentinel-2 L2A</b> template. The template arrives with about ten visualisations already in it - Natural color, SWIR, NDVI, Moisture Index, Geology and so on. Keep the ones you want and delete the rest; each one you keep becomes a style button in this app.',
+      'The configuration has an <b>instance id</b>, a long value shaped like <code>0f3a91d7-2c48-4b6e-9a15-3d7c8e2f0b44</code>. Paste it below and reload. The new styles appear beside SENTINEL 10M and follow the imagery-day slider.',
+      'Your quota is on the dashboard front page. A <b>Copernicus General user</b> account shows 30,000 processing units and 30,000 requests a month, neither rolling over. Requests is the one you meet first: every map tile is one request, and a screenful of globe is twenty or thirty. So this is a layer to go and look at one place with, not one to leave on while flying around.',
+      'Sentinel-2 passes the same ground every five days or so, which is why the app asks for a ten-day window ending on the slider day rather than for a single date. A single date would return a few diagonal strips and nothing else. The cost of the window is that what comes back may be stitched from two passes a few days apart.',
+      'It is optical, so clouds stop it. That is not a fault in the layer, it is what the satellite saw. The cloudless mosaic exists precisely because single acquisitions are so often grey.',
     ],
   },
 ];
@@ -8167,6 +8170,41 @@ scene.postRender.addEventListener(() => {
  * buttons that fetch nothing, which is worse than no button.
  */
 
+/*
+ * A chip is about eighteen characters wide, and Copernicus titles are longer
+ * than that: "Color Infrared (vegetation)", "Vegetation Index - NDVI". Cutting
+ * at eighteen gives COLOR INFRARED (VE, which reads as a bug.
+ *
+ * So the parenthetical is dropped - it qualifies rather than names - and where a
+ * title carries its own abbreviation after a dash, that abbreviation is the
+ * better label. NDVI says more than VEGETATION INDEX in the same space. Only
+ * then, and only if still too long, is it cut, and on a word boundary.
+ */
+const STYLE_SHORT = { ATMOSPHERIC: 'ATMOS' };
+
+function styleLabel(title) {
+  let text = String(title || '').trim();
+
+  // "Vegetation Index - NDVI" -> NDVI, when the tail is a real abbreviation.
+  const dash = text.split(/\s+[-–]\s+/);
+  if (dash.length === 2 && /^[A-Z0-9]{3,8}$/.test(dash[1].trim())) {
+    return dash[1].trim().toUpperCase();
+  }
+
+  text = text.replace(/\s*\([^)]*\)\s*/g, ' ').trim();
+  let out = text.toUpperCase().replace(/\s+/g, ' ');
+  out = out.split(' ').map((w) => STYLE_SHORT[w] || w).join(' ');
+  if (out.length <= 18) return out;
+
+  const words = out.split(' ');
+  let cut = '';
+  for (const w of words) {
+    if ((cut + ' ' + w).trim().length > 18) break;
+    cut = (cut + ' ' + w).trim();
+  }
+  return cut || out.slice(0, 18);
+}
+
 async function loadCopernicus() {
   let caps;
   try {
@@ -8187,7 +8225,15 @@ async function loadCopernicus() {
 
   // Web Mercator is the only projection the globe's tile pipeline takes. If the
   // instance offers none, say which it does offer rather than fetch blank tiles.
-  const matrix = (caps.matrixSets || []).find((m) => /WebMercator|3857/.test(m));
+  // 256 specifically, not merely the first web mercator set on offer. The 512
+  // variant exists and numbers its tiles differently at the same zoom, so
+  // feeding it the row and column Cesium computes returns 400 - verified
+  // against a live instance, where 512 refused and 256 returned the tile.
+  // It costs four times the requests for the same ground, and requests are the
+  // quota anyone meets first, but a working layer beats a cheap broken one.
+  const sets = caps.matrixSets || [];
+  const matrix = sets.find((m) => /WebMercator256|3857.*256/.test(m))
+    || sets.find((m) => /WebMercator|3857/.test(m) && !/512/.test(m));
   if (!matrix) {
     log('copernicus: this instance offers no web mercator tile matrix set '
       + `(${(caps.matrixSets || []).join(', ') || 'none listed'})`, 'warn');
@@ -8201,7 +8247,7 @@ async function loadCopernicus() {
     const key = 'cdse_' + layer.id.toLowerCase().replace(/[^a-z0-9]+/g, '_');
     if (IMAGERY[key]) continue;
     IMAGERY[key] = {
-      label: layer.title.toUpperCase().slice(0, 18),
+      label: styleLabel(layer.title),
       url: base
         + '?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile'
         + '&LAYER=' + encodeURIComponent(layer.id)
