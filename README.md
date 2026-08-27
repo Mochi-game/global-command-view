@@ -100,7 +100,7 @@ Copy `keys.example.json` to `keys.json` and paste in whichever you want, or use
 | `opensky_client_id` + `opensky_client_secret` | Higher air-traffic limits. Two community networks fill in without it. |
 | `aisstream` | Ships beyond the Baltic. |
 | `windy` | Webcams worldwide. |
-| `trafikverket` | Swedish road cameras. |
+| `trafikverket` | Three layers off one key: Swedish road cameras, road disruption across the state network, and live train positions. |
 | `tomtom` | Measured traffic flow and live jams. |
 | `openaq` | Air quality measured at ground level. |
 | `gfw` | Fishing behaviour and transponder gaps (granted by hand, expect a wait). |
@@ -183,6 +183,12 @@ jams and roadworks.
 **Above** — sixteen thousand catalogued objects propagated from live orbital
 elements, ISS pass predictions for wherever you are looking, and scheduled
 launches with the pad and the countdown.
+
+**Sweden** — road disruption across the state network with Trafikverket's own
+severity wording, live train positions refreshed every thirty seconds, and SMHI
+weather warnings drawn as the areas they are rather than as pins. The first two
+share the key the Swedish cameras already needed; SMHI needs no key at all.
+All three are Sweden only, and say so on every card.
 
 ---
 

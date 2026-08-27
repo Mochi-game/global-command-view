@@ -6,6 +6,48 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.92.0 — Sweden, off a key that was already here
+
+The inventory found that Trafikverket's key had been doing exactly one job since
+it was added: road cameras. The same key and the same endpoint answer for road
+disruption and for where every train in the country is. Neither was being asked
+for. SMHI publish warnings with no key at all, and the weather layer had been
+saying "United States only" in its own note the whole time.
+
+A **Sweden** group now sits at the bottom of the layer list.
+
+**Swedish road disruption** — roadworks, traffic notices and ferry information
+across the state road network, about 1 200 at a time, coloured by Trafikverket's
+own severity from grey through to red for *mycket stor påverkan*. Refreshed
+every three minutes. The wording is left in Swedish: that is what Trafikverket
+publish and what the sign says, and translating it and back is a chance to be
+wrong about something nobody needed changed.
+
+**Swedish trains** — where trains report themselves, every thirty seconds. A
+position, not a timetable: nothing here says whether a train is late.
+Trafikverket keep a position after a train has finished with it, so anything
+older than fifteen minutes is dropped rather than drawn standing still, and how
+many were dropped is printed. Typically about a hundred of four hundred and
+fifty.
+
+**SMHI warnings** — drawn as the areas they are. A wind warning covers a
+coastline, not a spot on it, so there is no pin and the middle of the shape is
+not more warned than the edge. Yellow, orange and red are SMHI's scale, kept
+unchanged; Meddelande is below yellow, is information rather than warning, and
+is drawn faint. CC BY 4.0, no account.
+
+None of the three schema versions were guessable and none were guessed. Situation
+is 1.6 and lives in the road.trafficinfo namespace, where it does not exist
+outside it and returns "ObjectType 'Situation' does not exists" for every version
+tried without it. TrainPosition is 1.1 in the Swedish-spelled namespace. Both
+were found by probing the live API for its own error messages before any of this
+was written, and the SMHI shape was read from a live response rather than from
+documentation.
+
+Verified end to end: 1 241 disruptions, 349 trains and 20 warning areas drawn on
+the globe, all three detail cards rendering, no console errors, and the two roads
+with no single point reported in the feed log rather than dropped in silence.
+
 ## 0.91.5 — two missing sources, and a badge that could only say two things
 
 Noticed that Copernicus was not in SOURCES & LICENCES. It was not, and neither

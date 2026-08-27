@@ -38,7 +38,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "0.91.5"
+VERSION = "0.92.0"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -3281,6 +3281,275 @@ def tomtom_key():
     return json.dumps({"key": key, "source": "TomTom Traffic Flow"}).encode(), "memory"
 
 
+# ---------------------------------------------------------------- sweden road
+
+# Trafikverket already had a key here, and it was being used for exactly one
+# thing: cameras. The same key and the same endpoint answer for road disruption
+# and for train positions, which is most of what a Swedish operator would want
+# from this app and none of which it had.
+#
+# Three object types, three different namespaces and schema versions, none of
+# them guessable - Situation is 1.6 in road.trafficinfo and does not exist at
+# all outside it, TrainPosition is 1.1 in the Swedish-spelled namespace. Every
+# one was probed against the live API before a line of this was written.
+
+TRAFIKVERKET_SITUATION = """<REQUEST>
+  <LOGIN authenticationkey="{key}"/>
+  <QUERY objecttype="Situation" namespace="road.trafficinfo"
+         schemaversion="1.6" limit="800">
+    <FILTER/>
+  </QUERY>
+</REQUEST>"""
+
+TRAFIKVERKET_TRAINS = """<REQUEST>
+  <LOGIN authenticationkey="{key}"/>
+  <QUERY objecttype="TrainPosition" namespace="järnväg.trafikinfo"
+         schemaversion="1.1" limit="1200">
+    <FILTER><EQ name="Status.Active" value="true"/></FILTER>
+  </QUERY>
+</REQUEST>"""
+
+ROAD_TTL = 180
+RAIL_TTL = 30
+SMHI_TTL = 600
+
+# A deviation carries a Swedish message type and a severity in words. Kept in
+# Swedish because that is what Trafikverket publishes and what the road sign
+# says; translating it and back is a chance to be wrong about something nobody
+# needed changed.
+ROAD_SEVERITY = {
+    "Mycket stor påverkan": 3,
+    "Stor påverkan": 2,
+    "Liten påverkan": 1,
+    "Ingen påverkan": 0,
+}
+
+
+def _wgs84_point(text):
+    """POINT (lon lat) -> (lon, lat), or None if it is not one."""
+    if not text or "(" not in text or ")" not in text:
+        return None
+    inside = text[text.index("(") + 1:text.index(")")]
+    bits = inside.replace(",", " ").split()
+    if len(bits) < 2:
+        return None
+    try:
+        return float(bits[0]), float(bits[1])
+    except ValueError:
+        return None
+
+
+def _trafikverket(xml, kind):
+    """POST a query and hand back the rows, or raise with something readable."""
+    body = xml.format(key=KEYS["trafikverket"]).encode("utf-8")
+    req = urllib.request.Request(
+        TRAFIKVERKET_URL, data=body,
+        headers={"Content-Type": "text/xml; charset=utf-8",
+                 "User-Agent": USER_AGENT})
+    with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+        payload = json.loads(resp.read())
+    result = payload.get("RESPONSE", {}).get("RESULT", [{}])[0]
+    if "ERROR" in result:
+        raise RuntimeError(str(result["ERROR"].get("MESSAGE", "refused")))
+    return result.get(kind) or []
+
+
+def sweden_road():
+    """Roadworks, incidents and ferry notices on the Swedish road network."""
+    if not KEYS.get("trafikverket"):
+        return json.dumps({
+            "events": [],
+            "needs_key": "trafikverket",
+            "how": "free at api.trafikinfo.trafikverket.se - the same key already "
+                   "used for the Swedish road cameras",
+        }).encode(), "no key"
+
+    hit = _mem_get("tv_road")
+    if hit and time.time() - hit[0] < ROAD_TTL:
+        return hit[1], "memory"
+
+    try:
+        rows = _trafikverket(TRAFIKVERKET_SITUATION, "Situation")
+    except Exception as exc:  # noqa: BLE001
+        log("sweden road: %s" % exc)
+        return json.dumps({"events": [], "error": str(exc)[:120]}).encode(), "error"
+
+    events, undrawable = [], 0
+    for situation in rows:
+        for dev in situation.get("Deviation") or []:
+            geometry = dev.get("Geometry") or {}
+            point = _wgs84_point(
+                (geometry.get("Point") or {}).get("WGS84") or geometry.get("WGS84"))
+            if not point:
+                # A deviation can be a stretch of road rather than a spot. Those
+                # are counted rather than dropped in silence, because a total
+                # that quietly excludes things is the kind of number this app
+                # goes out of its way not to print.
+                undrawable += 1
+                continue
+            events.append({
+                "id": dev.get("Id"),
+                "lon": point[0], "lat": point[1],
+                "kind": dev.get("MessageType") or "",
+                "what": dev.get("MessageCode") or dev.get("Header") or "",
+                "where": dev.get("LocationDescriptor") or "",
+                "road": dev.get("RoadNumber") or dev.get("RoadName") or "",
+                "severity": dev.get("SeverityText") or "",
+                "rank": ROAD_SEVERITY.get(dev.get("SeverityText") or "", 0),
+                "icon": dev.get("IconId") or "",
+                "start": dev.get("StartTime") or "",
+                "end": dev.get("EndTime") or "",
+                "open_ended": bool(dev.get("ValidUntilFurtherNotice")),
+                "link": dev.get("WebLink") or "",
+            })
+
+    data = json.dumps({
+        "events": events,
+        "undrawable": undrawable,
+        "source": "Trafikverket, Situation road.trafficinfo 1.6",
+    }).encode()
+    _mem_put("tv_road", data)
+    log("sweden road: %d disruptions, %d without a point" % (len(events), undrawable))
+    return data, "network"
+
+
+def sweden_rail():
+    """Where Swedish trains are right now, as Trafikverket sees them."""
+    if not KEYS.get("trafikverket"):
+        return json.dumps({
+            "trains": [],
+            "needs_key": "trafikverket",
+            "how": "free at api.trafikinfo.trafikverket.se - the same key already "
+                   "used for the Swedish road cameras",
+        }).encode(), "no key"
+
+    hit = _mem_get("tv_rail")
+    if hit and time.time() - hit[0] < RAIL_TTL:
+        return hit[1], "memory"
+
+    try:
+        rows = _trafikverket(TRAFIKVERKET_TRAINS, "TrainPosition")
+    except Exception as exc:  # noqa: BLE001
+        log("sweden rail: %s" % exc)
+        return json.dumps({"trains": [], "error": str(exc)[:120]}).encode(), "error"
+
+    trains, stale = [], 0
+    now = time.time()
+    for row in rows:
+        point = _wgs84_point((row.get("Position") or {}).get("WGS84"))
+        if not point:
+            continue
+        train = row.get("Train") or {}
+        stamp = row.get("TimeStamp") or ""
+        # Trafikverket keeps a position after a train has finished with it. The
+        # Active filter removes most of that; anything still older than a quarter
+        # of an hour is a train that stopped reporting rather than a train
+        # standing still, and those are two different things.
+        age = None
+        try:
+            when = datetime.datetime.fromisoformat(stamp)
+            age = now - when.timestamp()
+        except Exception:  # noqa: BLE001
+            pass
+        if age is not None and age > 900:
+            stale += 1
+            continue
+        trains.append({
+            "id": train.get("OperationalTrainNumber")
+                  or train.get("AdvertisedTrainNumber") or "",
+            "number": train.get("AdvertisedTrainNumber") or "",
+            "lon": point[0], "lat": point[1],
+            "bearing": row.get("Bearing"),
+            "when": stamp,
+            "age_s": int(age) if age is not None else None,
+        })
+
+    data = json.dumps({
+        "trains": trains,
+        "dropped_stale": stale,
+        "source": "Trafikverket, TrainPosition 1.1",
+    }).encode()
+    _mem_put("tv_rail", data)
+    log("sweden rail: %d trains reporting, %d stale positions dropped"
+        % (len(trains), stale))
+    return data, "network"
+
+
+# ---------------------------------------------------------------------- smhi
+
+# The only weather this app had was the American NWS, and its own layer note
+# said so out loud. SMHI publish Swedish warnings openly, with no key and no
+# account, under CC BY 4.0 - free to use, free to re-publish, and free of a
+# sign-up, which is a rare combination.
+#
+# Warnings are areas, not points: a wind warning covers a coastline rather than
+# a spot on it. They are drawn as the polygons they are, because a pin in the
+# middle of a county would state something the data does not.
+
+SMHI_WARNINGS = ("https://opendata-download-warnings.smhi.se"
+                 "/ibww/api/version/1/warning.json")
+
+SMHI_LEVEL = {"MESSAGE": 0, "YELLOW": 1, "ORANGE": 2, "RED": 3}
+
+
+def _smhi_text(value):
+    """SMHI give most strings as {sv, en}. Swedish first, English if not."""
+    if isinstance(value, dict):
+        return value.get("sv") or value.get("en") or ""
+    return value or ""
+
+
+def smhi_warnings():
+    """Swedish weather, water and fire warnings in force right now."""
+    hit = _mem_get("smhi_warn")
+    if hit and time.time() - hit[0] < SMHI_TTL:
+        return hit[1], "memory"
+
+    try:
+        rows = json.loads(fetch(SMHI_WARNINGS))
+    except Exception as exc:  # noqa: BLE001
+        log("smhi: %s" % exc)
+        return json.dumps({"warnings": [], "error": str(exc)[:120]}).encode(), "error"
+
+    if not isinstance(rows, list):
+        held = (", ".join(sorted(rows)[:6]) if isinstance(rows, dict)
+                else type(rows).__name__)
+        log("smhi: answered, but not with a list of warnings - held: %s" % held)
+        return json.dumps({
+            "warnings": [],
+            "error": "the feed answered in a shape this does not recognise (%s)" % held,
+        }).encode(), "error"
+
+    out = []
+    for warning in rows:
+        event = warning.get("event") or {}
+        for area in warning.get("warningAreas") or []:
+            shape = (area.get("area") or {}).get("geometry") or {}
+            if shape.get("type") not in ("Polygon", "MultiPolygon"):
+                continue
+            level = area.get("warningLevel") or {}
+            out.append({
+                "id": area.get("id"),
+                "event": _smhi_text(event),
+                "detail": _smhi_text(area.get("eventDescription")),
+                "level": _smhi_text(level),
+                "level_code": level.get("code") or "",
+                "rank": SMHI_LEVEL.get(level.get("code") or "", 0),
+                "area": _smhi_text(area.get("areaName")),
+                "start": area.get("approximateStart") or "",
+                "end": area.get("approximateEnd") or "",
+                "geometry": shape,
+            })
+
+    data = json.dumps({
+        "warnings": out,
+        "source": "SMHI, CC BY 4.0",
+    }).encode()
+    _mem_put("smhi_warn", data)
+    log("smhi: %d warning areas in force" % len(out))
+    return data, "network"
+
+
 # ---------------------------------------------------------------- copernicus
 
 # Sentinel-2 as it was on a given day, at 10 m.
@@ -5387,6 +5656,12 @@ class Handler(SimpleHTTPRequestHandler):
                 if len(box) != 4:
                     return self._send(400, b'{"error":"bbox=w,s,e,n required"}')
                 data, source = aprs_stations(tuple(float(v) for v in box))
+            elif name == "sweden-road":
+                data, source = sweden_road()
+            elif name == "sweden-rail":
+                data, source = sweden_rail()
+            elif name == "smhi":
+                data, source = smhi_warnings()
             elif name == "copernicus":
                 data, source = copernicus()
             elif name == "search":

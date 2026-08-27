@@ -378,6 +378,9 @@ const netOut = scene.primitives.add(new Cesium.PointPrimitiveCollection());
 const meshNodes = scene.primitives.add(new Cesium.PointPrimitiveCollection());
 const newsHeat = scene.primitives.add(new Cesium.PointPrimitiveCollection());
 const trains = scene.primitives.add(new Cesium.BillboardCollection({ scene }));
+const swRoad = scene.primitives.add(new Cesium.PointPrimitiveCollection());
+const swRail = scene.primitives.add(new Cesium.PointPrimitiveCollection());
+let smhiPrimitive = null;
 let cablePrimitive = null;
 
 // Contacts are drawn small from orbit and grow as you dive in, so a global view
@@ -408,6 +411,7 @@ const LAYER_GROUPS = [
   { name: 'Reference', ids: ['names'] },
   { name: 'Ground change', ids: ['sar', 'disturb', 'water'] },
   { name: 'Above', ids: ['satellites', 'launches'] },
+  { name: 'Sweden', ids: ['swroad', 'swrail', 'smhi'] },
 ];
 
 const LAYERS = [
@@ -444,6 +448,9 @@ const LAYERS = [
   { id: 'trains', name: 'Trains (US)', color: '#c4b5fd', on: false, count: 0, note: 'Amtrak — US only; Finland refuses every header tried' },
   { id: 'own', name: 'Own entries', color: '#ffb347', on: false, count: 0, note: 'hand-entered from the news — no feed saw these' },
   { id: 'capital', name: 'Capital ships (est.)', color: '#ff4d4d', on: false, count: 0, note: 'USNI Fleet Tracker, read at launch · area centres, not positions' },
+  { id: 'swroad', name: 'Swedish road disruption', color: '#ff9f45', on: false, count: 0, note: 'Trafikverket Situation — roadworks, incidents and ferries, Sweden only; some are stretches of road with no single point' },
+  { id: 'swrail', name: 'Swedish trains', color: '#5fe3c0', on: false, count: 0, note: 'Trafikverket TrainPosition — where trains report themselves, Sweden only; a stale position is dropped rather than shown standing still' },
+  { id: 'smhi', name: 'SMHI warnings', color: '#ffd166', on: false, count: 0, note: 'SMHI — areas, not points: a warning covers a coastline rather than a spot on it. Sweden only, no key needed' },
   { id: 'bases', name: 'Submarine bases', color: '#b58cff', on: false, count: 0, note: 'where they are based, not where they are' },
 ];
 
@@ -565,6 +572,9 @@ function applyVisibility() {
   fishingMarks.show = on('fishing');
   showNames(on('names'));
   for (const spec of OPERA) showOpera(spec, on(spec.id));
+  swRoad.show = on('swroad');
+  swRail.show = on('swrail');
+  if (smhiPrimitive) smhiPrimitive.show = on('smhi');
   radios.show = on('radio');
   broadcast.show = on('broadcast');
   scanners.show = on('scanners');
@@ -1923,6 +1933,49 @@ function describePicked(type, ref) {
         + 'somebody confirmed it, and one that has quietly stopped can linger '
         + 'in the list.'],
     ]);
+  } else if (type === 'swroad') {
+    const kind = ROAD_KIND_SHORT[ref.kind] || ref.kind || 'disruption';
+    showDetail(ref.road || ref.where.slice(0, 40) || 'Road disruption',
+      `${kind} · Trafikverket`, [
+        ['Severity', ref.severity || 'not stated by the source'],
+        ['Where', ref.where],
+        ['What', ref.what],
+        ['From', (ref.start || '').replace('T', ' ').slice(0, 16)],
+        ['Until', ref.open_ended
+          ? 'until further notice — no end date given'
+          : (ref.end || '').replace('T', ' ').slice(0, 16) || 'not stated'],
+        ['Read', ref.link],
+        ['Note', 'Sweden only. Trafikverket publish this for the state road '
+          + 'network, so a municipal street closure is not in here.'],
+      ]);
+  } else if (type === 'swrail') {
+    const age = Number.isFinite(ref.age_s) ? `${ref.age_s} s ago` : 'unknown';
+    showDetail(ref.number ? `Train ${ref.number}` : 'Train',
+      'position report · Trafikverket', [
+        ['Reported', age],
+        ['Bearing', ref.bearing !== null && ref.bearing !== undefined
+          ? `${Math.round(ref.bearing)}°` : 'not given'],
+        ['Position', `${ref.lat.toFixed(4)}, ${ref.lon.toFixed(4)}`],
+        ['Number', ref.number || ref.id],
+        ['Note', 'the train reports where it is, so this is a position and not '
+          + 'an estimate. It is not a timetable: nothing here says whether it '
+          + 'is late. Positions older than fifteen minutes are dropped rather '
+          + 'than drawn standing still.'],
+      ]);
+  } else if (type === 'smhi') {
+    showDetail(ref.event || 'Weather warning',
+      `${ref.level || 'warning'} · SMHI`, [
+        ['Area', ref.area],
+        ['Detail', ref.detail],
+        ['From', (ref.start || '').replace('T', ' ').slice(0, 16)],
+        ['Until', (ref.end || '').replace('T', ' ').slice(0, 16)
+          || 'no end given'],
+        ['Marker', 'the shaded area is the warning area, drawn as published. '
+          + 'It is not a point, and the middle of it is not more warned than '
+          + 'the edge.'],
+        ['Note', 'Sweden only. Yellow, orange and red are SMHI’s own scale; '
+          + 'Meddelande is information rather than a warning.'],
+      ]);
   } else if (type === 'own') {
     showDetail(ref.title, 'HAND-ENTERED \u00b7 not from any feed', [
       ['Where', ref.place || `${ref.lat.toFixed(4)}, ${ref.lon.toFixed(4)}`],
@@ -3036,6 +3089,9 @@ async function loadRadios() {
  */
 
 LAYER_ON_DEMAND.volcanoes = () => loadVolcanoes();
+LAYER_ON_DEMAND.swroad = () => loadSwedenRoad();
+LAYER_ON_DEMAND.swrail = () => loadSwedenRail();
+LAYER_ON_DEMAND.smhi = () => loadSmhi();
 
 async function loadVolcanoes() {
   try {
@@ -7694,13 +7750,14 @@ const SERVICES = [
   {
     fields: ['trafikverket'],
     name: 'Trafikverket',
-    adds: '1 528 Swedish road cameras, live, at full resolution.',
+    adds: 'Three layers off one key. <b>1 528 road cameras</b> at full resolution; <b>road disruption</b> across the state network - roadworks, incidents and ferry notices, with severity in Trafikverket own words; and <b>where every reporting train in Sweden is</b>, updated every thirty seconds.',
     url: 'https://api.trafikinfo.trafikverket.se/',
     steps: [
       'Open api.trafikinfo.trafikverket.se and press <b>Registrera</b>.',
       'Confirm the address in the email they send.',
       'Under <b>Mina nycklar</b>, copy the authentication key.',
-      'Paste it below.',
+      'Paste it below, reload, and switch on <b>Swedish road disruption</b> and <b>Swedish trains</b> under Sweden. The cameras appear under Infrastructure.',
+      'All of it is Sweden only, and the state road and rail network only. A municipal street closure is not in here, and neither is a train that is not reporting.',
     ],
   },
   {
@@ -7852,7 +7909,8 @@ const SOURCE_LICENCES = [
   ['adsbdb', 'aircraft registry, operators', 'free API', 'free'],
   ['planespotters', 'aircraft photographs', 'no paywalled features, credit + link required', 'non-commercial'],
   ['Digitraffic', 'Baltic AIS, Finnish cameras', 'CC BY 4.0', 'free'],
-  ['Trafikverket', 'Swedish road cameras', 'open API, attribution', 'free'],
+  ['Trafikverket', 'Swedish road cameras, road disruption and train positions', 'open API, attribution', 'free'],
+  ['SMHI', 'Swedish weather, water and fire warnings', 'CC BY 4.0, attribution required, no account', 'free'],
   ['Transport for London', 'London cameras', 'TfL Open Data Licence', 'free'],
   ['Windy', 'webcams worldwide', 'free tier is link/embed only', 'non-commercial'],
   ['aisstream.io', 'worldwide AIS', 'free tier', 'free'],
@@ -8189,6 +8247,175 @@ scene.postRender.addEventListener(() => {
   }
 });
 
+/* ------------------------------------------------------------------ sweden */
+
+/*
+ * Three layers off one key that was already here.
+ *
+ * Trafikverket's key had been doing exactly one job since it was added: road
+ * cameras. The same key and the same endpoint answer for road disruption and
+ * for where every train in the country is, which is most of what a Swedish
+ * operator would want from this app and none of what it had. SMHI needs no key
+ * at all and fills the hole the weather layer admitted to in its own note -
+ * "United States only".
+ *
+ * All three are Swedish and only Swedish. That is stated on every card rather
+ * than left for someone to discover by flying to Denmark and finding nothing.
+ */
+
+const ROAD_COLOURS = ['#8a94a6', '#ffd166', '#ff9f45', '#ff5c5c'];
+
+// What Trafikverket calls the disruption, in the words it uses. Not translated:
+// the app draws what the source says, and "Vagarbete" is what the sign says.
+const ROAD_KIND_SHORT = {
+  'Vägarbete': 'roadworks',
+  'Trafikmeddelande': 'traffic notice',
+  'Färjor': 'ferry',
+};
+
+async function loadSwedenRoad() {
+  try {
+    const data = await getJSON('/api/sweden-road');
+    swRoad.removeAll();
+    if (data.needs_key) {
+      setCount('swroad', 0);
+      log('sweden road: needs the Trafikverket key · Setup tab', 'warn');
+      applyVisibility();
+      return;
+    }
+    if (data.error) {
+      setCount('swroad', 0);
+      log(`sweden road: ${data.error}`, 'warn');
+      applyVisibility();
+      return;
+    }
+    for (const e of data.events) {
+      swRoad.add({
+        position: Cesium.Cartesian3.fromDegrees(e.lon, e.lat, 0),
+        pixelSize: 5 + e.rank * 2.5,
+        color: Cesium.Color.fromCssColorString(
+          ROAD_COLOURS[e.rank] || ROAD_COLOURS[0]).withAlpha(0.85),
+        outlineColor: Cesium.Color.fromCssColorString('#0b0e14').withAlpha(0.7),
+        outlineWidth: 1,
+        // Held off the planet by the same 50 km rule the other marks use, so a
+        // disruption in Skane does not draw through the globe from Australia.
+        disableDepthTestDistance: MARK_THROUGH_M,
+        scaleByDistance: new Cesium.NearFarScalar(1e5, 1.5, 4e6, 0.4),
+        id: { type: 'swroad', ref: e },
+      });
+    }
+    setCount('swroad', data.events.length);
+    log(`sweden road: ${data.events.length} disruptions · Trafikverket`
+      + (data.undrawable
+        ? ` · ${data.undrawable} are stretches of road with no single point`
+        : ''));
+  } catch (err) {
+    log(`sweden road feed unavailable (${err.message})`, 'warn');
+  }
+  applyVisibility();
+}
+
+async function loadSwedenRail() {
+  try {
+    const data = await getJSON('/api/sweden-rail');
+    swRail.removeAll();
+    if (data.needs_key) {
+      setCount('swrail', 0);
+      log('sweden rail: needs the Trafikverket key · Setup tab', 'warn');
+      applyVisibility();
+      return;
+    }
+    if (data.error) {
+      setCount('swrail', 0);
+      log(`sweden rail: ${data.error}`, 'warn');
+      applyVisibility();
+      return;
+    }
+    for (const t of data.trains) {
+      swRail.add({
+        position: Cesium.Cartesian3.fromDegrees(t.lon, t.lat, 0),
+        pixelSize: 7,
+        color: Cesium.Color.fromCssColorString('#5fe3c0').withAlpha(0.9),
+        outlineColor: Cesium.Color.fromCssColorString('#0b0e14').withAlpha(0.75),
+        outlineWidth: 1,
+        disableDepthTestDistance: MARK_THROUGH_M,
+        scaleByDistance: new Cesium.NearFarScalar(1e5, 1.4, 4e6, 0.5),
+        id: { type: 'swrail', ref: t },
+      });
+    }
+    setCount('swrail', data.trains.length);
+    log(`sweden rail: ${data.trains.length} trains reporting · Trafikverket`
+      + (data.dropped_stale
+        ? ` · ${data.dropped_stale} stale positions dropped`
+        : ''));
+  } catch (err) {
+    log(`sweden rail feed unavailable (${err.message})`, 'warn');
+  }
+  applyVisibility();
+}
+
+// Yellow, orange and red are SMHI's own scale and mean specific things to
+// anyone in Sweden, so they are kept rather than restyled. Meddelande - the
+// level below yellow - is information rather than warning, and is drawn faint.
+const SMHI_COLOURS = {
+  MESSAGE: '#8ab4ff', YELLOW: '#ffd166', ORANGE: '#ff9f45', RED: '#ff5c5c',
+};
+
+async function loadSmhi() {
+  try {
+    const data = await getJSON('/api/smhi');
+    if (smhiPrimitive) {
+      scene.primitives.remove(smhiPrimitive);
+      smhiPrimitive = null;
+    }
+    if (data.error) {
+      setCount('smhi', 0);
+      log(`smhi: ${data.error}`, 'warn');
+      applyVisibility();
+      return;
+    }
+
+    const instances = [];
+    for (const w of data.warnings) {
+      const rings = w.geometry.type === 'Polygon'
+        ? [w.geometry.coordinates]
+        : w.geometry.coordinates;
+      const colour = Cesium.Color.fromCssColorString(
+        SMHI_COLOURS[w.level_code] || SMHI_COLOURS.MESSAGE);
+      for (const polygon of rings) {
+        const outer = polygon[0];
+        if (!outer || outer.length < 3) continue;
+        instances.push(new Cesium.GeometryInstance({
+          geometry: new Cesium.PolygonGeometry({
+            polygonHierarchy: new Cesium.PolygonHierarchy(
+              Cesium.Cartesian3.fromDegreesArray(outer.flat())),
+          }),
+          attributes: {
+            color: Cesium.ColorGeometryInstanceAttribute.fromColor(
+              colour.withAlpha(w.rank >= 2 ? 0.3 : 0.18)),
+          },
+          id: { type: 'smhi', ref: w },
+        }));
+      }
+    }
+
+    if (instances.length) {
+      // Draped on the ground rather than floated above it, so a warning area
+      // follows the terrain and stays readable over satellite imagery.
+      smhiPrimitive = scene.primitives.add(new Cesium.GroundPrimitive({
+        geometryInstances: instances,
+        appearance: new Cesium.PerInstanceColorAppearance({ translucent: true }),
+        classificationType: Cesium.ClassificationType.TERRAIN,
+      }));
+    }
+    setCount('smhi', data.warnings.length);
+    log(`smhi: ${data.warnings.length} warning areas in force · SMHI, CC BY 4.0`);
+  } catch (err) {
+    log(`smhi feed unavailable (${err.message})`, 'warn');
+  }
+  applyVisibility();
+}
+
 /* ------------------------------------------------------------ copernicus */
 
 /*
@@ -8377,6 +8604,10 @@ getJSON('/api/version')
   setInterval(whileOn('radio', loadRadios), 30 * 60_000);
   setInterval(whileOn('outbreaks', loadOutbreaks), 6 * 3600_000);
   setInterval(whileOn('quakes', loadQuakes), 600_000);
+// Road disruption changes on the scale of a roadworks notice; trains move.
+setInterval(whileOn('swroad', loadSwedenRoad), 3 * 60_000);
+setInterval(whileOn('swrail', loadSwedenRail), 30_000);
+setInterval(whileOn('smhi', loadSmhi), 10 * 60_000);
   setInterval(whileOn(['flights', 'services'], pollFlights), 15_000);
   setInterval(whileOn('vessels', pollVessels), 20_000);
 
