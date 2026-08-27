@@ -3092,6 +3092,7 @@ async function loadOwnEntries() {
           destination: Cesium.Cartesian3.fromDegrees(e.lon, e.lat, 120000),
           orientation: flightOrientation(),
           duration: 2.4,
+          complete: carryCameraInto3D,
         });
       };
       list.append(li);
@@ -4226,6 +4227,7 @@ function renderMarks() {
         destination: Cesium.Cartesian3.fromDegrees(mark.lon, mark.lat, mark.height),
         orientation: { heading: mark.heading, pitch: mark.pitch, roll: 0 },
         duration: 2,
+        complete: carryCameraInto3D,
       });
       log(`mark: ${mark.name}`);
     };
@@ -4306,6 +4308,16 @@ function startFollow(type, ref) {
   followed = { type, ref };
   const position = positionOf(followed);
   if (!position) return;
+  // Following means moving the camera every frame, and Google's 3D view has no
+  // smooth way to be told that often - it would judder rather than track. The
+  // globe does it properly, so photoreal steps aside, the same as it does for
+  // the moon. Said out loud, because a view that changes under you without a
+  // reason is worse than one that explains itself.
+  if (map3d && !$('#map3d').hidden) {
+    $('#photoreal').checked = false;
+    showPhotoreal(false);
+    log('photoreal 3D off · tracking follows on the globe, which can turn with it');
+  }
   viewer.camera.lookAt(
     position,
     new Cesium.HeadingPitchRange(
@@ -6380,6 +6392,13 @@ function viewTheMoon() {
     moon, 0.5, new Cesium.Cartesian3()
   );
   const radius = Cesium.Cartesian3.magnitude(moon) * 0.62;
+  // Google's 3D view is of the Earth and has nowhere to put the moon, so
+  // photoreal steps aside rather than have the button appear to do nothing.
+  if (map3d && !$('#map3d').hidden) {
+    $('#photoreal').checked = false;
+    showPhotoreal(false);
+    log('photoreal 3D off · the moon is not somewhere it can go');
+  }
   viewer.camera.flyToBoundingSphere(new Cesium.BoundingSphere(midpoint, radius), {
     duration: 4,
   });
@@ -6444,6 +6463,7 @@ function applyTilt() {
       Cesium.Math.toRadians(viewPitch), range)
   );
   scene.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+  carryCameraInto3D();
 }
 
 $('#tilt').oninput = (e) => {
@@ -6822,6 +6842,7 @@ function flyToEvent(event) {
     destination: Cesium.Cartesian3.fromDegrees(event.lon, event.lat, event.altitude),
     orientation: flightOrientation(),
     duration: TOUR_FLIGHT_S,
+    complete: carryCameraInto3D,
   });
   if (event.kind === 'fire') {
     setTimeout(() => { firesAsked = ''; loadFires(); }, TOUR_FLIGHT_S * 1000 + 400);
@@ -7018,6 +7039,7 @@ async function loadBriefing() {
         destination: Cesium.Cartesian3.fromDegrees(event.lon, event.lat, event.altitude),
         orientation: flightOrientation(),
         duration: 2.6,
+        complete: carryCameraInto3D,
       });
       // The layers that would show it, on, so the jump lands on something.
       if (event.kind === 'fire') setTimeout(() => { firesAsked = ''; loadFires(); }, 2800);
@@ -7166,6 +7188,8 @@ function applyStanding() {
     destination: standing.position,
     orientation: { heading: standing.heading, pitch: standing.pitch, roll: 0 },
   });
+  // setView is immediate, so this is a plain call and not a callback.
+  carryCameraInto3D();
   $('#standing-look').textContent =
     `HDG ${Math.round(Cesium.Math.toDegrees(standing.heading) + 360) % 360}° · ` +
     `FOV ${Math.round(Cesium.Math.toDegrees(standing.fov))}°`;
@@ -7184,6 +7208,7 @@ function leaveViewpoint() {
     ),
     orientation: { heading: standing.heading, pitch: Cesium.Math.toRadians(-30) },
     duration: 1.6,
+    complete: carryCameraInto3D,
   });
   $('#standing').hidden = true;
   // The panorama belongs to the spot you were standing on. showStreetView is the
@@ -7304,7 +7329,7 @@ function dropToGround() {
       ground + 320),
     orientation: { heading: viewer.camera.heading, pitch: Cesium.Math.toRadians(-14), roll: 0 },
     duration: 2.5,
-    complete: updateBuildings,
+    complete: () => { updateBuildings(); carryCameraInto3D(); },
   });
   log(`descending to 320 m over ground at ${Math.round(ground)} m`);
 }

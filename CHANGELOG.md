@@ -23,6 +23,30 @@ when it finishes. Verified with photoreal on: search 67.8548, 20.5236 and the
 Google view lands on Kiruna at 67.886, 20.524, tilt 30 degrees — ninety minus the
 sixty of pitch the search flies with.
 
+Then the same question asked of everything else, because one call site being
+wrong is rarely one call site being wrong. A first sweep found twelve places that
+move the camera. The pattern used to find them had a fault - it looked for
+`lookAt(` followed by another bracket, which matches nothing - and a second sweep
+with that corrected found eighteen. The six it had been hiding included following
+a contact, which is the one that moves the camera most.
+
+Fifteen of the eighteen hand the position over. Three deliberately do not:
+
+- Turning photoreal on and off is the mechanism itself.
+- The moon is not somewhere Google's 3D view can go. It is a view of the Earth.
+- Following a contact moves the camera every frame, and the 3D element has no
+  smooth way to be told that often. It would judder rather than track.
+
+The last two switch photoreal off and say so in the feed, rather than leave a
+button that appears to do nothing. A view that changes under you is bad; a view
+that changes under you without saying why is worse.
+
+Also: airport codes are now indexed properly. `_load_airports` built the code
+index but did not declare it global, so it was filled in and thrown away, and
+every code fell through to the geocoder. ESSA came back as somewhere in France.
+The index now covers all 81,184 codes, and ESGV is Varberg Getteron Airfield at
+57.1251, 12.2292 rather than whatever Nominatim made of four letters.
+
 Worth naming the shape of it. The bug was not in the search or in the presets. It
 was in an assumption both of them inherited from before there were two renderers:
 that moving the camera is the same as changing the view. It has not been true

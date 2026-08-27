@@ -2793,12 +2793,13 @@ def entity_graph(name):
 AIRPORTS_URL = "https://davidmegginson.github.io/ourairports-data/airports.csv"
 AIRPORTS_TTL = 2592000       # a month; runways do not move
 _airports = []
+_airport_codes = {}
 _airports_at = 0.0
 _airports_lock = threading.Lock()
 
 
 def _load_airports():
-    global _airports, _airports_at
+    global _airports, _airport_codes, _airports_at
     with _airports_lock:
         if _airports and time.time() - _airports_at < AIRPORTS_TTL:
             return
@@ -2840,6 +2841,36 @@ def _load_airports():
                 "elev_ft": (r.get("elevation_ft") or "").strip(),
             })
         _airports = rows
+
+        # The layer draws large and medium fields only, or the map is unreadable
+        # over Europe. Search should still find ESGV: a small airfield is exactly
+        # the kind of place somebody types a code for, and looking it up costs a
+        # dictionary rather than a marker. Closed fields are left out - flying to
+        # a runway that is not there any more helps nobody.
+        codes = {}
+        reader = csv.DictReader(io.StringIO(raw.decode("utf-8", "replace")))
+        for r in reader:
+            if r.get("type") == "closed":
+                continue
+            try:
+                lat = float(r["latitude_deg"])
+                lon = float(r["longitude_deg"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            record = {
+                "icao": (r.get("icao_code") or r.get("ident") or "").strip(),
+                "iata": (r.get("iata_code") or "").strip(),
+                "name": (r.get("name") or "")[:70],
+                "lat": lat, "lon": lon,
+                "kind": (r.get("type") or "").replace("_", " "),
+                "town": (r.get("municipality") or "")[:40],
+                "country": (r.get("iso_country") or "")[:2],
+            }
+            for code in (record["icao"], record["iata"]):
+                if code and code.upper() not in codes:
+                    codes[code.upper()] = record
+        _airport_codes = codes
+        log("airports: %d codes indexed for search" % len(codes))
         _airports_at = time.time()
         log("airports: %d large and medium loaded \u00b7 OurAirports" % len(rows))
 
@@ -3357,15 +3388,16 @@ def search(q):
     _load_airports()
     upper = q.upper()
     if 3 <= len(upper) <= 4 and upper.isalnum():
-        for a in _airports:
-            if a["icao"].upper() == upper or a["iata"].upper() == upper:
-                return json.dumps({
-                    "kind": "airport",
-                    "label": "%s %s" % (a["icao"] or a["iata"], a["name"]),
-                    "detail": ", ".join(x for x in (a["town"], a["country"]) if x),
-                    "lat": a["lat"], "lon": a["lon"],
-                    "height": 9000,
-                }).encode(), "airports"
+        a = _airport_codes.get(upper)
+        if a:
+            return json.dumps({
+                "kind": "airport",
+                "label": "%s %s" % (a["icao"] or a["iata"], a["name"]),
+                "detail": ", ".join(x for x in (a["town"], a["country"], a["kind"]) if x),
+                "lat": a["lat"], "lon": a["lon"],
+                # A small field wants a closer look than an international one.
+                "height": 9000 if "large" in a["kind"] else 4000,
+            }).encode(), "airports"
 
     # Names go to the geocoder before the airport list, and that ordering was
     # earned: matching names first sent "Stockholm" to Skavsta, a minor field a
