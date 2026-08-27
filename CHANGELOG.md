@@ -6,6 +6,28 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.93.1 — the documentation catching up with the app
+
+Asked whether help, the README and the HTML page were up to date. Help was.
+The other two were not, and checking rather than answering from memory found
+three gaps.
+
+The **HTML page** was the worst of it: still claiming thirty-four layers when
+there are thirty-seven, with no Sweden group at all, no Copernicus in the key
+table, and no mention of either the search box or performance mode. It listed
+Trafikverket as a camera source, which had stopped being the whole truth two
+releases ago. All of that is in now, including a Sweden group written the same
+way as the others - what the layer is, and what kind of truth it is.
+
+The **README** was missing performance mode entirely, and said nothing about
+clicking a train to get its journey.
+
+One thing worth recording about how this was checked: searching the HTML page
+for "SMHI" found a hit, and there was no SMHI on the page. The match was inside
+base64 image data. Stripping the data URIs before searching is the only way to
+get an honest answer out of that file, which is the second time that particular
+trap has cost a wrong conclusion here.
+
 ## 0.93.0 — a train number that says where it is going
 
 Reported after clicking a train: I can see 1127, but I have no idea it runs

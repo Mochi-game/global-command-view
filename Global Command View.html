@@ -456,7 +456,7 @@
   <div class="wrap">
     <div class="col">
       <p class="eyebrow">What is on it</p>
-      <h2>Thirty-four layers, each one labelled by what kind of truth it is.</h2>
+      <h2>Thirty-seven layers, each one labelled by what kind of truth it is.</h2>
       <p>
         Everything starts switched off except names, borders and the public
         cameras — a layer that is off is not fetched at all. Turn on what you want
@@ -531,6 +531,16 @@
         <li><span class="row-name">Rocket launches</span><span class="row-what">What is on its way up, with the pad and the countdown. The status is printed untranslated — Go, TBD, Hold — and anything not Go is drawn dim, because half of spaceflight slips to the right.</span><span class="tag estimate">Area, not point</span></li>
       </ul>
     </div>
+
+    <div class="group">
+      <div class="group-head">
+        <h3>Sweden</h3><span>3 layers · two off one free key</span></div>
+      <ul class="rows">
+        <li><span class="row-name">Road disruption</span><span class="row-what">Roadworks, traffic notices and ferry information across the state road network — about 1 200 at a time, coloured by <b>Trafikverket's own severity</b> through to red for <i>mycket stor påverkan</i>. The wording stays in Swedish, because that is what they publish and what the sign says.</span><span class="tag measured">Measured</span></li>
+        <li><span class="row-name">Trains</span><span class="row-what">Where every reporting train in the country is, every thirty seconds. Click one and it tells you the journey: <b>Göteborg C to Köpenhamn H, two minutes late</b>, which station it last passed and what the timetable said. A position already passed carries a real time; one ahead carries an estimate, and the card says which.</span><span class="tag measured">Measured</span></li>
+        <li><span class="row-name">SMHI warnings</span><span class="row-what">Weather, water and fire warnings in force, drawn as the <b>areas</b> they are. A wind warning covers a coastline, not a spot on it, so there is no pin and the middle of the shape is not more warned than the edge. Needs no account at all.</span><span class="tag estimate">Area, not point</span></li>
+      </ul>
+    </div>
   </div>
 </section>
 
@@ -543,6 +553,10 @@
 
     <div class="verbs">
       <div class="verb">
+        <h4>Go straight there</h4>
+        <p>One box that takes whatever you have. A coordinate the way it is actually written — <b>67.8548, 20.5236</b>, or <b>N 59 19.8 E 018 04.2</b> off a kneeboard, or degrees-minutes-seconds off a chart. An ICAO code. An airport name. A town. It tells you which of those it decided you meant, because a coordinate that was read and a name looked up in somebody else's gazetteer are different kinds of answer.</p>
+      </div>
+      <div class="verb">
         <h4>Drop to the ground</h4>
         <p>Fall from orbit to street level in one move, and stand at a spot you pick. Real terrain underneath, real buildings around you.</p>
       </div>
@@ -553,6 +567,10 @@
       <div class="verb">
         <h4>Fly into photoreal 3D</h4>
         <p>Hand the camera to Google's photorealistic mesh at the same coordinate, tilt and heading. Real roofs, real trees, real shadows. Hand it back and you are where you left off, to the metre.</p>
+      </div>
+      <div class="verb">
+        <h4>Make it run on a laptop</h4>
+        <p>The globe redraws sixty times a second whether or not anything changed — invisible on a desktop with its own card, a loud fan on a thin laptop. <b>Performance mode</b> makes drawing conditional instead of constant: things that move still animate, fog and atmosphere and 3D buildings come off, terrain asks for half the detail. It changes how often the picture is painted, never what the data says. The app times its own frames and offers the switch, once, if it is drawing too slowly.</p>
       </div>
       <div class="verb">
         <h4>Switch the optics</h4>
@@ -621,7 +639,9 @@
           <tr><td>TomTom</td><td>Measured traffic flow and live jams.</td></tr>
           <tr><td>OpenAQ</td><td>Air quality at ground level.</td></tr>
           <tr><td>Global Fishing Watch</td><td>Fishing behaviour and transponder gaps.</td></tr>
-          <tr><td>Windy · Trafikverket</td><td>More cameras: worldwide, and Swedish roads.</td></tr>
+          <tr><td>Windy</td><td>More cameras, worldwide.</td></tr>
+            <tr><td>Trafikverket</td><td>Three layers off one key: Swedish road cameras, road disruption across the state network, and live train positions.</td></tr>
+            <tr><td>Copernicus</td><td>Sentinel-2 <i>on a given day</i> at 10 m — one acquisition, with whatever was in the air still in it.</td></tr>
         </tbody>
       </table>
     </div>

@@ -211,8 +211,16 @@ All three are Sweden only, and say so on every card.
   between two points. **Mark** a view and fly back to it.
 - **Detection mode** puts reticles and designators on contacts, spread by screen
   cell so labels never pile up.
+- **Click a Swedish train** and it tells you the journey: where it started, where
+  it is going, which station it last passed and how many minutes late it is
+  running.
 - **Commercial-safe mode** withdraws every source whose licence is not clean for a
   monetised video, and says what it took away.
+- **Performance mode** makes drawing conditional rather than constant — things
+  that move still animate, fog and atmosphere and 3D buildings come off, terrain
+  asks for half the detail. It changes how often the picture is painted, never
+  what the data says. The app times its own frames and offers the switch once if
+  it is drawing below about thirty a second.
 
 ---
 
