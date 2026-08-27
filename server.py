@@ -37,7 +37,7 @@ import urllib.request
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "0.90.1"
+VERSION = "0.90.2"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -3122,7 +3122,16 @@ def launches():
         return json.dumps({"launches": [], "error": str(exc)}).encode(), "error"
 
     out = []
-    for row in body.get("results", []):
+    rows = body.get("results")
+    if not isinstance(rows, list):
+        held = ", ".join(sorted(body)[:8]) or "nothing"
+        log("launches: answered, but with no results list - top level held: %s" % held)
+        return json.dumps({
+            "launches": [],
+            "error": "the feed answered in a shape this does not recognise (%s)" % held,
+        }).encode(), "error"
+
+    for row in rows:
         pad = row.get("pad") or {}
         lat, lon = pad.get("latitude"), pad.get("longitude")
         if lat is None or lon is None:
@@ -3490,7 +3499,16 @@ def air_quality(lat, lon, radius_km):
         return json.dumps({"readings": [], "error": str(exc)}).encode(), "error"
 
     readings = []
-    for row in body.get("results", []):
+    rows = body.get("results")
+    if not isinstance(rows, list):
+        held = ", ".join(sorted(body)[:8]) or "nothing"
+        log("openaq: answered, but with no results list - top level held: %s" % held)
+        return json.dumps({
+            "readings": [],
+            "error": "the feed answered in a shape this does not recognise (%s)" % held,
+        }).encode(), "error"
+
+    for row in rows:
         where = row.get("coordinates") or {}
         if where.get("latitude") is None or where.get("longitude") is None:
             continue
@@ -3588,7 +3606,22 @@ def fishing(lat, lon, radius_km, days=14):
         return json.dumps({"events": [], "error": str(exc)}).encode(), "error"
 
     events = []
-    for row in body.get("entries", body.get("data", [])):
+    # Which key the list arrives under is the one part of this that could not be
+    # checked against the live API without an account. If it is neither, that is
+    # worth saying out loud: an empty list and an unreadable answer look
+    # identical on screen, and only one of them means "no fishing here".
+    rows = body.get("entries")
+    if rows is None:
+        rows = body.get("data")
+    if not isinstance(rows, list):
+        held = ", ".join(sorted(body)[:8]) or "nothing"
+        log("gfw: answered, but with no entries/data list - top level held: %s" % held)
+        return json.dumps({
+            "events": [],
+            "error": "the feed answered in a shape this does not recognise (%s)" % held,
+        }).encode(), "error"
+
+    for row in rows:
         where = row.get("position") or {}
         if where.get("lat") is None or where.get("lon") is None:
             continue
@@ -3603,8 +3636,15 @@ def fishing(lat, lon, radius_km, days=14):
             "vessel": vessel.get("name") or vessel.get("ssvid") or "",
             "flag": vessel.get("flag", ""),
         })
+    # Rows that carried no position are dropped above. If that was all of them,
+    # the count of zero is about this reader, not about the ocean.
+    unread = len(rows) - len(events)
+    if rows and not events:
+        log("gfw: %d rows came back, none carried a position field this reads" % len(rows))
+
     data = json.dumps({
         "events": events,
+        "unread": unread,
         "days": days,
         "radius_km": radius_km,
         "source": "Global Fishing Watch, CC BY-SA 4.0",

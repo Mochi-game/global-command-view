@@ -6,6 +6,34 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.90.2 — two feeds checked without being able to run them
+
+The air quality and fishing layers have never run against a live API, because
+they need accounts nobody here has yet. That is not a reason to leave them
+unchecked, only a reason to check what can be checked.
+
+Both endpoints were probed with a well-formed but invalid key. That separates
+the two failures worth telling apart: OpenAQ answers `Invalid credentials` for a
+path that exists and `Not Found` for one that does not. The path is right, and
+so is the rest - PM2.5 really is parameter id 2, coordinates really are written
+latitude first, and the radius really does cap at 25 km, which is what the code
+already clamps to. Every field the reader touches is in the published schema,
+including that latitude and longitude may be null, which it already skips.
+
+Global Fishing Watch confirmed the body fields and all three dataset names. The
+one thing that could not be confirmed is which key the list of events arrives
+under. The code guesses `entries`, then `data`.
+
+So both now say when they cannot read an answer. A feed that replies in an
+unfamiliar shape used to produce an empty list, and an empty list is a claim:
+no fishing here, clean air here. It is not the same as "I could not tell", and
+the difference is the whole point of the layer.
+
+Found while testing that: the guard meant for air quality landed in the launch
+feed instead, because both parsed a list called `results` and the first match
+won. It would have reported a launch failure as an air quality one. Third time
+a second copy of something has drifted from the first in this codebase.
+
 ## 0.90.1 — moving the camera nobody could see
 
 Reported an hour after the search box shipped: put in a coordinate, and now
