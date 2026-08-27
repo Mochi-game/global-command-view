@@ -1161,3 +1161,38 @@ audio.stream-player {
 }
 #map3d[hidden] { display: none; }
 #map3d gmp-map-3d { width: 100%; height: 100%; display: block; }
+
+/* ------------------------------------------------------------------ find */
+
+#find {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 8px;
+}
+#find-q {
+  flex: 1;
+  min-width: 0;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--line);
+  border-radius: 0;
+}
+#find-q::placeholder { color: var(--dim); }
+#find-q:focus { outline: none; border-color: var(--amber); }
+#find button { flex: none; }
+
+/* What it decided the query was. A coordinate read here and a name looked up
+   in somebody's gazetteer are different kinds of answer, and the box says
+   which rather than just moving the camera. */
+#find-said {
+  margin: 0 0 8px;
+  font-size: 10px;
+  line-height: 1.4;
+  color: var(--dim);
+}
+#find-said[hidden] { display: none; }
+#find-said b { color: var(--ink); font-weight: 500; }
+#find-said.miss { color: var(--amber); }

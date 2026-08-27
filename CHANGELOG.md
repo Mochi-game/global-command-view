@@ -6,6 +6,34 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.90.0 — a box that takes you anywhere
+
+Asked for: type a coordinate the way a flight simulator writes it, or a town, or
+an airport code, and go there. All three now work from one box under Jump to.
+
+**Coordinates are read here, not looked up.** A kneeboard gives degrees and
+decimal minutes, a chart gives degrees, minutes and seconds, a map application
+gives decimal degrees — and all three turn up in either order, with the
+hemisphere letter before or after, and with any combination of the degree and
+minute marks or none. Rather than a pattern per format, the parser reads the
+hemisphere letters and then the runs of digits, and lets the count decide: one
+number is degrees, two is degrees and minutes, three is degrees, minutes and
+seconds. Eleven cases tested, including the ones that must *not* parse —
+"Varberg" has no digits, but "Hangar 3 West" would otherwise read as a longitude.
+
+**Codes are instant and local.** ESSA, LAX, ESGG resolve from the airport list
+already in memory without a network call.
+
+**Names go to the geocoder before the airport list, and that ordering was
+earned.** Matching airport names first sent "Stockholm" to Skavsta — a minor
+field a hundred kilometres from the city, because its name happens to contain the
+word. Somebody typing a town wants the town. The airport list is still tried
+afterwards, because it carries names no gazetteer has.
+
+The box prints what it decided your query was. A coordinate read here and a name
+looked up in somebody else's gazetteer are different kinds of answer, and this is
+not an app that hides which one you got.
+
 ## 0.89.2 — the oldest layers said the least
 
 Went through the help tabs and the layer notes against what the app actually does

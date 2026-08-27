@@ -37,7 +37,7 @@ import urllib.request
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "0.89.2"
+VERSION = "0.90.0"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -3239,6 +3239,172 @@ def tomtom_key():
     return json.dumps({"key": key, "source": "TomTom Traffic Flow"}).encode(), "memory"
 
 
+# --------------------------------------------------------------------- search
+
+# One box that takes whatever you have: a coordinate off a kneeboard, an ICAO
+# code, an airport name, or a town.
+#
+# The order matters and is deliberate. Coordinates and airport codes are answered
+# from here without touching the network, so the common cases are instant and
+# cost nobody anything. Only a query that looks like neither goes out to
+# Nominatim, which is a volunteer service and paced accordingly.
+
+# Coordinates as they are actually written down. A flight simulator kneeboard
+# gives degrees and decimal minutes; a chart gives degrees, minutes, seconds; a
+# map application gives decimal degrees. All three turn up, in either order, with
+# the hemisphere letter before or after, and with any combination of the degree,
+# minute and second marks or none at all.
+#
+# Rather than a pattern per format, this reads the hemisphere letters, then the
+# runs of digits, and lets the count decide: one number is degrees, two is
+# degrees and minutes, three is degrees, minutes and seconds.
+_HEMI = re.compile(r"[NSEW]", re.I)
+_NUM = re.compile(r"\d+(?:[.,]\d+)?")
+
+
+def _to_degrees(parts):
+    """[d], [d, m] or [d, m, s] -> decimal degrees."""
+    if not parts or len(parts) > 3:
+        return None
+    out = 0.0
+    for n, value in enumerate(parts):
+        out += value / (60.0 ** n)
+    return out
+
+
+def parse_coordinates(text):
+    """(lat, lon) from a written coordinate, or None if it is not one."""
+    raw = text.strip()
+    if not raw or len(raw) > 120:
+        return None
+
+    letters = [(m.start(), m.group(0).upper()) for m in _HEMI.finditer(raw)]
+    # A place name is full of letters; a coordinate has at most two, and they are
+    # one from NS and one from EW. Anything else is a name and not a position.
+    if letters and (len(letters) > 2
+                    or len({c for _, c in letters if c in "NS"}) > 1
+                    or len({c for _, c in letters if c in "EW"}) > 1):
+        return None
+    if not letters and _HEMI.sub("", raw) != raw:
+        return None
+    # Reject anything with other letters in it: "Malmo" has no digits, but
+    # "Hangar 3 West" would otherwise parse as a longitude.
+    if re.search(r"[A-MO-Za-mo-z]", _HEMI.sub("", raw)):
+        return None
+
+    numbers = [float(m.group(0).replace(",", ".")) for m in _NUM.finditer(raw)]
+    if len(numbers) < 2:
+        return None
+
+    if letters:
+        ns = next((c for _, c in letters if c in "NS"), None)
+        ew = next((c for _, c in letters if c in "EW"), None)
+        if not ns or not ew:
+            return None
+        # Split the numbers where the second hemisphere letter falls, so
+        # "N 59 19.8 E 018 04.2" divides into two groups of two.
+        cut = max(i for i, _ in letters)
+        first, second = [], []
+        for m in _NUM.finditer(raw):
+            (first if m.start() < cut else second).append(
+                float(m.group(0).replace(",", ".")))
+        # A leading letter puts both groups after it, so fall back to halving.
+        if not first or not second:
+            half = len(numbers) // 2
+            first, second = numbers[:half], numbers[half:]
+        lat, lon = _to_degrees(first), _to_degrees(second)
+        if lat is None or lon is None:
+            return None
+        first_is_lat = _HEMI.search(raw).group(0).upper() in "NS"
+        if not first_is_lat:
+            lat, lon = lon, lat
+            ns, ew = ns, ew
+        if ns == "S":
+            lat = -lat
+        if ew == "W":
+            lon = -lon
+    else:
+        # No letters: decimal degrees, latitude first, as every map writes it.
+        if len(numbers) != 2:
+            return None
+        lat, lon = numbers[0], numbers[1]
+        if raw.lstrip().startswith("-"):
+            lat = -lat
+        if re.search(r"[,\s]\s*-", raw):
+            lon = -lon
+
+    if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
+        return None
+    return round(lat, 6), round(lon, 6)
+
+
+def search(q):
+    """Somewhere to fly to, from a coordinate, an airport code or a name."""
+    q = (q or "").strip()
+    if not q:
+        return json.dumps({"error": "nothing to look for"}).encode(), "empty"
+
+    point = parse_coordinates(q)
+    if point:
+        return json.dumps({
+            "kind": "coordinates",
+            "label": "%.5f, %.5f" % point,
+            "detail": "read as a position, not looked up anywhere",
+            "lat": point[0], "lon": point[1],
+            "height": 6000,
+        }).encode(), "parsed"
+
+    _load_airports()
+    upper = q.upper()
+    if 3 <= len(upper) <= 4 and upper.isalnum():
+        for a in _airports:
+            if a["icao"].upper() == upper or a["iata"].upper() == upper:
+                return json.dumps({
+                    "kind": "airport",
+                    "label": "%s %s" % (a["icao"] or a["iata"], a["name"]),
+                    "detail": ", ".join(x for x in (a["town"], a["country"]) if x),
+                    "lat": a["lat"], "lon": a["lon"],
+                    "height": 9000,
+                }).encode(), "airports"
+
+    # Names go to the geocoder before the airport list, and that ordering was
+    # earned: matching names first sent "Stockholm" to Skavsta, a minor field a
+    # hundred kilometres from the city, because its name happens to contain the
+    # word. Somebody typing a town wants the town. An airport is what a code is
+    # for, and codes are matched above without touching the network.
+    where = country_point(q[:120])
+    if where:
+        return json.dumps({
+            "kind": "place",
+            "label": q,
+            "detail": "geocoded by OpenStreetMap Nominatim",
+            "lat": where[0], "lon": where[1],
+            "height": 30000,
+        }).encode(), "nominatim"
+
+    # Nothing by that name anywhere, so try the airport list after all: it
+    # carries names no gazetteer has, like Landvetter or Kastrup.
+    lower = q.lower()
+    hits = [a for a in _airports
+            if lower in a["name"].lower() or lower == a["town"].lower()]
+    if hits:
+        hits.sort(key=lambda a: (not a["big"], len(a["name"])))
+        a = hits[0]
+        return json.dumps({
+            "kind": "airport",
+            "label": "%s %s" % (a["icao"] or a["iata"], a["name"]),
+            "detail": ", ".join(x for x in (a["town"], a["country"]) if x),
+            "lat": a["lat"], "lon": a["lon"],
+            "height": 9000,
+            "others": len(hits) - 1,
+        }).encode(), "airports"
+
+    return json.dumps({
+        "error": "nothing found",
+        "tried": "coordinates, airport codes and names, then Nominatim",
+    }).encode(), "miss"
+
+
 # --------------------------------------------------------------- air quality
 
 # What people are actually breathing, from OpenAQ: reference monitors run by
@@ -5051,6 +5217,8 @@ class Handler(SimpleHTTPRequestHandler):
                 if len(box) != 4:
                     return self._send(400, b'{"error":"bbox=w,s,e,n required"}')
                 data, source = aprs_stations(tuple(float(v) for v in box))
+            elif name == "search":
+                data, source = search(query.get("q", [""])[0])
             elif name == "geocode":
                 # The page cannot pace Nominatim politely on its own, and every
                 # open tab would pace separately. One queue, here.

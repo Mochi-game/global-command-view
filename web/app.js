@@ -7360,6 +7360,63 @@ function renderStyles() {
   }
 }
 
+/* -------------------------------------------------------------------- find */
+
+/*
+ * One box for "take me there", whatever form the destination arrives in: a
+ * coordinate off a kneeboard, an ICAO code, an airport name, a town.
+ *
+ * The server decides which of those it is and says so in the answer, and that
+ * distinction is printed rather than swallowed. A coordinate was read; a name
+ * was looked up in somebody else\'s gazetteer and might be the wrong Springfield.
+ * Those are different kinds of answer and the difference belongs on screen.
+ */
+
+async function flyToQuery(text) {
+  const said = $('#find-said');
+  const query = (text || '').trim();
+  if (!query) return;
+
+  said.hidden = false;
+  said.className = 'note';
+  said.textContent = 'looking\u2026';
+
+  let found;
+  try {
+    found = await getJSON('/api/search?q=' + encodeURIComponent(query));
+  } catch (err) {
+    said.className = 'note miss';
+    said.textContent = `could not look that up (${err.message})`;
+    return;
+  }
+  if (found.error) {
+    said.className = 'note miss';
+    said.textContent = `nothing found. Tried ${found.tried || 'everything'}.`;
+    log(`find: nothing matched "${query}"`, 'warn');
+    return;
+  }
+
+  const how = found.kind === 'coordinates'
+    ? 'read as a position'
+    : found.kind === 'airport' ? 'airport code or name' : 'geocoded name';
+  said.innerHTML = `<b>${found.label}</b> \u00b7 ${how}`
+    + (found.detail ? `<br>${found.detail}` : '')
+    + (found.others ? `<br>${found.others} other match(es) not shown` : '');
+
+  viewer.camera.flyTo({
+    destination: Cesium.Cartesian3.fromDegrees(found.lon, found.lat, found.height || 20000),
+    orientation: { heading: 0, pitch: Cesium.Math.toRadians(-60), roll: 0 },
+    duration: 2.2,
+  });
+  log(`find: ${found.label} · ${how} · `
+    + `${found.lat.toFixed(4)}, ${found.lon.toFixed(4)}`);
+}
+
+$('#find').onsubmit = (e) => {
+  e.preventDefault();
+  flyToQuery($('#find-q').value);
+};
+
 const PLACES = [
   { name: 'GLOBE', lon: 12, lat: 30, height: 24_000_000 },
   { name: 'PALM', lon: 55.14, lat: 25.11, height: 9_000 },

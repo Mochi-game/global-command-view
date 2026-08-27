@@ -160,6 +160,9 @@ launches with the pad and the countdown.
   vision, FLIR, and a CRT pass with real barrel distortion.
 - **Step back through time** with the day slider — a burn scar today is a brown
   patch; five days back it is a story about how it got there.
+- **Search for anywhere** — a coordinate in any written form, an ICAO or IATA
+  code, an airport name, a town. It says whether it read a position or looked
+  a name up.
 - **Measure** the straight line through space, the ground distance and the climb
   between two points. **Mark** a view and fly back to it.
 - **Detection mode** puts reticles and designators on contacts, spread by screen

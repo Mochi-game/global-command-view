@@ -214,6 +214,13 @@
 
   <section class="block">
     <h2 data-section="jump-to">Jump to</h2>
+    <form id="find" autocomplete="off">
+      <input id="find-q" type="search" spellcheck="false"
+             placeholder="coordinates, ESSA, Varberg&hellip;"
+             aria-label="Fly to a coordinate, airport code or place">
+      <button type="submit" class="chip">GO</button>
+    </form>
+    <p id="find-said" class="note" hidden></p>
     <div id="places" class="chips"></div>
   </section>
 
@@ -339,6 +346,15 @@
       <ul>
         <li><b>Drag</b> to turn the globe, <b>scroll</b> to zoom.</li>
         <li><b>Middle-drag</b>, or <b>Ctrl-drag</b>, to tilt the camera.</li>
+        <li><b>Jump to</b> has a search box above its presets. It takes whatever
+          you have: a coordinate, an ICAO or IATA code like <b>ESSA</b> or
+          <b>LAX</b>, an airport name, or a town. Coordinates are read in
+          whatever form they are written &mdash; decimal, degrees and decimal
+          minutes as a kneeboard gives them, or degrees, minutes and seconds
+          &mdash; with the hemisphere letter before or after, and with or without
+          the degree marks. Underneath it says what it decided your query was,
+          because a coordinate read here and a name looked up in somebody's
+          gazetteer are different kinds of answer.</li>
         <li><b>Jump to</b> in the left panel has preset views. Click a section
           heading to fold it away when the panel gets crowded.</li>
       </ul>
