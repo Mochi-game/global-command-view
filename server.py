@@ -38,7 +38,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "0.92.1"
+VERSION = "0.93.0"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -2044,6 +2044,37 @@ NWS_URL = "https://api.weather.gov/alerts/active"
 NWS_TTL = 300
 
 
+def _nws_prose(text):
+    """NWS bulletin text into something a card can show.
+
+    The wire format is a teleprinter product: a short all-caps identifier on the
+    first line, then paragraphs hard-wrapped at about seventy characters, with
+    bullet points marked by an asterisk. The detail card renders with normal
+    white space, so those line breaks collapse into spaces and the whole thing
+    arrives as one unbroken block beginning with something like FFWPHI.
+
+    So the wrapping is undone rather than fought against: the identifier goes,
+    wrapped lines are rejoined into the paragraph they belong to, and paragraphs
+    are separated by a middle dot, which survives the collapse.
+    """
+    if not text:
+        return ""
+    blocks = [b.strip() for b in text.replace("\r", "").split("\n\n")]
+    blocks = [b for b in blocks if b]
+    # A first block that is a single short all-caps word is the product
+    # identifier, and means nothing to anyone reading a map.
+    if (blocks and len(blocks[0].split()) == 1
+            and blocks[0].isupper() and len(blocks[0]) <= 12):
+        blocks = blocks[1:]
+    out = []
+    for block in blocks:
+        joined = " ".join(line.strip() for line in block.split("\n") if line.strip())
+        joined = joined.lstrip("* ").strip()
+        if joined:
+            out.append(joined)
+    return " · ".join(out)
+
+
 def weather_alerts():
     key = "nws"
     hit = _mem_get(key)
@@ -2074,6 +2105,12 @@ def weather_alerts():
             "lat": point[0],
             "lon": point[1],
             "url": pr.get("@id") or "",
+            # The @id is the record as published, and it is JSON rather than a
+            # page: opening it gets you a wall of braces, which is what "the
+            # link did not work" meant. The words are the useful part and they
+            # were being thrown away, so they are kept and shown instead.
+            "description": _nws_prose(pr.get("description"))[:1200],
+            "instruction": _nws_prose(pr.get("instruction"))[:600],
         })
 
     data = json.dumps({
@@ -3473,6 +3510,11 @@ def sweden_rail():
         if age is not None and age > 900:
             stale += 1
             continue
+        # A clock a second or two apart from Trafikverket produced "-1 s ago" on
+        # the card, which is not a thing that can happen. Clamped, because the
+        # honest answer to a negative age is zero and not a smaller negative.
+        if age is not None and age < 0:
+            age = 0
         trains.append({
             "id": train.get("OperationalTrainNumber")
                   or train.get("AdvertisedTrainNumber") or "",
@@ -3491,6 +3533,167 @@ def sweden_rail():
     _mem_put("tv_rail", data)
     log("sweden rail: %d trains reporting, %d stale positions dropped"
         % (len(trains), stale))
+    return data, "network"
+
+
+# A train number on its own says nothing. Reported as: I can see train 1127 but
+# I have no idea it runs Gothenburg to Copenhagen, or that it is late.
+#
+# TrainPosition answers where; TrainAnnouncement answers what the journey is and
+# how it is going. They are different object types in different namespaces with
+# different schema versions, and the station names are a third - TrainStation in
+# rail.infrastructure, which is the one place it exists.
+#
+# Asked per train, on click, rather than for all four hundred at once. A journey
+# is what you want when you have picked a train out, and fetching it for every
+# dot on screen would spend the quota on questions nobody asked.
+
+TRAFIKVERKET_STATIONS = """<REQUEST>
+  <LOGIN authenticationkey="{key}"/>
+  <QUERY objecttype="TrainStation" namespace="rail.infrastructure"
+         schemaversion="1.5">
+    <FILTER/>
+    <INCLUDE>LocationSignature</INCLUDE>
+    <INCLUDE>AdvertisedLocationName</INCLUDE>
+  </QUERY>
+</REQUEST>"""
+
+TRAFIKVERKET_JOURNEY = """<REQUEST>
+  <LOGIN authenticationkey="{key}"/>
+  <QUERY objecttype="TrainAnnouncement" schemaversion="1.9"
+         orderby="AdvertisedTimeAtLocation">
+    <FILTER>
+      <AND>
+        <EQ name="AdvertisedTrainIdent" value="{number}"/>
+        <EQ name="Advertised" value="true"/>
+        <GT name="AdvertisedTimeAtLocation" value="$dateadd(-08:00:00)"/>
+        <LT name="AdvertisedTimeAtLocation" value="$dateadd(08:00:00)"/>
+      </AND>
+    </FILTER>
+    <INCLUDE>ActivityType</INCLUDE>
+    <INCLUDE>AdvertisedTimeAtLocation</INCLUDE>
+    <INCLUDE>EstimatedTimeAtLocation</INCLUDE>
+    <INCLUDE>TimeAtLocation</INCLUDE>
+    <INCLUDE>LocationSignature</INCLUDE>
+    <INCLUDE>FromLocation</INCLUDE>
+    <INCLUDE>ToLocation</INCLUDE>
+    <INCLUDE>Canceled</INCLUDE>
+  </QUERY>
+</REQUEST>"""
+
+STATION_TTL = 24 * 3600
+JOURNEY_TTL = 60
+_stations = {}
+_stations_at = 0.0
+
+
+def _station_names():
+    """Signature to name, for the 1 750 stations Trafikverket advertise."""
+    global _stations, _stations_at
+    if _stations and time.time() - _stations_at < STATION_TTL:
+        return _stations
+    try:
+        rows = _trafikverket(TRAFIKVERKET_STATIONS, "TrainStation")
+    except Exception as exc:  # noqa: BLE001
+        log("stations: %s" % exc)
+        return _stations
+    _stations = {r.get("LocationSignature"): r.get("AdvertisedLocationName")
+                 for r in rows if r.get("AdvertisedLocationName")}
+    _stations_at = time.time()
+    log("stations: %d Swedish station names cached" % len(_stations))
+    return _stations
+
+
+def _minutes_late(advertised, actual):
+    """Whole minutes between two ISO stamps, or None if either is missing."""
+    if not advertised or not actual:
+        return None
+    try:
+        a = datetime.datetime.fromisoformat(advertised)
+        b = datetime.datetime.fromisoformat(actual)
+    except Exception:  # noqa: BLE001
+        return None
+    return int(round((b - a).total_seconds() / 60.0))
+
+
+def train_journey(number):
+    """Where a Swedish train started, where it is going, and whether it is late."""
+    number = "".join(c for c in (number or "") if c.isalnum())[:8]
+    if not number:
+        return json.dumps({"error": "no train number"}).encode(), "empty"
+    if not KEYS.get("trafikverket"):
+        return json.dumps({
+            "needs_key": "trafikverket",
+            "how": "the same key already used for the Swedish road cameras",
+        }).encode(), "no key"
+
+    cache = "tv_journey_" + number
+    hit = _mem_get(cache)
+    if hit and time.time() - hit[0] < JOURNEY_TTL:
+        return hit[1], "memory"
+
+    try:
+        rows = _trafikverket(
+            TRAFIKVERKET_JOURNEY.replace("{number}", number), "TrainAnnouncement")
+    except Exception as exc:  # noqa: BLE001
+        log("train %s: %s" % (number, exc))
+        return json.dumps({"error": str(exc)[:120]}).encode(), "error"
+
+    if not rows:
+        return json.dumps({
+            "number": number,
+            "stops": [],
+            "note": "Trafikverket advertise no journey for this number in the "
+                    "eight hours either side of now. Freight and empty stock "
+                    "run without being advertised.",
+        }).encode(), "network"
+
+    names = _station_names()
+
+    def name_of(signature):
+        return names.get(signature) or signature or ""
+
+    def name_list(entries):
+        return ", ".join(name_of(e.get("LocationName"))
+                         for e in (entries or []) if e.get("LocationName"))
+
+    stops, cancelled = [], False
+    for row in rows:
+        if row.get("Canceled"):
+            cancelled = True
+        advertised = row.get("AdvertisedTimeAtLocation") or ""
+        actual = row.get("TimeAtLocation") or ""
+        estimated = row.get("EstimatedTimeAtLocation") or ""
+        stops.append({
+            "station": name_of(row.get("LocationSignature")),
+            "activity": row.get("ActivityType") or "",
+            "advertised": advertised[11:16],
+            "estimated": estimated[11:16],
+            "actual": actual[11:16],
+            # Actual if it has happened, otherwise the estimate. A train that has
+            # passed a station has a fact; one that has not has a forecast, and
+            # the card says which it is showing.
+            "late": _minutes_late(advertised, actual or estimated),
+            "done": bool(actual),
+        })
+
+    origin = name_list(rows[0].get("FromLocation"))
+    destination = name_list(rows[0].get("ToLocation"))
+    done = [s for s in stops if s["done"]]
+    ahead = [s for s in stops if not s["done"]]
+
+    data = json.dumps({
+        "number": number,
+        "from": origin,
+        "to": destination,
+        "cancelled": cancelled,
+        "stops": stops,
+        "passed": len(done),
+        "next": ahead[0] if ahead else None,
+        "last_seen": done[-1] if done else None,
+        "source": "Trafikverket, TrainAnnouncement 1.9",
+    }).encode()
+    _mem_put(cache, data)
     return data, "network"
 
 
@@ -5675,6 +5878,8 @@ class Handler(SimpleHTTPRequestHandler):
                 if len(box) != 4:
                     return self._send(400, b'{"error":"bbox=w,s,e,n required"}')
                 data, source = aprs_stations(tuple(float(v) for v in box))
+            elif name == "train":
+                data, source = train_journey(query.get("number", [""])[0])
             elif name == "sweden-road":
                 data, source = sweden_road()
             elif name == "sweden-rail":

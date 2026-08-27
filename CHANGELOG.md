@@ -6,6 +6,49 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.93.0 — a train number that says where it is going
+
+Reported after clicking a train: I can see 1127, but I have no idea it runs
+Gothenburg to Copenhagen, or whether it is late. Both are published. The
+position layer answers where; a different object type answers what the journey
+is and how it is going.
+
+Clicking a train now looks the journey up. Route, the station it last passed
+with the real time against the timetabled one, the next station with its
+estimate, how many of its stops are done, and whether any of it is cancelled.
+Train 1127 turns out to be Gothenburg C to Copenhagen H, and was running two
+minutes late while this was being written.
+
+Asked per train, on click. Fetching a journey for all four hundred dots on
+screen would spend the quota on questions nobody asked. The card draws
+immediately with what the position gave and fills the journey in when it
+arrives, because a card that waits in silence looks broken.
+
+Three schema hunts again, and the third was the awkward one: TrainAnnouncement
+is 1.9 with no namespace, but the station names are TrainStation in
+rail.infrastructure - not in the rail namespace the trains themselves live in,
+and not without one. Without it G and Dk.kh stay G and Dk.kh, which is no use to
+anyone. 1 750 names, cached for a day.
+
+Two smaller things from the same screenshot.
+
+**"Reported: -1 s ago"** on a train card, which is not a thing that can happen.
+A clock a second or two out of step with Trafikverket produced a negative age.
+Clamped, because the honest answer to a negative age is zero.
+
+**The weather link did not work.** It pointed at api.weather.gov, which answers
+200 with `application/geo+json` - so clicking it got a wall of braces rather
+than a weather page. There is no human page in the NWS API to point at instead,
+but the warning text was in the response all along and was being thrown away.
+The card now carries the words: what the warning says and what to do about it.
+The link stays, labelled Record (JSON), which is what it is.
+
+That text arrives as a teleprinter product - a short all-caps identifier, then
+paragraphs hard-wrapped at seventy characters - and the card renders with normal
+white space, so it collapsed into one block starting with FFWPHI. The wrapping
+is now undone rather than fought: identifier dropped, wrapped lines rejoined,
+paragraphs separated by a middle dot that survives the collapse.
+
 ## 0.92.1 — a box that was not a box, and a clock that would not say which
 
 Two reports from the same screenshot of the feed log.

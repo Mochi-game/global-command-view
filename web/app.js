@@ -1835,8 +1835,13 @@ function describePicked(type, ref) {
       ['Urgency', ref.urgency],
       ['Until', ref.until ? ref.until.replace('T', ' ') : ''],
       ['Headline', ref.headline],
+      ['What it says', ref.description],
+      ['What to do', ref.instruction],
       ['Marker', 'centre of the warned area, which can be a whole county'],
-      ['Read', ref.url],
+      // The link is the record as published, and that record is JSON. Saying so
+      // beats letting somebody click it expecting a weather page and get a wall
+      // of braces, which is what happened.
+      ['Record (JSON)', ref.url],
     ]);
   } else if (type === 'plant') {
     showDetail(ref.name || 'unnamed station', `power station \u00b7 ${ref.fuel || 'unknown fuel'}`, [
@@ -1952,19 +1957,7 @@ function describePicked(type, ref) {
           + 'network, so a municipal street closure is not in here.'],
       ]);
   } else if (type === 'swrail') {
-    const age = Number.isFinite(ref.age_s) ? `${ref.age_s} s ago` : 'unknown';
-    showDetail(ref.number ? `Train ${ref.number}` : 'Train',
-      'position report · Trafikverket', [
-        ['Reported', age],
-        ['Bearing', ref.bearing !== null && ref.bearing !== undefined
-          ? `${Math.round(ref.bearing)}°` : 'not given'],
-        ['Position', `${ref.lat.toFixed(4)}, ${ref.lon.toFixed(4)}`],
-        ['Number', ref.number || ref.id],
-        ['Note', 'the train reports where it is, so this is a position and not '
-          + 'an estimate. It is not a timetable: nothing here says whether it '
-          + 'is late. Positions older than fifteen minutes are dropped rather '
-          + 'than drawn standing still.'],
-      ]);
+    showTrain(ref);
   } else if (type === 'smhi') {
     showDetail(ref.event || 'Weather warning',
       `${ref.level || 'warning'} · SMHI`, [
@@ -8249,6 +8242,94 @@ scene.postRender.addEventListener(() => {
       + 'Performance mode under Broadcast will lighten it', 'warn');
   }
 });
+
+/*
+ * A train number on its own says nothing.
+ *
+ * The position layer knows where train 1127 is and nothing else about it, which
+ * was reported as exactly that: I can see it, but I do not know it runs
+ * Gothenburg to Copenhagen, or whether it is late. Both are published, in a
+ * different object type, and asking costs one request - so it is asked when a
+ * train is actually clicked rather than for all four hundred on screen.
+ *
+ * The card draws immediately with what the position gave, and fills in the
+ * journey when it arrives. A card that waits in silence looks broken.
+ */
+
+function trainFields(ref, journey) {
+  const age = Number.isFinite(ref.age_s)
+    ? (ref.age_s <= 1 ? 'just now' : `${ref.age_s} s ago`)
+    : 'unknown';
+  const rows = [];
+
+  if (journey === 'looking') {
+    rows.push(['Journey', 'looking it up…']);
+  } else if (journey && journey.needs_key) {
+    rows.push(['Journey', 'needs the Trafikverket key — Setup tab']);
+  } else if (journey && journey.error) {
+    rows.push(['Journey', `could not look it up (${journey.error})`]);
+  } else if (journey && journey.stops && !journey.stops.length) {
+    rows.push(['Journey', 'not advertised. Freight and empty stock run without '
+      + 'a public timetable, so Trafikverket publish no journey for this '
+      + 'number.']);
+  } else if (journey) {
+    rows.push(['Route', journey.from && journey.to
+      ? `${journey.from}  →  ${journey.to}` : 'not stated']);
+    if (journey.cancelled) rows.push(['Cancelled', 'part of this journey is cancelled']);
+
+    const seen = journey.last_seen;
+    const next = journey.next;
+    // Late is reported against whichever is the better answer: a station the
+    // train has passed is a fact, one ahead of it is a forecast, and the card
+    // says which of the two it is quoting.
+    const quoted = seen || next;
+    if (quoted && Number.isFinite(quoted.late)) {
+      rows.push(['Running', quoted.late === 0 ? 'on time'
+        : quoted.late > 0 ? `${quoted.late} min late`
+        : `${-quoted.late} min early`]);
+    }
+    if (seen) {
+      rows.push(['Last passed',
+        `${seen.station} ${seen.actual} (timetabled ${seen.advertised})`]);
+    }
+    if (next) {
+      rows.push(['Next', `${next.station} ${next.activity.toLowerCase()} `
+        + `${next.advertised}${next.estimated && next.estimated !== next.advertised
+          ? ` — expected ${next.estimated}` : ''}`]);
+    }
+    rows.push(['Stops', `${journey.passed} of ${journey.stops.length} passed`]);
+  }
+
+  rows.push(['Reported', age]);
+  rows.push(['Bearing', ref.bearing !== null && ref.bearing !== undefined
+    ? `${Math.round(ref.bearing)}°` : 'not given']);
+  rows.push(['Position', `${ref.lat.toFixed(4)}, ${ref.lon.toFixed(4)}`]);
+  rows.push(['Note', 'the position is the train reporting itself. The timetable '
+    + 'beside it is a separate feed: a station already passed carries a real '
+    + 'time, one ahead of it carries an estimate. Positions older than fifteen '
+    + 'minutes are dropped rather than drawn standing still.']);
+  return rows;
+}
+
+async function showTrain(ref) {
+  const title = ref.number ? `Train ${ref.number}` : 'Train';
+  showDetail(title, 'position report · Trafikverket',
+    trainFields(ref, 'looking'));
+  if (!ref.number) return;
+
+  let journey = null;
+  try {
+    journey = await getJSON('/api/train?number=' + encodeURIComponent(ref.number));
+  } catch (err) {
+    journey = { error: err.message };
+  }
+  // The viewer may have clicked something else while this was in flight, and
+  // overwriting their new selection with an old train would be worse than
+  // showing nothing.
+  if ($('#detail-title').textContent !== title) return;
+  showDetail(title, 'position report · Trafikverket',
+    trainFields(ref, journey));
+}
 
 /* ------------------------------------------------------------------ sweden */
 
