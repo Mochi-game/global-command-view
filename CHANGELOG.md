@@ -6,6 +6,23 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.91.2 — fourteen unasked questions that looked like fourteen empty feeds
+
+Reported as a feeling rather than a fault: it sometimes seems like something is
+missing from the layer panel. Nothing was. All 34 layers render, in 8 groups
+that sum to 34, with no orphans - checked rather than eyeballed.
+
+The fault was in what the numbers said. A switched-off layer showed 0, and in
+this app a 0 means something specific and load-bearing: the feed answered, and
+there was nothing there. An off layer has not asked anyone anything. So most of
+the panel was reporting empty feeds when it should have been reporting silence,
+which is the exact misreading the layer list exists to prevent - and it was
+doing it fourteen rows at a time.
+
+An off layer now reads as a dot, the same as an imagery overlay that has no
+count to give. A zero from here on means what it has always been supposed to
+mean.
+
 ## 0.91.1 — the Copernicus layer, run for the first time
 
 Written blind in 0.91.0 and now run against a real instance, which is the only

@@ -515,7 +515,14 @@ function renderLayerList() {
       `<span class="name">${layer.name}</span>` +
       // An imagery overlay has no count, and a 0 beside one reads as "found
       // nothing" rather than "this is a picture, not a tally".
-      `<span class="count">${layer.noCount ? '·'
+      //
+      // A switched-off layer has the same problem and it is worse, because it is
+      // most of the panel. Nothing has been asked of it, so its zero is not an
+      // answer - but zero is exactly how this app reports "the feed replied and
+      // there was nothing there". Fourteen rows reading 0 look like fourteen
+      // empty feeds rather than fourteen unasked questions, which is the one
+      // misreading the whole layer list exists to prevent.
+      `<span class="count">${layer.noCount || !layer.on ? '·'
         : layer.count.toLocaleString('en-US')}</span>`;
     li.title = `source: ${layer.note}`;
     li.onclick = () => {
