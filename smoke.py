@@ -161,6 +161,37 @@ def check_grouped(app_js, report):
         report.note("layer groups: every layer belongs to one")
 
 
+def check_keys_documented(app_js, report):
+    """A key the server accepts that nobody is told how to get.
+
+    Four times now a second copy of a list has drifted from the first: the keys
+    endpoint kept its own hardcoded names, the layer groups missed two layers,
+    the help text fell behind, and the README key table went a release without
+    the newest key in it. The lists are not going away, so the drift is checked
+    instead of trusted.
+    """
+    server = read(os.path.join(ROOT, "server.py"))
+    found = re.search(r"ALLOWED_KEYS = \((.*?)\)", server, re.S)
+    if not found:
+        report.fail("keys", "ALLOWED_KEYS not found in server.py")
+        return
+    declared = re.findall(r'"([a-z_]+)"', found.group(1))
+
+    readme = read(os.path.join(ROOT, "README.md"))
+    missing = []
+    for key in declared:
+        if "`%s`" % key not in readme:
+            missing.append("%s (README)" % key)
+        if "'%s'" % key not in app_js:
+            missing.append("%s (Setup)" % key)
+    if missing:
+        report.fail("keys", "accepted by the server but undocumented: %s"
+                    % ", ".join(missing))
+    else:
+        report.note("keys: all %d have a README row and a Setup field"
+                    % len(declared))
+
+
 def check_cache(report):
     """The disk cache inside the ceilings it claims to keep.
 
@@ -447,6 +478,7 @@ def check_server(port, quick, report):
 
 # ------------------------------------------------------------------------ main
 
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--quick", action="store_true",
@@ -464,6 +496,7 @@ def main():
     check_strings(app_js, report)
     check_placeholders(app_js, report)
     check_grouped(app_js, report)
+    check_keys_documented(app_js, report)
     check_commas(app_js, report)
     check_cache(report)
     check_ids(app_js, index_html, report)

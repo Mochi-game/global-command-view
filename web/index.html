@@ -791,6 +791,47 @@
         own disk. What leaves your computer are requests to the public feeds
         listed under SOURCES &amp; LICENCES, and nothing else.</p>
 
+      <h3>Moving it to another computer</h3>
+      <p>
+        Everything that is <i>yours</i> lives in four files inside the app
+        folder. There is no <code>.env</code>, no profile, and nothing stored
+        anywhere but on your own disk, so moving the app is copying files.
+      </p>
+      <p>
+        Install it on the new machine the ordinary way &mdash; unpack the
+        release, check Python is there &mdash; then copy these across into the
+        same places, and start it:
+      </p>
+      <ul>
+        <li><code>keys.json</code> &mdash; your API keys. <b>This one on its own
+          is enough to be running again.</b> If you only copy one file, copy
+          this.</li>
+        <li><code>data/marks.json</code> &mdash; the views you have marked and
+          named.</li>
+        <li><code>data/manual_events.json</code> &mdash; anything you entered by
+          hand into the briefing.</li>
+        <li><code>data/usage.json</code> &mdash; the Google spend counters.</li>
+      </ul>
+      <p>
+        Keys restricted by referrer keep working without being touched. The
+        restriction is to <code>127.0.0.1:8820</code>, and that is localhost on
+        the new machine as much as on the old one.
+      </p>
+      <p>
+        One honest catch, on that last file. <code>usage.json</code> counts
+        locally, but your Google quota belongs to the <i>project</i>, not to the
+        computer. Run this on two machines with the same key and each one counts
+        only its own calls, so both bars read low while the real total is the sum
+        of them. The Google console is the authority, which the spend panel says
+        there too. If the second machine is a replacement rather than an
+        addition, copy the file and the count stays honest.
+      </p>
+      <p>
+        <b>Do not put <code>keys.json</code> anywhere public.</b> It is excluded
+        from the repository on purpose. Move it with a USB stick or your own
+        file sync, not through a paste box, a chat or a public gist.
+      </p>
+
       <p class="note">A fuller description, with screenshots, is in
         <b>Global Command View.html</b>, beside this one.</p>
     </section>

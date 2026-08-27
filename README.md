@@ -93,8 +93,35 @@ Copy `keys.example.json` to `keys.json` and paste in whichever you want, or use
 | `tomtom` | Measured traffic flow and live jams. |
 | `openaq` | Air quality measured at ground level. |
 | `gfw` | Fishing behaviour and transponder gaps (granted by hand, expect a wait). |
+| `copernicus` | Sentinel-2 on a given day at 10 m, from your own configuration instance. |
 
 `keys.json` is in `.gitignore`. Keep it that way.
+
+### Moving it to another computer
+
+Everything that is yours lives in four files inside the app folder. There is no
+`.env`, no profile and no account — moving the app is copying files. Install it
+on the new machine the ordinary way, then copy these into the same places:
+
+| File | What it holds |
+| --- | --- |
+| `keys.json` | Your API keys. **This one alone is enough to be running again.** |
+| `data/marks.json` | Views you have marked and named. |
+| `data/manual_events.json` | Anything entered by hand into the briefing. |
+| `data/usage.json` | The Google spend counters. |
+
+Keys restricted by referrer need no change: the restriction is to
+`127.0.0.1:8820`, which is localhost on the new machine too.
+
+One catch, on that last file. `usage.json` counts locally, but a Google quota
+belongs to the *project*. Run this on two machines with one key and each counts
+only its own calls, so both bars read low while the real total is the sum. The
+Google console is the authority — the spend panel says so there as well. If the
+second machine replaces the first rather than joining it, copy the file and the
+count stays honest.
+
+Move `keys.json` with a USB stick or your own file sync. Not through a paste
+box, a chat, or a public gist.
 
 ---
 

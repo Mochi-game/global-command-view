@@ -6,6 +6,35 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.91.3 — how to move it, and a check for the drift that keeps happening
+
+Asked for the move-to-another-machine instructions to be written down where
+people will find them, rather than said once in a conversation. They are now in
+the About tab and in the README.
+
+Everything personal lives in four files in the app folder: `keys.json`, and the
+marks, manual events and spend counters under `data/`. No `.env`, no profile,
+no account. Copying `keys.json` alone is enough to be running again. Keys
+restricted by referrer need no change, because the restriction is to
+`127.0.0.1:8820` and that is localhost wherever it runs.
+
+The catch that is written down with it: `usage.json` counts locally but a Google
+quota belongs to the project, so two machines sharing one key each count only
+their own calls and both bars read low. The console is the authority. The spend
+panel already said so; now the moving instructions do too.
+
+Writing that turned up the README key table missing `copernicus` entirely - a
+key accepted by the server for a whole release with nothing telling anyone how
+to get one. That is the fourth time in this codebase that a second copy of a
+list has drifted from the first, after the keys endpoint keeping its own
+hardcoded names, two layers landing in no group, and the help text falling
+behind.
+
+So the drift is now tested rather than trusted. Every key in `ALLOWED_KEYS` must
+have a README row and a Setup field, and the smoke test says which is missing.
+Verified by removing the copernicus row and watching it fail, then putting it
+back and watching it pass.
+
 ## 0.91.2 — fourteen unasked questions that looked like fourteen empty feeds
 
 Reported as a feeling rather than a fault: it sometimes seems like something is
