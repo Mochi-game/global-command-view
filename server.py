@@ -38,7 +38,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.2.1"
+VERSION = "1.2.2"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -5929,7 +5929,14 @@ AEROWAY_QUERY = (
     '(way["aeroway"~"^(taxiway|taxilane|apron)$"]'
     '({s:.4f},{w:.4f},{n:.4f},{e:.4f}););out geom;'
 )
-AEROWAY_TTL = 7 * 86400
+# A year. A taxiway does not move, and the source it comes from goes down for
+# hours at a time - so an airport fetched once should stay fetched.
+#
+# The cost of keeping something a year is that a real change hides behind it: a
+# new taxiway, a renumbering, a closure. So the age travels with the answer and
+# the card prints it. A year-old map is fine; a year-old map that looks like
+# today is not.
+AEROWAY_TTL = 365 * 86400
 
 
 def aeroway(south, west, north, east):
@@ -5967,6 +5974,16 @@ def aeroway(south, west, north, east):
         try:
             with open(path, "rb") as fh:
                 raw = fh.read()
+            # Stamp the age on the way out rather than storing it, so a file
+            # written before this existed still answers honestly.
+            try:
+                kept = json.loads(raw)
+                kept["fetched"] = time.strftime(
+                    "%Y-%m-%d", time.gmtime(os.path.getmtime(path)))
+                kept["age_days"] = int((time.time() - os.path.getmtime(path)) / 86400)
+                raw = json.dumps(kept).encode()
+            except Exception:  # noqa: BLE001
+                pass
             _mem_put(cache, raw)
             return raw, "disk"
         except Exception:  # noqa: BLE001 - a bad cache file is not a reason to fail
@@ -6001,6 +6018,8 @@ def aeroway(south, west, north, east):
     data = json.dumps({
         "ways": out,
         "labelled": labelled,
+        "fetched": time.strftime("%Y-%m-%d"),
+        "age_days": 0,
         "source": "OpenStreetMap contributors, ODbL",
         "note": "drawn from OpenStreetMap, which is volunteer-surveyed. A new "
                 "taxiway can be missing and a closed one can linger. It is a "

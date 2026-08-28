@@ -2093,6 +2093,9 @@ function describePicked(type, ref) {
         ['Designator', ref.ref || 'none in the survey'],
         ['Name', ref.name || '—'],
         ['Surface', ref.surface || 'not surveyed'],
+        ['Fetched', ref.fetched
+          ? `${ref.fetched}${ref.age_days ? ` · ${ref.age_days} days ago` : ' · today'}`
+          : 'unknown'],
         ['Note', 'from OpenStreetMap, which is volunteer-surveyed. A new taxiway '
           + 'can be missing and a closed one can linger. It is a map of the '
           + 'ground, not a clearance to drive on it.'],
@@ -9363,7 +9366,7 @@ async function loadAeroway(force) {
           isApron ? apron.withAlpha(0.35)
             : taxi.withAlpha(way.kind === 'taxilane' ? 0.3 : 0.55)),
       },
-      id: { type: 'aeroway', ref: way },
+      id: { type: 'aeroway', ref: { ...way, fetched: data.fetched, age_days: data.age_days } },
     }));
 
     // The designator goes at the middle of the way, which is where a chart puts
@@ -9397,8 +9400,14 @@ async function loadAeroway(force) {
   }
   aerowayLabels.show = layerOn('aeroway');
   setCount('aeroway', (data.ways || []).length);
+  // Kept for a year, so an answer can be old. Said out loud past a month,
+  // because a map that is quietly a year out of date is the kind of thing this
+  // app exists not to hand somebody.
+  const old = data.age_days > 30
+    ? ` · from ${data.fetched}, ${data.age_days} days old`
+    : '';
   log(`taxiways: ${(data.ways || []).length} ways, ${data.labelled} with a `
-    + 'designator · OpenStreetMap');
+    + `designator · OpenStreetMap${old}`);
 }
 
 /* ------------------------------------------------------------------ sweden */

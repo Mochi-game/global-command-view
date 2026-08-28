@@ -6,6 +6,21 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.2.2 — taxiways kept a year, and told how old they are
+
+Asked to keep them a year rather than a week. Fair: a taxiway does not move, and
+the source goes down for hours at a time, so an airport fetched once should stay
+fetched.
+
+The cost of keeping something a year is that a real change hides behind it — a
+new taxiway, a renumbering, a closure. So the age travels with the answer. The
+card prints when it was fetched and how many days ago, and past a month the feed
+log says so too. A year-old map is fine; a year-old map that looks like today is
+not, and that is the whole reason this app exists.
+
+Verified against a cache file backdated two hundred days: it came back reading
+`2026-02-09 · 200 days ago` rather than pretending to be current.
+
 ## 1.2.1 — one source, four mirrors, one operator
 
 The taxiways stayed at zero, and this time it was not the app. Overpass was
