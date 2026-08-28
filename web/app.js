@@ -396,6 +396,7 @@ const newsHeat = scene.primitives.add(new Cesium.PointPrimitiveCollection());
 const trains = scene.primitives.add(new Cesium.BillboardCollection({ scene }));
 const metarPoints = scene.primitives.add(new Cesium.PointPrimitiveCollection());
 const navaidPoints = scene.primitives.add(new Cesium.PointPrimitiveCollection());
+const aerowayLabels = scene.primitives.add(new Cesium.LabelCollection({ scene }));
 const swRoad = scene.primitives.add(new Cesium.PointPrimitiveCollection());
 const swRail = scene.primitives.add(new Cesium.PointPrimitiveCollection());
 let smhiPrimitive = null;
@@ -421,7 +422,7 @@ const SCALE = {
 
 const LAYER_GROUPS = [
   { name: 'Radio', ids: ['broadcast', 'radio', 'scanners', 'airports', 'aprs'] },
-  { name: 'Aviation', ids: ['runways', 'metar', 'navaids'] },
+  { name: 'Aviation', ids: ['runways', 'aeroway', 'metar', 'navaids'] },
   { name: 'Moving', ids: ['flights', 'services', 'vessels', 'trains', 'capital', 'fishing'] },
   { name: 'Earth', ids: ['fires', 'quakes', 'volcanoes', 'weather'] },
   { name: 'People', ids: ['outbreaks', 'news', 'air', 'own'] },
@@ -467,6 +468,7 @@ const LAYERS = [
   { id: 'trains', name: 'Trains (US)', color: '#c4b5fd', on: false, count: 0, note: 'Amtrak — US only; Finland refuses every header tried' },
   { id: 'own', name: 'Own entries', color: '#ffb347', on: false, count: 0, note: 'hand-entered from the news — no feed saw these' },
   { id: 'capital', name: 'Capital ships (est.)', color: '#ff4d4d', on: false, count: 0, note: 'USNI Fleet Tracker, read at launch · area centres, not positions' },
+  { id: 'aeroway', name: 'Taxiways & aprons', color: '#fcd34d', on: false, count: 0, note: 'OpenStreetMap — taxiways with the designators a controller speaks, drawn in the yellow they are painted; volunteer-surveyed, so a new one can be missing' },
   { id: 'navaids', name: 'Navigation beacons', color: '#4fd6ff', on: false, count: 0, note: 'OurAirports — VOR, VOR-DME, VORTAC, TACAN, DME and NDB with their frequencies; no ILS exists in this data' },
   { id: 'metar', name: 'Airfield weather (METAR)', color: '#7dffab', on: false, count: 0, note: 'NOAA aviation weather — an observation at the field, not a forecast for the area; coloured by flight category and bigger where something is falling' },
   { id: 'runways', name: 'Runways & approaches', color: '#cbd5e1', on: false, count: 0, note: 'OurAirports — real runway geometry; the approach line is 10 NM of arithmetic from the published heading, not a procedure off a chart' },
@@ -631,6 +633,8 @@ function applyVisibility() {
   if (runwayPrimitive) runwayPrimitive.show = on('runways');
   metarPoints.show = on('metar');
   navaidPoints.show = on('navaids');
+  if (aerowayPrimitive) aerowayPrimitive.show = on('aeroway');
+  aerowayLabels.show = on('aeroway');
   swRoad.show = on('swroad');
   swRail.show = on('swrail');
   if (smhiPrimitive) smhiPrimitive.show = on('smhi');
@@ -2037,6 +2041,16 @@ function describePicked(type, ref) {
         + 'somebody confirmed it, and one that has quietly stopped can linger '
         + 'in the list.'],
     ]);
+  } else if (type === 'aeroway') {
+    showDetail(ref.ref || ref.name || ref.kind,
+      `${ref.kind} · OpenStreetMap`, [
+        ['Designator', ref.ref || 'none in the survey'],
+        ['Name', ref.name || '—'],
+        ['Surface', ref.surface || 'not surveyed'],
+        ['Note', 'from OpenStreetMap, which is volunteer-surveyed. A new taxiway '
+          + 'can be missing and a closed one can linger. It is a map of the '
+          + 'ground, not a clearance to drive on it.'],
+      ]);
   } else if (type === 'navaid') {
     const khz = Number(ref.khz);
     const tuned = Number.isFinite(khz)
@@ -3046,6 +3060,7 @@ viewer.camera.moveEnd.addEventListener(loadAirports);
 viewer.camera.moveEnd.addEventListener(() => loadRunways(false));
 viewer.camera.moveEnd.addEventListener(() => loadMetar(false));
 viewer.camera.moveEnd.addEventListener(() => loadNavaids(false));
+viewer.camera.moveEnd.addEventListener(() => loadAeroway(false));
 // Observations are issued twice an hour; this asks a little more often so
 // a change is never more than five minutes stale on screen.
 setInterval(whileOn('metar', () => loadMetar(true)), 5 * 60_000);
@@ -3251,6 +3266,7 @@ LAYER_ON_DEMAND.volcanoes = () => loadVolcanoes();
 LAYER_ON_DEMAND.runways = () => loadRunways(true);
 LAYER_ON_DEMAND.metar = () => loadMetar(true);
 LAYER_ON_DEMAND.navaids = () => loadNavaids(true);
+LAYER_ON_DEMAND.aeroway = () => loadAeroway(true);
 LAYER_ON_DEMAND.swroad = () => loadSwedenRoad();
 LAYER_ON_DEMAND.swrail = () => loadSwedenRail();
 LAYER_ON_DEMAND.smhi = () => loadSmhi();
@@ -9180,6 +9196,129 @@ async function loadNavaids(force) {
   setCount('navaids', (data.navaids || []).length);
   log(`navaids: ${(data.navaids || []).length} beacons in view · OurAirports`);
   applyVisibility();
+}
+
+/* ------------------------------------------------------------------ aeroway */
+
+/*
+ * The ground chart: taxiways, taxilanes and aprons, with the letters painted on
+ * them.
+ *
+ * The letters are the point. A controller says "taxi via Whisky One, hold short
+ * of Uniform", and until you can read W1 and U off the map that instruction is
+ * noise. Arlanda has 206 taxiways and OpenStreetMap has labelled 191 of them.
+ *
+ * Drawn in the yellow taxiway centrelines are actually painted, because that is
+ * what the surface looks like from a cockpit and there is no reason to invent a
+ * different convention for a map of the same ground.
+ */
+
+let aerowayPrimitive = null;
+let aerowayAt = '';
+
+const TAXIWAY_COLOUR = '#fcd34d';
+const APRON_COLOUR = '#8a94a6';
+
+async function loadAeroway(force) {
+  if (!layerOn('aeroway')) return;
+  const view = viewer.camera.computeViewRectangle();
+  if (!view) return;
+  const box = {
+    south: Cesium.Math.toDegrees(view.south),
+    west: Cesium.Math.toDegrees(view.west),
+    north: Cesium.Math.toDegrees(view.north),
+    east: Cesium.Math.toDegrees(view.east),
+  };
+  const key = [box.south, box.west, box.north, box.east].map((n) => n.toFixed(2)).join(',');
+  if (key === aerowayAt && !force) return;
+  aerowayAt = key;
+
+  let data;
+  // Overpass walks a list of mirrors with a fifteen-second timeout each, so a
+  // cold fetch can take most of a minute. Silence for that long reads as broken,
+  // and this layer draws nothing at all until it answers.
+  log('taxiways: asking OpenStreetMap · this can take a moment');
+  try {
+    data = await getJSON('/api/aeroway?'
+      + `south=${box.south.toFixed(4)}&west=${box.west.toFixed(4)}`
+      + `&north=${box.north.toFixed(4)}&east=${box.east.toFixed(4)}`);
+  } catch (err) {
+    log(`taxiways unavailable (${err.message})`, 'warn');
+    return;
+  }
+
+  if (aerowayPrimitive) {
+    scene.primitives.remove(aerowayPrimitive);
+    aerowayPrimitive = null;
+  }
+  aerowayLabels.removeAll();
+
+  if (data.too_wide) {
+    setCount('aeroway', 0);
+    log(`taxiways: ${data.note}`, 'warn');
+    return;
+  }
+  if (data.error) {
+    setCount('aeroway', 0);
+    log(`taxiways: ${data.error}`, 'warn');
+    return;
+  }
+
+  const instances = [];
+  const taxi = Cesium.Color.fromCssColorString(TAXIWAY_COLOUR);
+  const apron = Cesium.Color.fromCssColorString(APRON_COLOUR);
+
+  for (const way of data.ways || []) {
+    const flat = way.points.flat();
+    if (flat.length < 4) continue;
+    const isApron = way.kind === 'apron';
+    instances.push(new Cesium.GeometryInstance({
+      geometry: new Cesium.GroundPolylineGeometry({
+        positions: Cesium.Cartesian3.fromDegreesArray(flat),
+        width: isApron ? 1.2 : (way.kind === 'taxilane' ? 1.4 : 2.2),
+        arcType: Cesium.ArcType.GEODESIC,
+      }),
+      attributes: {
+        color: Cesium.ColorGeometryInstanceAttribute.fromColor(
+          isApron ? apron.withAlpha(0.35)
+            : taxi.withAlpha(way.kind === 'taxilane' ? 0.4 : 0.7)),
+      },
+      id: { type: 'aeroway', ref: way },
+    }));
+
+    // The designator goes at the middle of the way, which is where a chart puts
+    // it and where it is least likely to sit on a junction.
+    if (way.ref) {
+      const mid = way.points[Math.floor(way.points.length / 2)];
+      aerowayLabels.add({
+        position: Cesium.Cartesian3.fromDegrees(mid[0], mid[1], 0),
+        text: way.ref,
+        font: '600 11px "JetBrains Mono", monospace',
+        fillColor: Cesium.Color.fromCssColorString(
+          isApron ? APRON_COLOUR : TAXIWAY_COLOUR),
+        outlineColor: Cesium.Color.fromCssColorString('#0b0e14'),
+        outlineWidth: 3,
+        style: Cesium.LabelStyle.FILL_AND_OUTLINE,
+        // Only readable close in; a screenful of letters from higher up is a
+        // smear, and taxiway names are useless at that distance anyway.
+        distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 25000),
+        disableDepthTestDistance: MARK_THROUGH_M,
+      });
+    }
+  }
+
+  if (instances.length) {
+    aerowayPrimitive = scene.primitives.add(new Cesium.GroundPolylinePrimitive({
+      geometryInstances: instances,
+      appearance: new Cesium.PolylineColorAppearance({ translucent: true }),
+      asynchronous: true,
+    }));
+    aerowayPrimitive.show = layerOn('aeroway');
+  }
+  aerowayLabels.show = layerOn('aeroway');
+  setCount('aeroway', (data.ways || []).length);
+  log(`taxiways: ${(data.ways || []).length} ways, ${data.labelled} with a `
+    + 'designator · OpenStreetMap');
 }
 
 /* ------------------------------------------------------------------ sweden */

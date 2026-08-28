@@ -6,6 +6,40 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.1.0 — taxiways, with the letters a controller speaks
+
+Asked whether taxiways were possible. OurAirports has runways and stops there,
+but OpenStreetMap has the whole ground chart, and the app already walks Overpass
+for the buildings layer - same mirrors, same circuit breaker.
+
+**Taxiways, taxilanes and aprons**, drawn in the yellow they are actually
+painted, because that is what the surface looks like from a cockpit and there is
+no reason to invent a different convention for a map of the same ground.
+
+**The letters are the point.** A controller says *taxi via Whisky One, hold
+short of Uniform*, and until you can read W1 and U off the map that instruction
+is noise. Arlanda has 206 taxiways and OpenStreetMap has labelled 191 of them:
+W1, U, W7, X, JV, LY. The labels appear below about 25 km, because a screenful
+of them from higher up is a smear and taxiway names mean nothing at that
+distance anyway.
+
+Two things this needed that the other layers did not.
+
+The request is refused above roughly one airport's worth of view. A taxiway is a
+few hundred metres of paint, and asking OpenStreetMap for a country of them
+would time out and deserve to.
+
+And **the layer now says it is waiting.** Overpass walks a list of mirrors with a
+fifteen-second timeout each, so a cold fetch can take most of a minute — during
+which this drew nothing and said nothing. Found by testing it: I waited fourteen
+seconds, saw an empty globe and an empty log, and concluded it was broken. It
+was not. Silence that long is indistinguishable from failure, so it announces
+the wait now.
+
+The card and the layer note both say the same caveat: this is volunteer-surveyed,
+a new taxiway can be missing and a closed one can linger, and it is a map of the
+ground rather than a clearance to drive on it.
+
 ## 1.0.2 — the app pointing at its own switches
 
 Reported that the flown-track checkbox had gone. It had not: it was in the

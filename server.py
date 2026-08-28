@@ -38,7 +38,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.0.2"
+VERSION = "1.1.0"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -5905,6 +5905,88 @@ def overpass(query):
     raise last
 
 
+# ------------------------------------------------------------------ aeroway
+
+# The ground chart: taxiways, taxilanes and aprons, with the letters painted on
+# them.
+#
+# OpenStreetMap has this and OurAirports does not, so it comes from Overpass -
+# the same machinery the buildings and infrastructure layers already walk, with
+# the same mirror list and the same circuit breaker.
+#
+# The letters are the point. A controller says "taxi via Whisky One, hold short
+# of Uniform", and until you can read W1 and U off the map that instruction is
+# noise. Arlanda has 206 taxiways and every one of them is labelled in OSM.
+
+AEROWAY_QUERY = (
+    '[out:json][timeout:40];'
+    '(way["aeroway"~"^(taxiway|taxilane|apron)$"]'
+    '({s:.4f},{w:.4f},{n:.4f},{e:.4f}););out geom;'
+)
+AEROWAY_TTL = 7 * 86400
+
+
+def aeroway(south, west, north, east):
+    """Taxiways, taxilanes and aprons in a box, with their designators."""
+    if not all(math.isfinite(v) for v in (south, west, north, east)):
+        return json.dumps({"ways": [], "error": "the view did not resolve to a box"}).encode(), "refused"
+    if west > east or south > north:
+        return json.dumps({"ways": [], "too_wide": True,
+                           "note": "the view wraps the globe - zoom in"}).encode(), "refused"
+    # A taxiway is a few hundred metres of paint. Asking Overpass for a whole
+    # country of them would time out and deserve to.
+    if north - south > 0.6 or east - west > 1.2:
+        return json.dumps({
+            "ways": [], "too_wide": True,
+            "note": "zoom in to about one airport - taxiways are painted lines "
+                    "and this asks OpenStreetMap for every one in the box",
+        }).encode(), "refused"
+
+    box = "%.3f,%.3f,%.3f,%.3f" % (south, west, north, east)
+    cache = "aeroway_" + box.replace(",", "_").replace(".", "p").replace("-", "m")
+    hit = _mem_get(cache)
+    if hit and time.time() - hit[0] < AEROWAY_TTL:
+        return hit[1], "memory"
+
+    query = AEROWAY_QUERY.format(s=south, w=west, n=north, e=east)
+    try:
+        # overpass() hands back the raw bytes it fetched, not parsed JSON - the
+        # other callers decode it themselves and so does this.
+        body = json.loads(overpass(query))
+    except Exception as exc:  # noqa: BLE001
+        log("aeroway: %s" % exc)
+        return json.dumps({"ways": [], "error": str(exc)[:120]}).encode(), "error"
+
+    out = []
+    for el in body.get("elements", []):
+        geometry = el.get("geometry") or []
+        if len(geometry) < 2:
+            continue
+        tags = el.get("tags") or {}
+        out.append({
+            "kind": tags.get("aeroway", ""),
+            # The designator a controller speaks. Some taxiways have none, which
+            # is a fact about that taxiway rather than a gap to fill in.
+            "ref": (tags.get("ref") or "").strip()[:12],
+            "name": (tags.get("name") or "").strip()[:40],
+            "surface": (tags.get("surface") or "").strip()[:12],
+            "points": [[round(p["lon"], 6), round(p["lat"], 6)] for p in geometry],
+        })
+
+    labelled = sum(1 for w in out if w["ref"])
+    data = json.dumps({
+        "ways": out,
+        "labelled": labelled,
+        "source": "OpenStreetMap contributors, ODbL",
+        "note": "drawn from OpenStreetMap, which is volunteer-surveyed. A new "
+                "taxiway can be missing and a closed one can linger. It is a "
+                "map of the ground, not a clearance to drive on it.",
+    }).encode()
+    _mem_put(cache, data)
+    log("aeroway: %d taxiways and aprons, %d with a designator" % (len(out), labelled))
+    return data, "network"
+
+
 def buildings(tile_lat, tile_lon):
     """OSM building footprints for one 0.01° tile, extruded client-side.
 
@@ -6380,6 +6462,12 @@ class Handler(SimpleHTTPRequestHandler):
                     float(query.get("east", ["0"])[0]))
             elif name == "taf":
                 data, source = taf(query.get("icao", [""])[0])
+            elif name == "aeroway":
+                data, source = aeroway(
+                    float(query.get("south", ["0"])[0]),
+                    float(query.get("west", ["0"])[0]),
+                    float(query.get("north", ["0"])[0]),
+                    float(query.get("east", ["0"])[0]))
             elif name == "runways":
                 data, source = runways(
                     float(query.get("south", ["0"])[0]),
