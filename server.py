@@ -38,7 +38,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "0.96.1"
+VERSION = "0.96.2"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))

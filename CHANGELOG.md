@@ -6,6 +6,31 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.96.2 — a welcome page that overclaimed on its first line
+
+The welcome page written yesterday said **Public cameras** gives you four
+thousand of them straight away. Asked whether that only holds with an account,
+and it does. Counted:
+
+    Trafikverket             1 525    needs a key
+    Windy                      986    needs a key
+    Digitraffic                811    no key
+    Transport for London       804    no key
+
+With no account at all it is **1 615**, not four thousand — the claim was out by
+more than half, on the first thing a new arrival reads, in the app whose whole
+argument is that it does not say more than it can support. Worse than a wrong
+number: a promise that fails the moment somebody acts on it.
+
+It now says about sixteen hundred with no account, names which two feeds those
+are, and says four thousand comes once the free Trafikverket and Windy keys are
+in. The same claim was repeated three times on the HTML page and is qualified
+there too.
+
+The screenshot captions that read "4 143 public cameras" are left alone. A
+caption describing what a particular screenshot showed is true about that
+screenshot, and the picture was taken with the keys in.
+
 ## 0.96.1 — a switch that protects somebody who is not you
 
 Asked to put a screenshot of the train card on GitHub. Two of the marks were in
