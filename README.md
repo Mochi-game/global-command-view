@@ -188,6 +188,14 @@ jams and roadworks.
 elements, ISS pass predictions for wherever you are looking, and scheduled
 launches with the pad and the countdown.
 
+**Aviation** — runways in their real length and bearing, with ten nautical miles
+of extended centreline out of each end; the track an aircraft actually flew,
+drawn at the altitude it reported; and METAR observations at every reporting
+field, coloured by flight category and larger where something is falling. No
+account for any of it. The centreline is arithmetic from the published heading,
+not a procedure off a chart — Jeppesen plates are licensed per pilot and are not
+in here.
+
 **Sweden** — road disruption across the state network with Trafikverket's own
 severity wording, live train positions refreshed every thirty seconds, and SMHI
 weather warnings drawn as the areas they are rather than as pins. The first two

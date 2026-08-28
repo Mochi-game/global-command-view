@@ -6,6 +6,27 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.99.1 — saying where the aviation switches are
+
+The flown track could not be found, and the reason was fair: it lives in the
+Tracks section, which starts folded, next to two ship settings. Nothing said so.
+
+The help now has an **Aviation** section that gives the click path rather than
+the feature list. It names the fold, because that is the actual obstacle. It
+says to zoom in for runways and why — a runway is two kilometres long and the
+request is refused for anything wider than a country. And it separates the three
+things in that folded section, which are easy to mistake for each other:
+
+- **Course vector** is a pale blue line *ahead* of the aircraft, ten minutes of
+  projection. A guess, drawn as one.
+- **Flown track** is an amber line *behind* it, through reported positions at
+  reported altitude. It guesses nothing.
+- **Wake** is the same idea for ships.
+
+Also in it: the METAR colours as the terms they are, why a field with weather is
+drawn larger, and that the raw line at the bottom of the card is the authority —
+if it and the decoded rows ever disagree, the raw line wins.
+
 ## 0.99.0 — aviation: runways, the track that was flown, and the weather pilots read
 
 Asked what could be had in the aviation direction — approach routes, Jeppesen
