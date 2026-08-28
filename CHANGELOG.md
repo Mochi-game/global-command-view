@@ -6,6 +6,32 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.96.1 — a switch that protects somebody who is not you
+
+Asked to put a screenshot of the train card on GitHub. Two of the marks were in
+frame with their names on: a flying club and a person. One of them is a home.
+
+That would have put a private address on a public repository — permanent,
+searchable, and copied by everyone who forks it. But the screenshot was the
+small half of the problem. This app is used to film a YouTube channel, and
+marks are drawn on the globe with their names at a readable size, always. Every
+video published from it would have carried the author's private addresses,
+labelled, and nobody would have noticed until it had happened a dozen times.
+
+**Hide my marks on the globe**, under Marks. The list in the panel stays; only
+the globe stops showing them. Remembered across reloads, so it stays on once
+switched on, and the feed log says *safe to record* when it does.
+
+The help has a section called *Before you record anything* that says what this
+is for in plain words, and says the part worth saying out loud: this is the one
+setting in the app that protects somebody who is not you. A published video
+carries every label in frame to everyone who watches, and a home address does
+not stop being one because it was only on screen for a second.
+
+Verified: toggling hides the points and the labels while all eight marks stay in
+the list, the setting survives a reload, and it is re-applied whenever the marks
+are redrawn.
+
 ## 0.96.0 — the globe opens empty, and says why
 
 Asked for a first run that starts with nothing on and welcomes people properly.

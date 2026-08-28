@@ -4287,6 +4287,35 @@ async function initMarks() {
   renderMarks();
 }
 
+/*
+ * Marks are named after somebody's life, not after the world: a mother, a
+ * friend, a home. They are drawn with their names on the globe, which is right
+ * while you are looking and wrong the moment you record.
+ *
+ * This app is used to film a YouTube channel. Without this switch every video
+ * published from it carries the author's private addresses, labelled, at a
+ * readable size. That is not a screenshot problem, it is a standing leak, and
+ * one nobody would notice until it had already happened a dozen times.
+ *
+ * The list in the panel stays either way. Only the globe stops showing them.
+ */
+let marksHidden = localStorage.getItem('gcv-marks-hidden') === '1';
+
+function applyMarksHidden() {
+  markPoints.show = !marksHidden;
+  markLabels.show = !marksHidden;
+  $('#marks-hide').checked = marksHidden;
+}
+
+$('#marks-hide').onchange = (e) => {
+  marksHidden = e.target.checked;
+  localStorage.setItem('gcv-marks-hidden', marksHidden ? '1' : '0');
+  applyMarksHidden();
+  log(marksHidden
+    ? 'marks hidden on the globe · safe to record'
+    : 'marks visible again');
+};
+
 function renderMarks() {
   const marks = loadMarks();
   const list = $('#marks');
@@ -4336,6 +4365,7 @@ function renderMarks() {
       distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 3_000_000),
     });
   }
+  applyMarksHidden();
 }
 
 function markThisView() {
