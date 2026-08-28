@@ -163,8 +163,8 @@ const IMAGERY = {
   ops: {
     label: 'OPS',
     what: 'A dark cartographic chart rather than imagery. Roads, coastlines and place names with nothing else competing for attention. The easiest optic for reading positions off.',
-    url: 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-    credit: '© OpenStreetMap contributors © CARTO',
+    url: 'https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+    credit: 'Imagery © Esri and its licensors — dark canvas',
     max: 19,
     tune: { brightness: 1.1, contrast: 1.15, saturation: 0.9, hue: 0.0, gamma: 1.0 },
   },
@@ -224,7 +224,7 @@ const IMAGERY = {
  * A monetised channel is commercial use, and several sources here do not permit
  * it: the ion Community tier is licensed for personal use, Windy's free webcam
  * tier is link-and-embed only, planespotters asks for non-commercial use. The
- * basemaps are the murkier case - Esri's imagery service and CARTO's tiles both
+ * basemaps are the murkier case - Esri's imagery and canvas services both
  * carry terms that plausibly restrict this - so rather than reason about them,
  * this mode narrows the app to sources whose licence is unambiguous.
  *
@@ -332,6 +332,10 @@ function makeImageryLayer(key) {
     })
   );
   Object.assign(layer, spec.tune);
+  // A Copernicus tile carries the Copernicus logo. One of those is attribution;
+  // thirty of them across a screen is a wall, and at that distance a 10 m
+  // product was showing nothing 10 m wide anyway.
+  if (spec.cdse) layer.minimumTerrainLevel = CDSE_MIN_LEVEL;
   return layer;
 }
 
@@ -432,7 +436,7 @@ const LAYERS = [
   { id: 'vessels', name: 'Vessels (AIS)', color: '#4fd6ff', on: false, count: 0, note: 'Digitraffic covers the Baltic; an aisstream key opens the rest — ships report their own position' },
   { id: 'cables', name: 'Submarine cables', color: '#b58cff', on: false, count: 0, note: 'TeleGeography — fine to watch; ask them before monetising' },
   { id: 'cameras', name: 'Public cameras', color: '#7dffab', on: false, count: 0, note: 'Digitraffic, TfL, Trafikverket and Windy merged — a still from the camera, not a live stream' },
-  { id: 'names', name: 'Names & borders', color: '#cbd5e1', on: false, count: 0, note: 'Natural Earth lines, CARTO labels \u2014 works over satellite too' },
+  { id: 'names', name: 'Names & borders', color: '#cbd5e1', on: false, count: 0, note: 'Natural Earth lines, Esri dark-canvas labels \u2014 works over satellite too' },
   { id: 'sar', name: 'Radar backscatter', color: '#8fbcd4', on: false, count: 0, note: 'NASA OPERA Sentinel-1 \u2014 sees through cloud and darkness', noCount: true },
   { id: 'disturb', name: 'Ground disturbance', color: '#e879a0', on: false, count: 0, note: 'NASA OPERA DIST-ALERT \u2014 vegetation lost since a baseline', noCount: true },
   { id: 'water', name: 'Surface water / flood', color: '#38bdf8', on: false, count: 0, note: 'NASA OPERA DSWx \u2014 radar, so cloud does not hide the flood', noCount: true },
@@ -3340,8 +3344,19 @@ async function loadOutbreaks() {
  * know which you are looking at.
  */
 
+/*
+ * CARTO started watermarking. Their tiles still answer 200 with a real image,
+ * but the image now reads API KEY REQUIRED across it - which means nothing in
+ * the app could detect the failure. The globe simply came up covered in it, on
+ * the default optic, for everybody.
+ *
+ * Esri's dark canvas is the same job without a key. The trade is licensing
+ * rather than looks: CARTO was one of the clean sources and Esri is not, so
+ * commercial-safe mode swaps this out along with the rest of them - which is
+ * the machinery that already existed for exactly this.
+ */
 const LABEL_TILES =
-  'https://basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}.png';
+  'https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}';
 
 let labelLayer = null;
 let borderPrimitive = null;
@@ -3354,7 +3369,7 @@ function showNames(on) {
       new Cesium.UrlTemplateImageryProvider({
         url: LABEL_TILES,
         maximumLevel: 18,
-        credit: new Cesium.Credit('Labels \u00a9 OpenStreetMap contributors, \u00a9 CARTO'),
+        credit: new Cesium.Credit('Labels © Esri and its licensors'),
       })
     );
   }
@@ -3396,7 +3411,7 @@ async function loadBorders() {
 
     setCount('names', data.countries.length + data.states.length);
     log(`names: ${data.countries.length} country borders, ${data.states.length} internal `
-      + '\u00b7 Natural Earth, labels by CARTO');
+      + '\u00b7 Natural Earth, labels by Esri');
   } catch (err) {
     log(`borders unavailable (${err.message})`, 'warn');
   }
@@ -5969,6 +5984,23 @@ const OPERA = [
 // Roughly a country in view. Above this the bands are swath outlines and
 // nothing readable, so the layer holds its fire.
 const OPERA_MIN_LEVEL = 5;
+
+/*
+ * Copernicus watermarks every tile with the Copernicus logo - not a no-data
+ * placeholder, but attribution burned into each 256-pixel square, over real
+ * imagery as much as over empty ocean.
+ *
+ * That makes the arithmetic decide how it looks. At continental zoom a screen
+ * holds thirty tiles, so thirty logos: a wall of them, and the picture is gone.
+ * Zoomed in, one tile covers a good part of the screen and it is one mark in a
+ * corner, which is what attribution is supposed to look like.
+ *
+ * So the layer is held back until it is worth drawing. That costs nothing real:
+ * a 10 m product read from orbit height shows nothing 10 m wide anyway, which
+ * is the same argument the OPERA layers are held back on.
+ */
+const CDSE_MIN_LEVEL = 8;
+const CDSE_HINT_M = 400_000;
 const OPERA_HINT_M = 1_200_000;
 
 const operaLayers = new Map();   // id -> Cesium.ImageryLayer
@@ -6300,7 +6332,7 @@ $('#photoreal').onchange = (e) => showPhotoreal(e.target.checked);
 /*
  * What the switch actually withdraws, and why each one:
  *
- *   basemap        Esri imagery and CARTO tiles, for NASA GIBS  (terms)
+ *   basemap        Esri imagery and canvas, for NASA GIBS       (terms)
  *   terrain        Cesium ion Community tier is personal use    (licence)
  *   ion buildings  same tier, same licence                      (licence)
  *   photoreal 3D   Google Maps Platform has its own terms       (terms)
@@ -7483,6 +7515,12 @@ function selectStyle(key, byHandover) {
   const spec = IMAGERY[key];
   currentStyle = key;
   showStyleWhat(key);
+  // Turned on from too far out it draws nothing, and silence reads as broken.
+  if (spec && spec.cdse && scene.camera.positionCartographic.height > CDSE_HINT_M) {
+    log(`${spec.label.toLowerCase()}: too far out to draw · zoom in to about `
+      + 'a county and it appears · held back because every tile carries the '
+      + 'Copernicus logo, and thirty of them is a wall', 'warn');
+  }
   localStorage.setItem('gcv-style', key);
   rebuildImagery();
   $('#globe').classList.toggle('heat', !!spec.heat);
@@ -8113,7 +8151,7 @@ const SOURCE_LICENCES = [
   ['OpenAQ', 'PM2.5 measurements', 'CC BY 4.0', 'free key'],
   ['Global Fishing Watch', 'fishing, encounters, AIS gaps', 'CC BY-SA 4.0', 'free token'],
   ['Natural Earth', 'country and state borders', 'public domain', 'free'],
-  ['CARTO basemaps', 'the dark map', 'free tier, attribution', 'free'],
+  ['Esri dark canvas', 'the dark chart and its labels', 'Imagery © Esri and its licensors, non-commercial', 'non-commercial'],
   ['Esri World Imagery', 'satellite imagery', 'for use with Esri products', 'non-commercial'],
   ['OpenSky Network', 'global air traffic', 'non-profit research and education only', 'non-commercial'],
   ['adsb.fi', 'air traffic fallback', 'community feed, attribution', 'free'],

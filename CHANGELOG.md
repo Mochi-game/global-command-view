@@ -6,6 +6,44 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.98.0 — two tiles that answer 200 and say nothing
+
+Two reports in a row, and they turned out to be the same bug wearing different
+clothes: a tile server that returns a perfectly valid image containing no map.
+Nothing in the app can detect that. HTTP says fine, the decoder says fine, and
+the globe comes up covered in somebody's branding.
+
+**CARTO started watermarking.** Their tiles still answer 200 with a real PNG,
+but the PNG now reads API KEY REQUIRED across it. That hit the default optic —
+so a fresh install opened on a globe tiled with the words — and the labels for
+**Names & borders**, which is one of only two layers the welcome page suggests
+turning on first.
+
+Both now come from Esri's dark canvas, which needs no key and does the same two
+jobs: `World_Dark_Gray_Base` for the chart, `World_Dark_Gray_Reference` for the
+labels. The trade is licensing rather than looks. CARTO was one of the clean
+sources and Esri is not, so commercial-safe mode swaps this out along with the
+rest of them — which is machinery that already existed for exactly this, and
+which turns OPS into NASA Blue Marble.
+
+**Copernicus watermarks every tile.** Not a no-data placeholder, which is what
+it looked like over open ocean: the logo is burned into each 256-pixel square,
+over real imagery as much as over empty sea. Verified by fetching one tile over
+Gothenburg and looking at it — Sentinel-2 imagery with the logo in the corner.
+
+Which makes it arithmetic. A screen at continental zoom holds about thirty
+tiles, so thirty logos and no picture. Zoomed in, one tile covers much of the
+screen and it is one mark in a corner, which is what attribution is meant to
+look like. So the Copernicus optics are held back below zoom level 8, and say so
+rather than drawing nothing in silence. That costs nothing real: a 10 m product
+read from orbit height was never showing anything 10 m wide.
+
+Whether `showLogo=false` would remove it is **not known**. Probing for it hit
+429 on the account's rate limit, and the honest thing was to stop spending
+somebody else's quota guessing rather than keep trying. If the Configuration
+Utility has a logo setting, turning it off there would make the zoom gate
+unnecessary — but the gate is right on its own terms anyway.
+
 ## 0.97.1 — an address in the DNS box is a question, not a mistake
 
 Reported: put an external IP into Recon and got **400 dns takes a hostname**
