@@ -3,7 +3,7 @@
 A live picture of the world built only from public feeds, on a 3D globe that runs
 on your own machine. Aircraft, ships, satellites, radar that sees through cloud,
 submarine cables, public road cameras, radio you can listen to, traffic, rocket
-launches. Thirty-four layers.
+launches. Thirty-seven layers.
 
 **Every layer says where its data came from and how sure it is.** Nothing is
 simulated, nothing is smoothed, and when a feed has nothing to say the app says
@@ -237,6 +237,39 @@ All three are Sweden only, and say so on every card.
 4. **Do not minimise the window while recording.** Browsers throttle hidden
    windows and the globe stops streaming tiles. Keep it visible, behind OBS or on
    a second screen.
+
+---
+
+## Where the idea came from
+
+I saw [Bilawal Sidhu's **gods-eye-view**](https://github.com/bilawalsidhu/gods-eye-view)
+on YouTube and wanted one. He got there first and he got the idea right: a real
+globe, real public feeds, no simulation. If you have not seen his, go and look —
+it is the more finished project by some distance.
+
+This is not a fork of it and shares none of its code. His is a Vite and npm
+application in JavaScript; this is a single Python file with no dependencies at
+all serving plain JavaScript, and the two codebases have nothing textual in
+common beyond the standard HTML head and the one line Cesium gives you for
+turning a position into degrees. Same idea, built again from the other end.
+
+What is different here, rather than better:
+
+- **Nothing to install past Python.** No `npm install`, no build step, no
+  `node_modules`. Download, unpack, double-click.
+- **A single file on the server side**, which means the whole thing is readable
+  in an afternoon and portable to anything Python runs on.
+- **Sweden, properly.** Trafikverket road disruption and live train positions,
+  SMHI warnings drawn as the areas they are.
+- **An editorial rule taken further than is comfortable.** Every layer is
+  labelled *measured*, *inferred* or *area-not-point*. A count of zero means the
+  feed answered and had nothing, never that nothing was asked. A saved API key
+  reads SAVED until a call using it has actually succeeded, and only then
+  WORKING. Where a marker is the centre of a county rather than a place, the
+  card says so.
+
+Credit where it belongs: the idea is his. The code, the architecture and the
+mistakes are mine.
 
 ---
 
