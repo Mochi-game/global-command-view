@@ -511,6 +511,36 @@ function whileOn(ids, fn) {
   };
 }
 
+/*
+ * Switches that belong to a layer but do not live beside it.
+ *
+ * Flown tracks are the clearest case: the aircraft layer is in Layers, the
+ * switch that draws their paths is in Tracks, and Tracks starts folded. It had
+ * to be explained twice, which is the definition of a thing the app should say
+ * itself. Said once when the layer goes on, and only when the switch is not
+ * already doing its job.
+ */
+const LAYER_HINTS = {
+  flights: () => !wantTracks
+    && 'tip: Flown track, under Tracks in the section row above, draws where each '
+     + 'aircraft has actually been — at the altitude it reported. The section '
+     + 'starts folded.',
+  vessels: () => !wantWakes
+    && 'tip: Wake, under Tracks, draws where each ship has been.',
+  airports: () => 'tip: click an airport for its tower, ground and ATIS '
+     + 'frequencies, and the beacons that belong to it.',
+  runways: () => 'tip: the green line off each runway end is 10 NM of arithmetic '
+     + 'from the published heading — where a straight-in would be, not a '
+     + 'procedure.',
+};
+
+function hintFor(id) {
+  const hint = LAYER_HINTS[id];
+  if (!hint) return;
+  const text = hint();
+  if (text) log(text);
+}
+
 function renderLayerList() {
   const ul = $('#layers');
   ul.innerHTML = '';
@@ -563,6 +593,10 @@ function renderLayerList() {
       // Layers that start off have nothing loaded yet, so switching one on has
       // to fetch it rather than reveal an empty collection.
       if (layer.on && LAYER_ON_DEMAND[layer.id]) LAYER_ON_DEMAND[layer.id]();
+      // Some of what a layer can do lives in a different section, and one of
+      // those sections starts folded. Saying so once, at the moment somebody
+      // switches the layer on, beats explaining it twice afterwards.
+      if (layer.on) hintFor(layer.id);
     };
       ul.append(li);
     }

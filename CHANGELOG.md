@@ -6,6 +6,31 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.0.2 — the app pointing at its own switches
+
+Reported that the flown-track checkbox had gone. It had not: it was in the
+Tracks section, which had been folded, and folds are remembered per browser. But
+that is twice I have had to explain where that switch lives, which is the
+definition of something the app should be saying itself.
+
+Switching a layer on now prints a line about the parts of it that live
+somewhere else:
+
+- **Air traffic** points at Flown track, says it is under Tracks in the section
+  row, and says that section starts folded — which is the actual obstacle.
+- **Vessels** points at Wake the same way.
+- **Airports** says to click one for its frequencies and beacons.
+- **Runways** repeats that the green line is arithmetic, not a procedure.
+
+The aircraft and vessel hints only appear when the switch is not already doing
+its job, so turning a layer off and on again with tracks already drawing says
+nothing. Verified both ways: it fires with the section folded, and stays quiet
+when the box is ticked.
+
+This is the same problem as the layer counts reading zero when a feed had not
+been asked. The app knows something the person in front of it does not, and the
+fix is to say it at the moment it matters rather than to document it.
+
 ## 1.0.1 — the airport you could not see
 
 Reported straight after the last release: clicking the blue dot at Arlanda gave
