@@ -38,7 +38,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "0.97.0"
+VERSION = "0.97.1"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -2406,14 +2406,28 @@ def recon(kind, target):
     bare = target.split("/")[0]
     looks_like_ip = bare.count(".") == 3 and bare.replace(".", "").isdigit()
     if kind in ("geo", "ports", "whois", "net") and not _is_public_ip(bare):
-        raise ValueError("that is not a public IP address")
+        # Naming the lookup that would have worked, rather than only the one
+        # that did not. A hostname here is a near miss, not a wrong idea.
+        if not looks_like_ip:
+            raise ValueError(
+                "that looks like a hostname - use DNS to turn it into an "
+                "address first, then look the address up")
+        raise ValueError("that is not a public address - private ranges and "
+                         "loopback are refused on purpose")
     if kind != "net" and "/" in target:
-        raise ValueError("a prefix only works with the network lookup")
-    if kind == "dns" and looks_like_ip:
-        raise ValueError("dns takes a hostname")
+        raise ValueError("that is a prefix - pick the network lookup for it")
+    # An address typed into the DNS box is not a mistake to refuse, it is a
+    # different question: what is this called? Reported as putting an external
+    # IP in and getting "dns takes a hostname" back, which is true, unhelpful,
+    # and answers nothing. A reverse lookup is what was meant, so that is what
+    # it does - and the answer says which of the two it performed.
+    reverse = kind == "dns" and looks_like_ip
 
     urls = {
-        "dns": "https://dns.google/resolve?name=%s&type=A" % urllib.parse.quote(target),
+        "dns": ("https://dns.google/resolve?name=%s&type=PTR"
+                % urllib.parse.quote(".".join(reversed(bare.split("."))) + ".in-addr.arpa")
+                if reverse else
+                "https://dns.google/resolve?name=%s&type=A" % urllib.parse.quote(target)),
         "geo": "http://ip-api.com/json/%s" % urllib.parse.quote(target),
         "ports": "https://internetdb.shodan.io/%s" % urllib.parse.quote(target),
         "whois": "https://rdap.db.ripe.net/ip/%s" % urllib.parse.quote(target),
@@ -2429,7 +2443,13 @@ def recon(kind, target):
     except Exception as exc:  # noqa: BLE001
         raise ValueError("the registry did not answer (%s)" % exc)
 
-    data = json.dumps({"kind": kind, "target": target, "result": body}).encode()
+    data = json.dumps({
+        "kind": kind,
+        "target": target,
+        "asked": ("reverse lookup: what is this address called"
+                  if reverse else None),
+        "result": body,
+    }).encode()
     _mem_put(key, data)
     log(f"recon {kind}: {target}")
     return data, "network"

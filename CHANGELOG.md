@@ -6,6 +6,34 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.97.1 — an address in the DNS box is a question, not a mistake
+
+Reported: put an external IP into Recon and got **400 dns takes a hostname**
+back, followed by a fair offer to delete the whole tool if it could not be made
+to work.
+
+It worked. It just refused the thing that was asked. Four of the five lookups
+take an address and only DNS does not, and the one that was picked answered by
+naming what it would not do rather than doing the obvious other thing.
+
+An address typed into a DNS box is not an error to reject, it is a different
+question: **what is this called?** So it does a reverse lookup now. The reported
+address comes back as `78-69-116-2-no600.tbcn.telia.com`, and the answer says
+which of the two questions was asked so the direction is never ambiguous.
+
+Fixing the server exposed the same fault on the client: the summary filtered DNS
+answers to `type === 1`, which is an A record. A PTR is type 12, so the reverse
+answer would have been dropped and shown as *no A record* — technically true,
+and hiding the answer sitting right there. Both types are read now.
+
+The other error messages name the lookup that *would* have worked instead of
+only the one that did not. A hostname in the RDAP box now says to resolve it
+first and look the address up, rather than "that is not a public IP address".
+The dropdown reads **DNS → name to address, or back**, and the field suggests
+both shapes.
+
+Nothing was deleted. It was a good tool with a bad answer.
+
 ## 0.97.0 — every optic says what it is
 
 Nineteen buttons reading FIRE IR, SWIR, NDVI, BATHYMETRIC, ATMOS PENETRATION,

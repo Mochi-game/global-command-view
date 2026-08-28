@@ -2326,7 +2326,10 @@ $('#recon-go').onclick = async () => {
     const data = await getJSON(
       `/api/recon?kind=${kind}&target=${encodeURIComponent(target)}`
     );
-    out.textContent = reconSummary(kind, data.result);
+    // Which of the two DNS questions was asked, when the answer does not
+    // make that obvious on its own.
+    out.textContent = (data.asked ? data.asked + '\n\n' : '')
+      + reconSummary(kind, data.result);
     log(`recon ${kind}: ${target}`);
   } catch (err) {
     out.textContent = err.message;
@@ -2337,10 +2340,14 @@ $('#recon-go').onclick = async () => {
 function reconSummary(kind, r) {
   if (!r) return 'no answer';
   if (kind === 'dns') {
-    const answers = (r.Answer || []).filter((a) => a.type === 1);
-    return answers.length
-      ? answers.map((a) => `${a.name} \u2192 ${a.data}  (ttl ${a.TTL}s)`).join('\n')
-      : `no A record (status ${r.Status})`;
+    // Type 1 is an A record, type 12 is a PTR. Filtering on 1 alone meant a
+    // reverse lookup came back as "no A record", which is technically true
+    // and hides the answer that was sitting right there.
+    const answers = (r.Answer || []).filter((a) => a.type === 1 || a.type === 12);
+    if (!answers.length) return `no answer (status ${r.Status})`;
+    return answers
+      .map((a) => `${a.name} \u2192 ${a.data}  (ttl ${a.TTL}s)`)
+      .join('\n');
   }
   if (kind === 'geo') {
     return [

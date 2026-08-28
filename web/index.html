@@ -129,13 +129,13 @@
     </p>
     <div class="recon-row">
       <select id="recon-kind">
-        <option value="dns">DNS &rarr; A record</option>
+        <option value="dns">DNS &rarr; name to address, or back</option>
         <option value="geo">IP &rarr; location</option>
         <option value="ports">IP &rarr; open ports</option>
         <option value="whois">IP &rarr; RDAP owner</option>
         <option value="net">IP &rarr; network / ASN</option>
       </select>
-      <input type="text" id="recon-target" placeholder="svt.se or 8.8.8.8">
+      <input type="text" id="recon-target" placeholder="svt.se, or 8.8.8.8 for a reverse lookup">
       <button id="recon-go" class="chip">LOOK UP</button>
     </div>
     <pre id="recon-out"></pre>
