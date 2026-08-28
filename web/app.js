@@ -7708,6 +7708,8 @@ const SERVICES = [
   {
     fields: ['cesium_ion'],
     name: 'Cesium ion',
+    tier: 1,
+    cost: 'free',
     adds: 'World terrain and worldwide 3D buildings — real hills, real skylines, and camera projections that drape over them instead of lying flat. The nearest thing to photorealistic ground without paying Google.',
     url: 'https://cesium.com/ion/signup',
     steps: [
@@ -7720,6 +7722,8 @@ const SERVICES = [
   {
     fields: ['google_maps'],
     name: 'Google Maps Platform',
+    tier: 4,
+    cost: 'billed',
     adds: 'Photorealistic 3D — the measured, textured mesh of some 2500 cities, with roofs, trees and shadows instead of grey boxes. Also Street View: an actual photograph taken from the spot you are standing on, on most roads on earth.',
     url: 'https://console.cloud.google.com/google/maps-apis/start',
     steps: [
@@ -7734,6 +7738,8 @@ const SERVICES = [
   {
     fields: ['windy'],
     name: 'Windy',
+    tier: 2,
+    cost: 'free',
     adds: 'About a thousand webcams worldwide, and more wherever you look.',
     url: 'https://api.windy.com/webcams',
     steps: [
@@ -7746,6 +7752,8 @@ const SERVICES = [
   {
     fields: ['trafikverket'],
     name: 'Trafikverket',
+    tier: 1,
+    cost: 'free',
     adds: 'Three layers off one key. <b>1 528 road cameras</b> at full resolution; <b>road disruption</b> across the state network - roadworks, incidents and ferry notices, with severity in Trafikverket own words; and <b>where every reporting train in Sweden is</b>, updated every thirty seconds.',
     url: 'https://api.trafikinfo.trafikverket.se/',
     steps: [
@@ -7759,6 +7767,8 @@ const SERVICES = [
   {
     fields: ['opensky_client_id', 'opensky_client_secret'],
     name: 'OpenSky Network',
+    tier: 2,
+    cost: 'free',
     adds: 'The whole planet\u2019s air traffic in one call — about 13 000 aircraft — instead of stitched 250 nm circles.',
     url: 'https://opensky-network.org/',
     steps: [
@@ -7771,6 +7781,8 @@ const SERVICES = [
   {
     fields: ['aisstream'],
     name: 'aisstream.io',
+    tier: 2,
+    cost: 'free',
     adds: 'Ship positions worldwide. Without it the sea is only the Baltic, which is all Digitraffic covers.',
     url: 'https://aisstream.io/',
     steps: [
@@ -7781,6 +7793,8 @@ const SERVICES = [
   },
   {
     name: 'OpenAQ',
+    tier: 3,
+    cost: 'free',
     adds: 'Air quality, as PM2.5 measured at the ground. The only layer here that measures something happening to people rather than to the ground — and the one most likely to matter to somebody watching from the place being looked at.',
     url: 'https://openaq.org/developers/',
     fields: ['openaq'],
@@ -7793,6 +7807,8 @@ const SERVICES = [
   },
   {
     name: 'Global Fishing Watch',
+    tier: 3,
+    cost: 'free',
     adds: 'What vessels appear to be <i>doing</i>, which the AIS layer cannot say: fishing rather than transit, encounters between two ships at sea, and transponder gaps where a vessel went dark and came back somewhere else.',
     url: 'https://globalfishingwatch.org/our-apis/',
     fields: ['gfw'],
@@ -7804,6 +7820,8 @@ const SERVICES = [
   },
   {
     name: 'TomTom',
+    tier: 2,
+    cost: 'free',
     adds: 'Measured traffic flow. The simulated version this replaces was removed for a good reason: a moving dot that is not a car is worse than no dot, because it looks like information.',
     url: 'https://developer.tomtom.com/',
     fields: ['tomtom'],
@@ -7815,6 +7833,8 @@ const SERVICES = [
   },
   {
     name: 'Copernicus Data Space',
+    tier: 2,
+    cost: 'free',
     adds: 'Sentinel-2 <i>on a given day</i>, at 10 m. The Sentinel layer already here is the EOX cloudless mosaic - a year of passes averaged into a basemap with no clouds, no smoke, no ships and no flood in it. This is the other kind: one acquisition, with whatever was in the air still in it. A sediment plume, the edge of a burn scar, a flooded field, an algal bloom.',
     url: 'https://shapps.dataspace.copernicus.eu/dashboard/',
     fields: ['copernicus'],
@@ -7831,6 +7851,16 @@ const SERVICES = [
   },
 ];
 
+// How long ago a key last worked, in words. Its own helper because whenLine
+// takes an event and this takes a unix second from the server.
+function keyAgo(unixSeconds) {
+  const mins = Math.max(0, Math.round((Date.now() / 1000 - unixSeconds) / 60));
+  if (mins < 1) return 'moments ago';
+  if (mins < 60) return `${mins} min ago`;
+  const hours = Math.round(mins / 60);
+  return hours < 24 ? `${hours} h ago` : `${Math.round(hours / 24)} days ago`;
+}
+
 async function renderKeyRows() {
   let state = {};
   try {
@@ -7839,23 +7869,140 @@ async function renderKeyRows() {
 
   const host = $('#key-rows');
   host.innerHTML = '';
-  for (const service of SERVICES) {
-    const set = service.fields.every((f) => state[f]);
-    const row = document.createElement('div');
-    row.className = 'key-row';
-    row.innerHTML = `
-      <h4>${service.name}<span class="state ${set ? 'set' : ''}">${set ? 'IN USE' : 'NOT SET'}</span></h4>
-      <p class="adds">${service.adds}</p>
-      <ol>${service.steps.map((step) => `<li>${step}</li>`).join('')}</ol>
-      <p class="adds"><a href="${service.url}" target="_blank" rel="noreferrer">${service.url}</a></p>
-      ${service.fields.map((f) => `
-        <div class="key-field">
-          <input type="text" data-field="${f}" placeholder="${f}${set ? ' — saved, paste to replace' : ''}">
-          <button class="chip" data-save="${f}">SAVE</button>
-        </div>`).join('')}
-    `;
-    host.append(row);
+
+  /*
+   * Eleven keys in one undifferentiated column told nobody where to start.
+   * Every card looked as important as every other, the order was the order they
+   * happened to be written in, and the one that can actually charge you money
+   * sat between two that cannot.
+   *
+   * So: a summary of what is needed before any of it, then the same cards in
+   * tiers, numbered. The first thing it says is the true thing - nothing here
+   * is required - and the last group is the only one with a bill attached.
+   */
+  const TIERS = [
+    { n: 1, name: 'Start with these two',
+      why: 'The biggest difference for the least trouble. Both free, both take '
+         + 'about two minutes.' },
+    { n: 2, name: 'Then whichever you want',
+      why: 'Each one adds a layer or widens one you already have. All free, and '
+         + 'none of them are needed by anything else.' },
+    { n: 3, name: 'Narrower ones',
+      why: 'Free, and each answers one specific question. Worth it if that is '
+         + 'the question you have.' },
+    { n: 4, name: 'The one that can cost money',
+      why: 'Google bill this past a monthly free allowance. The app counts your '
+         + 'usage against that allowance and shows it under Google spend, but '
+         + 'their console is the authority.' },
+  ];
+
+  /*
+   * Three states, not two.
+   *
+   * This said IN USE the moment a key was saved, which is a claim about a text
+   * field rather than about the key. A key can be saved and wrong, saved and
+   * expired, or saved and refused by a referrer rule, and all three read as
+   * IN USE. The server now records when a call using a key actually came back
+   * with something, so SAVED and WORKING can be told apart - and for the two
+   * keys the browser uses rather than the server, the honest answer is that it
+   * cannot tell, which is what it says.
+   */
+  const stateOf = (service) => {
+    const parts = service.fields.map((f) => state[f] || {});
+    if (!parts.every((p) => p.set)) return { code: 'unset', label: 'NOT SET' };
+    if (parts.some((p) => p.client_side)) {
+      return { code: 'browser', label: 'SAVED', note: 'used by the browser, so '
+        + 'the server cannot vouch for it' };
+    }
+    const when = parts.map((p) => p.worked).filter(Boolean);
+    if (when.length === parts.length) {
+      return { code: 'working', label: 'WORKING',
+        note: `a call using it succeeded ${keyAgo(Math.max(...when))}` };
+    }
+    return { code: 'saved', label: 'SAVED', note: 'nothing has used it yet this '
+      + 'session — switch on a layer that needs it' };
+  };
+
+  const done = SERVICES.filter((s) => stateOf(s).code !== 'unset');
+  const proven = SERVICES.filter((s) => stateOf(s).code === 'working');
+  const namesFor = (tier) => SERVICES.filter((s) => s.tier === tier)
+    .map((s) => s.name).join(', ');
+
+  const summary = document.createElement('div');
+  summary.className = 'key-summary';
+  summary.innerHTML = `
+    <h4>What do you actually need?</h4>
+    <dl>
+      <dt class="none">Needed</dt>
+      <dd><b>Nothing.</b> Borders, place names, about four thousand public
+        cameras, ships in the Baltic and aircraft worldwide all work with no
+        account at all. Everything below is an addition.</dd>
+      <dt>Biggest gain</dt><dd>${namesFor(1)} — free</dd>
+      <dt>Adds a layer</dt><dd>${namesFor(2)} — free</dd>
+      <dt>Narrower</dt><dd>${namesFor(3)} — free</dd>
+      <dt class="billed">Costs money</dt><dd>${namesFor(4)} — free allowance
+        first, then billed</dd>
+    </dl>
+    <p class="adds">${done.length} of ${SERVICES.length} saved, ${proven.length} seen working.
+      Keys live in <code>keys.json</code> beside the app, take effect without a
+      restart, and are never shown back to you once saved.</p>`;
+  host.append(summary);
+
+  let number = 0;
+  for (const tier of TIERS) {
+    const members = SERVICES.filter((s) => s.tier === tier.n);
+    if (!members.length) continue;
+
+    const head = document.createElement('div');
+    head.className = 'key-tier' + (tier.n === 4 ? ' billed' : '');
+    head.innerHTML = `<h4>${tier.name}</h4><p>${tier.why}</p>`;
+    host.append(head);
+
+    for (const service of members) {
+      number += 1;
+      const st = stateOf(service);
+      const set = st.code !== 'unset';
+      const row = document.createElement('div');
+      row.className = 'key-row';
+      row.innerHTML = `
+        <h4><span class="num">${number}</span>${service.name}<span class="state ${st.code}">${st.label}</span></h4>
+        ${st.note ? `<p class="state-note">${st.note}</p>` : ''}
+        <p class="adds">${service.adds}</p>
+        <ol>${service.steps.map((step) => `<li>${step}</li>`).join('')}</ol>
+        <p class="key-go"><a class="chip" href="${service.url}" target="_blank" rel="noreferrer">GET THE KEY ↗</a></p>
+        ${service.fields.map((f) => `
+          <div class="key-field">
+            <input type="text" data-field="${f}" placeholder="${f}${set ? ' — saved, paste to replace' : ''}">
+            <button class="chip" data-save="${f}">SAVE</button>
+          </div>`).join('')}
+      `;
+      host.append(row);
+    }
   }
+
+  // Last, not first: somebody arriving here wants to know what to get before
+  // they want to be told how to handle it. But it belongs on the page, because
+  // the mistake it warns about is easy and quiet.
+  const safety = document.createElement('div');
+  safety.className = 'key-safety';
+  safety.innerHTML = `
+    <h4>Handling the keys</h4>
+    <ul>
+      <li>Keep the account logins in a password manager. This app never sees
+        them — only the API keys.</li>
+      <li><b>Do not paste an API key into a chat, an email or a screenshot.</b>
+        A key in a transcript is a key somebody else has, and most of them spend
+        your quota rather than your money — which makes the theft quiet.</li>
+      <li>An empty field leaves the saved key untouched. Paste over it only when
+        you mean to replace it.</li>
+      <li>Keys live in <code>keys.json</code> beside the app, in plain text, on
+        this machine. That file is excluded from the repository on purpose.
+        Move it with a USB stick, not through a paste box.</li>
+      <li>Restrict what can be restricted. Google and TomTom both allow a
+        referrer rule; set it to <code>127.0.0.1:8820</code> and a copied key is
+        worth much less.</li>
+    </ul>`;
+  host.append(safety);
 
   for (const button of host.querySelectorAll('[data-save]')) {
     button.onclick = async () => {

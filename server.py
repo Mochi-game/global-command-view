@@ -38,7 +38,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "0.93.1"
+VERSION = "0.94.0"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -165,6 +165,8 @@ def opensky_token():
     )
     with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
         payload = json.loads(resp.read())
+    key_worked("opensky_client_id")
+    key_worked("opensky_client_secret")
     _opensky_token["value"] = payload["access_token"]
     _opensky_token["expires"] = time.time() + payload.get("expires_in", 1800) - 60
     log("opensky: authenticated, global snapshots available")
@@ -222,6 +224,27 @@ def _mem_get(key):
         if hit is not None:
             _mem.move_to_end(key)
         return hit
+
+
+# Whether a key has actually been used for something that worked.
+#
+# SETUP said IN USE the moment a key was saved, which is a claim about a text
+# field and not about the key. A key can be saved and wrong, saved and expired,
+# saved and refused by a referrer rule - and the panel called all of those IN
+# USE. In an app whose whole discipline is not stating more than it can support,
+# that was the worst-supported sentence in it.
+#
+# Three states now: not set, saved but never seen to work, and seen to work at a
+# time this records. Some keys are used by the browser rather than by the
+# server - Cesium ion and Google Maps - and for those the honest answer is that
+# this cannot tell, which is what it says.
+_key_ok = {}
+CLIENT_SIDE_KEYS = ("cesium_ion", "google_maps")
+
+
+def key_worked(name):
+    """Record that a call using this key came back with something."""
+    _key_ok[name] = time.time()
 
 
 def _mem_put(key, data):
@@ -441,6 +464,7 @@ def trafikverket_cameras():
     if os.path.exists(path) and time.time() - os.path.getmtime(path) < 86400:
         with open(path, "rb") as fh:
             raw = fh.read()
+        key_worked("trafikverket")
         _mem_put("cameras-se", raw)
         return json.loads(raw)
 
@@ -476,6 +500,7 @@ def trafikverket_cameras():
         })
 
     raw = json.dumps(out).encode()
+    key_worked("trafikverket")
     _mem_put("cameras-se", raw)
     os.makedirs(CACHE_DIR, exist_ok=True)
     with open(path, "wb") as fh:
@@ -511,6 +536,7 @@ def windy_cameras():
     if os.path.exists(path) and time.time() - os.path.getmtime(path) < 86400:
         with open(path, "rb") as fh:
             raw = fh.read()
+        key_worked("windy")
         _mem_put("cameras-windy", raw)
         return json.loads(raw)
 
@@ -555,6 +581,7 @@ def windy_cameras():
                 })
 
     raw = json.dumps(out).encode()
+    key_worked("windy")
     _mem_put("cameras-windy", raw)
     os.makedirs(CACHE_DIR, exist_ok=True)
     with open(path, "wb") as fh:
@@ -3140,6 +3167,7 @@ def incidents(south, west, north, east):
         "incidents": out,
         "source": "TomTom Traffic Incidents",
     }).encode()
+    key_worked("tomtom")
     _mem_put(cache, data)
     jams = sum(1 for x in out if (x["magnitude"] or 0) in (1, 2, 3))
     log("incidents: %d in view, %d with a graded delay" % (len(out), jams))
@@ -3464,6 +3492,7 @@ def sweden_road():
         "undrawable": undrawable,
         "source": "Trafikverket, Situation road.trafficinfo 1.6",
     }).encode()
+    key_worked("trafikverket")
     _mem_put("tv_road", data)
     log("sweden road: %d disruptions, %d without a point" % (len(events), undrawable))
     return data, "network"
@@ -3530,6 +3559,7 @@ def sweden_rail():
         "dropped_stale": stale,
         "source": "Trafikverket, TrainPosition 1.1",
     }).encode()
+    key_worked("trafikverket")
     _mem_put("tv_rail", data)
     log("sweden rail: %d trains reporting, %d stale positions dropped"
         % (len(trains), stale))
@@ -3863,6 +3893,7 @@ def copernicus():
         "matrixSets": mercator or matrix_sets,
         "source": "Copernicus Data Space Ecosystem, Sentinel Hub OGC",
     }).encode()
+    key_worked("copernicus")
     _mem_put("copernicus_caps", data)
     log("copernicus: %d visualisation(s) offered by this instance" % len(layers))
     return data, "network"
@@ -4115,6 +4146,7 @@ def air_quality(lat, lon, radius_km):
         "source": "OpenAQ, CC BY 4.0",
         "radius_km": round(metres / 1000, 1),
     }).encode()
+    key_worked("openaq")
     _mem_put(cache, data)
     log("openaq: %d PM2.5 readings within %d km" % (len(readings), metres / 1000))
     return data, "network"
@@ -4238,6 +4270,7 @@ def fishing(lat, lon, radius_km, days=14):
         "radius_km": radius_km,
         "source": "Global Fishing Watch, CC BY-SA 4.0",
     }).encode()
+    key_worked("gfw")
     _mem_put(cache, data)
     log("gfw: %d events in %d days within %d km" % (len(events), days, radius_km))
     return data, "network"
@@ -5814,7 +5847,13 @@ class Handler(SimpleHTTPRequestHandler):
                 # SETUP however correctly it was saved - the field was telling
                 # the truth about a list, not about the key.
                 data = json.dumps({
-                    k: bool(KEYS.get(k)) for k in ALLOWED_KEYS
+                    k: {
+                        "set": bool(KEYS.get(k)),
+                        "worked": _key_ok.get(k),
+                        # A key the browser uses is one the server never sends a
+                        # request with, so it has nothing to report about it.
+                        "client_side": k in CLIENT_SIDE_KEYS,
+                    } for k in ALLOWED_KEYS
                 }).encode()
                 source = "memory"
             elif name == "place":

@@ -1197,3 +1197,115 @@ audio.stream-player {
 #find-said[hidden] { display: none; }
 #find-said b { color: var(--ink); font-weight: 500; }
 #find-said.miss { color: var(--amber); }
+
+/* ---------------------------------------------------------------- setup */
+
+/* Eleven keys in one column told nobody where to start: every card looked as
+   important as every other, and the only one that can charge money sat between
+   two that cannot. The summary answers the question people actually arrive
+   with, and the tiers give the rest an order. */
+
+.key-summary {
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--amber);
+  padding: 12px 14px;
+  margin-bottom: 16px;
+}
+.key-summary h4 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+}
+.key-summary dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 5px 12px;
+  margin: 0 0 10px;
+  font-size: 11.5px;
+}
+.key-summary dt {
+  color: var(--dim);
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  padding-top: 2px;
+}
+.key-summary dt.none { color: #7dffab; }
+.key-summary dt.billed { color: #8ab4ff; }
+.key-summary dd { margin: 0; color: var(--dim); line-height: 1.45; }
+.key-summary dd b { color: var(--ink); }
+
+.key-tier { margin: 20px 0 10px; }
+.key-tier h4 {
+  margin: 0 0 3px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+.key-tier.billed h4 { color: #8ab4ff; }
+.key-tier p { margin: 0; font-size: 11px; color: var(--dim); line-height: 1.45; }
+
+/* The number is the whole point of the tiers: it says there is an order, and
+   which end of it you are at. */
+.key-row h4 .num {
+  display: inline-block;
+  min-width: 17px;
+  margin-right: 7px;
+  text-align: center;
+  color: var(--amber);
+  border: 1px solid var(--line);
+  font-size: 10px;
+  line-height: 15px;
+}
+
+/* A bare URL at the bottom of a card is not an invitation. This is. */
+.key-go { margin: 0 0 8px; }
+.key-go .chip { display: inline-block; text-decoration: none; }
+
+/* The setup tab is read once, carefully, by somebody deciding whether to bother
+   creating an account. The rest of the panel is glanced at while something else
+   is happening. So this one reads at a size meant for reading. */
+
+#guide-setup .key-row .adds,
+#guide-setup .key-row ol { font-size: 12.5px; line-height: 1.55; }
+#guide-setup .key-row h4 { font-size: 13px; }
+#guide-setup .key-summary dl { font-size: 12.5px; }
+#guide-setup .key-tier h4 { font-size: 12px; }
+#guide-setup .key-tier p { font-size: 12px; }
+
+/* Three states, and each one looks like what it means: nothing yet, saved but
+   unproven, and seen to work. */
+.key-row .state.unset { color: var(--dim); }
+.key-row .state.saved,
+.key-row .state.browser { color: var(--amber); border-color: rgba(255, 176, 0, 0.45); }
+.key-row .state.working { color: #7dffab; border-color: rgba(125, 255, 171, 0.5); }
+.key-row .state-note {
+  margin: -4px 0 8px;
+  font-size: 11px;
+  color: var(--dim);
+  font-style: italic;
+}
+
+.key-safety {
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--amber);
+  padding: 12px 14px;
+  margin-top: 22px;
+}
+.key-safety h4 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  color: var(--amber);
+}
+.key-safety ul { margin: 0; padding-left: 16px; }
+.key-safety li {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--dim);
+  margin-bottom: 6px;
+}
+.key-safety li b { color: var(--ink); }

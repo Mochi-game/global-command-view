@@ -6,6 +6,47 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.94.0 — a setup page that says what to do first, and a badge that stops lying
+
+Shown another app's onboarding as the standard to meet, and it was. Two things
+it does that this did not, and the second one was a fault rather than a gap.
+
+**Eleven keys in one undifferentiated column told nobody where to start.** Every
+card looked as important as every other, the order was the order they happened
+to be written in, and the only one that can charge money sat between two that
+cannot.
+
+There is now a summary that answers the question people actually arrive with —
+**needed: nothing** — and then four tiers, numbered: the two worth doing first,
+the ones that each add a layer, the narrow ones, and the one Google bills for
+past a free allowance. The bare URL at the bottom of each card is a button.
+
+**And SETUP said IN USE the moment a key was saved.** That is a claim about a
+text field, not about the key. A key can be saved and wrong, saved and expired,
+or saved and refused by a referrer rule, and all three read as IN USE. In an app
+whose entire discipline is not stating more than it can support, that was the
+worst-supported sentence in it.
+
+The server now records when a call using a key actually came back with
+something, at twelve points across the feeds that use one. Three states:
+
+- **NOT SET** — no key.
+- **SAVED** — a key is there and nothing has used it yet, with a line saying to
+  switch on a layer that needs it.
+- **WORKING** — a call using it succeeded, and when.
+
+Cesium ion and Google Maps are used by the browser rather than by the server, so
+the server has nothing to report about them and says exactly that instead of
+guessing. Verified live: Trafikverket, Windy and Copernicus read WORKING with
+timestamps; OpenSky, aisstream and TomTom read SAVED; OpenAQ and Global Fishing
+Watch read NOT SET.
+
+Also a **Handling the keys** block, and the setup tab now reads at a size meant
+for reading rather than for glancing at. One of its five lines is there because
+of something that happened in this very project: do not paste an API key into a
+chat, an email or a screenshot. Most of these keys spend a quota rather than
+money, which is what makes that kind of theft quiet.
+
 ## 0.93.1 — the documentation catching up with the app
 
 Asked whether help, the README and the HTML page were up to date. Help was.
