@@ -107,6 +107,7 @@ const IMAGERY = {
    */
   burn: {
     label: 'FIRE IR',
+    what: 'Short-wave infrared. Burnt ground reads dark rust, healthy vegetation bright green, an active fire front glows orange. It sees through smoke, which true colour cannot, so use it to ask how much has burned.',
     url: 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/'
        + 'VIIRS_SNPP_CorrectedReflectance_BandsM11-I2-I1/default/{gibsDay}/'
        + 'GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg',
@@ -129,6 +130,7 @@ const IMAGERY = {
    */
   smoke: {
     label: 'SMOKE',
+    what: 'The same satellite and the same day in the colours an eye would see. Smoke is grey-brown and opaque and drifts for hundreds of kilometres. Use it to ask where the smoke is going and who is downwind, which FIRE IR deliberately looks straight through.',
     url: 'https://gibs.earthdata.nasa.gov/wmts/epsg3857/best/VIIRS_SNPP_CorrectedReflectance_TrueColor/default/{gibsDay}/GoogleMapsCompatible_Level9/{z}/{y}/{x}.jpg',
     credit: 'NASA GIBS / EOSDIS \u2014 VIIRS true colour, daily',
     max: 9,
@@ -150,6 +152,7 @@ const IMAGERY = {
    */
   s2: {
     label: 'SENTINEL 10M',
+    what: 'Sentinel-2 at 10 m, sharp enough to see individual buildings. It is a mosaic composited from a year of passes, so there are no clouds, no smoke, no ships and no flood in it. A basemap, not a look at a day.',
     url: 'https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2024_3857/default/g/{z}/{y}/{x}.jpg',
     credit: 'Sentinel-2 cloudless 2024 by EOX \\u2014 contains modified '
           + 'Copernicus Sentinel data, CC BY 4.0',
@@ -159,6 +162,7 @@ const IMAGERY = {
   },
   ops: {
     label: 'OPS',
+    what: 'A dark cartographic chart rather than imagery. Roads, coastlines and place names with nothing else competing for attention. The easiest optic for reading positions off.',
     url: 'https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
     credit: '© OpenStreetMap contributors © CARTO',
     max: 19,
@@ -166,6 +170,7 @@ const IMAGERY = {
   },
   thermal: {
     label: 'THERMAL',
+    what: 'A false-colour treatment of the same imagery, not a heat camera. It exaggerates contrast the way a thermal sight would and is for the look of the footage, not for measuring temperature.',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     credit: 'Imagery © Esri and its licensors',
     max: 19,
@@ -176,6 +181,7 @@ const IMAGERY = {
   },
   satellite: {
     label: 'SATELLITE',
+    what: 'Aerial and satellite imagery at high resolution, the ordinary picture of the ground. Undated: it is whatever Esri last flew, which can be years old in some places and months in others.',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     credit: 'Imagery © Esri and its licensors',
     max: 19,
@@ -183,6 +189,7 @@ const IMAGERY = {
   },
   nightvision: {
     label: 'NIGHT VIS',
+    what: 'Image-intensifier green applied to daylight imagery. Presentation, not a sensor: nothing here is darker or brighter than it was, only greener.',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     credit: 'Imagery © Esri and its licensors',
     max: 19,
@@ -193,6 +200,7 @@ const IMAGERY = {
   },
   flir: {
     label: 'FLIR',
+    what: 'The white-hot look of an infrared sight, applied to ordinary imagery. Like THERMAL, it is a treatment rather than a measurement, and nothing in it is warm.',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     credit: 'Imagery © Esri and its licensors',
     max: 19,
@@ -201,6 +209,7 @@ const IMAGERY = {
   },
   crt: {
     label: 'CRT',
+    what: 'A real post-process pass over the picture: barrel distortion, scan lines and chromatic separation. For when the footage should look like it came off a screen rather than out of a satellite.',
     url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
     credit: 'Imagery © Esri and its licensors',
     max: 19,
@@ -7466,6 +7475,7 @@ function selectStyle(key, byHandover) {
   }
   const spec = IMAGERY[key];
   currentStyle = key;
+  showStyleWhat(key);
   localStorage.setItem('gcv-style', key);
   rebuildImagery();
   $('#globe').classList.toggle('heat', !!spec.heat);
@@ -7483,6 +7493,21 @@ function selectStyle(key, byHandover) {
   log(`optics: ${spec.label}`);
 }
 
+/*
+ * An optic is a claim about what you are looking at, and half of these are not
+ * what they sound like: THERMAL and FLIR are treatments of ordinary daylight
+ * imagery with nothing warm in them, and SENTINEL 10M is a year averaged into a
+ * basemap rather than a day. Someone choosing between them cannot know that
+ * from a nine-character label, so the choice explains itself once made.
+ */
+function showStyleWhat(key) {
+  const note = $('#style-what');
+  if (!note) return;
+  const spec = IMAGERY[key] || {};
+  note.textContent = spec.what || '';
+  note.hidden = !spec.what;
+}
+
 function renderStyles() {
   const box = $('#styles');
   box.innerHTML = '';
@@ -7490,9 +7515,14 @@ function renderStyles() {
     const b = document.createElement('button');
     b.className = 'chip' + (key === currentStyle ? ' active' : '');
     b.textContent = spec.label;
+    // The chip alone says SWIR or NDVI, which means nothing to anyone who does
+    // not already know. The title is for a passing hover; the line under the
+    // row is for whoever actually picked one.
+    if (spec.what) b.title = spec.what;
     b.onclick = () => selectStyle(key);
     box.append(b);
   }
+  showStyleWhat(currentStyle);
 }
 
 /* -------------------------------------------------------------------- find */
@@ -8724,6 +8754,21 @@ async function loadSmhi() {
  * buttons that fetch nothing, which is worse than no button.
  */
 
+const CDSE_WHAT = {
+  TRUE_COLOR: 'One acquisition in the colours an eye would see, at 10 m. Unlike the cloudless mosaic this keeps whatever was in the air that week: cloud, smoke, a sediment plume, a flood.',
+  FALSE_COLOR: 'Near infrared shown as red, so living vegetation glows and bare ground, roads and buildings go flat. The quickest way to see where something is growing and where it has stopped.',
+  COLOR_INFRARED: 'Near infrared shown as red. Healthy vegetation is bright red, stressed or cut vegetation is dull, water is near black. Good for crop damage and for clear-cuts.',
+  COLOR_INFRARED__URBAN_: 'Built-up ground separated from vegetation. Concrete, roofs and roads stand out against the landscape, which makes new construction and damage to it visible.',
+  SWIR: 'Short-wave infrared at 10 m. It passes through smoke and haze, burnt ground reads dark, and wet ground reads differently from dry. The sharp equivalent of FIRE IR.',
+  AGRICULTURE: 'Crop vigour. Fields in good condition read bright, struggling or harvested ones read dull. Field boundaries are unusually clear, which also makes it useful for seeing what land is being worked.',
+  GEOLOGY: 'Rock and soil rather than what grows on them. Different minerals take different colours, so faults, bedding and bare ground structure show up that true colour flattens.',
+  BATHYMETRIC: 'Shallow water. Depth in the first few metres reads as colour, so sandbanks, reefs and channels near the coast appear. It says nothing about deep water.',
+  MOISTURE_INDEX: 'How much water is in the vegetation. Wet reads one way and dry another, which shows drought stress before it is visible in true colour, and shows fire risk with it.',
+  VEGETATION_INDEX: 'NDVI: a single number per pixel for how much living plant matter is there. Not a picture but a measurement drawn as one, and the standard way of comparing the same field between two dates.',
+  NDVI: 'NDVI: a single number per pixel for how much living plant matter is there. Not a picture but a measurement drawn as one, and the standard way of comparing the same field between two dates.',
+  ATMOSPHERIC_PENETRATION: 'No visible light at all, only infrared. Haze and thin cloud largely disappear, at the cost of colours that mean nothing to the eye. For when the air is in the way.',
+};
+
 /*
  * A chip is about eighteen characters wide, and Copernicus titles are longer
  * than that: "Color Infrared (vegetation)", "Vegetation Index - NDVI". Cutting
@@ -8802,6 +8847,7 @@ async function loadCopernicus() {
     if (IMAGERY[key]) continue;
     IMAGERY[key] = {
       label: styleLabel(layer.title),
+      what: CDSE_WHAT[layer.id] || 'A visualisation from your own Copernicus configuration. What it shows is set in the Sentinel Hub dashboard, not here.',
       url: base
         + '?SERVICE=WMTS&VERSION=1.0.0&REQUEST=GetTile'
         + '&LAYER=' + encodeURIComponent(layer.id)

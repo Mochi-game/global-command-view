@@ -6,6 +6,34 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.97.0 — every optic says what it is
+
+Nineteen buttons reading FIRE IR, SWIR, NDVI, BATHYMETRIC, ATMOS PENETRATION,
+and nothing anywhere saying what any of them shows. A nine-character label is
+not an explanation, and half of these are not what they sound like.
+
+Each optic now carries a sentence on what you see and a sentence on when it is
+the right one. Hovering a button shows it; picking one prints it under the row.
+The Copernicus visualisations are described too, keyed on the layer id, so they
+explain themselves even though which of them exist is decided in somebody else's
+dashboard rather than here.
+
+The help section was rewritten around the distinction that actually matters, and
+it is not the one the old list implied. Some of these are **measurements** and
+some are only **a look**:
+
+- FIRE IR, SMOKE, SENTINEL 10M, SATELLITE and the Copernicus set are sensed.
+  Something was measured and this is what it measured.
+- THERMAL, NIGHT VIS, FLIR and CRT are daylight imagery recoloured. **THERMAL
+  and FLIR contain nothing warm, and NIGHT VIS contains nothing dark.** They are
+  here because footage sometimes wants that look, and nothing in them can be
+  measured.
+
+Both are useful and they are not interchangeable, so they are listed apart
+instead of together. The old section had them in one list with "sensor
+emulations" as the only hint, which is exactly the sort of phrase that reads as
+a feature rather than a warning.
+
 ## 0.96.2 — a welcome page that overclaimed on its first line
 
 The welcome page written yesterday said **Public cameras** gives you four

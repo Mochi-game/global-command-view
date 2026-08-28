@@ -1451,3 +1451,26 @@ audio.stream-player {
   color: var(--dim);
 }
 .welcome-back b { color: var(--ink); }
+
+/* An optic is a claim about what you are looking at, and half of them are not
+   what they sound like. The label has nine characters; this has the rest. */
+#style-what {
+  margin: 8px 0 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--line);
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+#style-what[hidden] { display: none; }
+
+/* The optics section needed a level between the section heading and the list:
+   measurements and treatments are different kinds of thing and listing them
+   together was the reason nobody could tell which was which. */
+.guide-body h4 {
+  margin: 16px 0 6px;
+  font-size: 11px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--amber);
+}

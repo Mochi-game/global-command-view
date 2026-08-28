@@ -50,6 +50,7 @@
   <section class="block">
     <h2 data-section="optics">Optics</h2>
     <div id="styles" class="chips"></div>
+    <p id="style-what" class="adds"></p>
     <label class="toggle-row">
       <input type="checkbox" id="lighting" checked>
       <span>Sun terminator</span>
@@ -463,19 +464,85 @@
       </p>
 
       <h3>4 · Optics</h3>
+      <p>
+        The optic changes what the ground is made of, not what is drawn on top
+        of it. Pick one and the line under the row says what you are looking at;
+        hovering a button says the same thing without changing anything.
+      </p>
+      <p>
+        <b>The distinction that matters most:</b> some of these are measurements
+        and some are only a look. Both are useful and they are not
+        interchangeable, so they are separated here rather than listed together.
+      </p>
+
+      <h4>Measurements — something was sensed</h4>
       <ul>
-        <li><b>OPS</b> — dark cartographic base, best for reading positions.</li>
-        <li><b>SATELLITE</b> — aerial imagery.</li>
-        <li><b>THERMAL</b>, <b>NIGHT VIS</b>, <b>FLIR</b> — sensor emulations.</li>
-        <li><b>CRT</b> — a real post-process pass: barrel distortion, scan lines,
-          chromatic separation.</li>
-        <li><b>SENTINEL 10M</b> &mdash; sharp, and <i>not</i> dated. It is a
-          cloudless mosaic composited from a year of passes, so it has no clouds,
-          no smoke, no ships and no flood in it. A basemap, not a look.</li>
-        <li>Any style from your own <b>Copernicus</b> instance &mdash; the
-          opposite trade. One acquisition at 10 m, with whatever was in the air
-          still in it, following the imagery-day slider. Needs a free account;
-          the Setup tab has the steps and the two limits worth knowing.</li>
+        <li><b>SATELLITE</b> &mdash; ordinary aerial and satellite imagery.
+          Undated: whatever Esri last flew, which can be years old in one place
+          and months in another.</li>
+        <li><b>SENTINEL 10M</b> &mdash; sharp enough for individual buildings,
+          and <i>not</i> dated. A cloudless mosaic composited from a year of
+          passes, so there is no cloud, no smoke, no ship and no flood in it. A
+          basemap, not a look at a day.</li>
+        <li><b>FIRE IR</b> &mdash; short-wave infrared. Burnt ground reads dark
+          rust, healthy vegetation bright green, an active front glows orange.
+          It sees <i>through</i> smoke, so it answers how much has burned.</li>
+        <li><b>SMOKE</b> &mdash; the same satellite the same day, in the colours
+          an eye would see. The other half of the pair: it answers where the
+          smoke is going and who is downwind, which FIRE IR looks straight
+          through.</li>
+        <li><b>OPS</b> &mdash; not imagery at all but a dark cartographic chart.
+          Roads, coastlines and names, with nothing competing. The easiest optic
+          to read positions off.</li>
+      </ul>
+
+      <h4>Treatments — the picture is restyled, nothing new is sensed</h4>
+      <p class="guide-note">
+        <b>THERMAL</b> and <b>FLIR</b> contain nothing warm, and <b>NIGHT VIS</b>
+        contains nothing dark. They are daylight imagery recoloured to look like
+        a sensor, and they are here because footage sometimes wants that look.
+        Nothing in them can be measured, and the card under the row says so when
+        you pick one.
+      </p>
+      <ul>
+        <li><b>THERMAL</b> &mdash; exaggerated contrast in the style of a
+          thermal sight.</li>
+        <li><b>NIGHT VIS</b> &mdash; image-intensifier green over daylight.</li>
+        <li><b>FLIR</b> &mdash; the white-hot look of an infrared sight.</li>
+        <li><b>CRT</b> &mdash; a real post-process pass: barrel distortion, scan
+          lines, chromatic separation. For when the footage should look like it
+          came off a screen.</li>
+      </ul>
+
+      <h4>From your own Copernicus instance</h4>
+      <p>
+        These appear only once a Copernicus instance is configured, and which
+        ones appear is decided in your Sentinel Hub dashboard rather than here.
+        All of them are one acquisition at 10 m, following the imagery-day
+        slider, with whatever was in the air still in it.
+      </p>
+      <ul>
+        <li><b>NATURAL COLOR</b> &mdash; what an eye would see, on a given day.</li>
+        <li><b>COLOR INFRARED</b> and <b>FALSE COLOR</b> &mdash; near infrared
+          shown as red. Living vegetation glows, cut or stressed vegetation goes
+          dull, water goes near black.</li>
+        <li><b>SWIR</b> &mdash; the sharp equivalent of FIRE IR. Passes through
+          smoke and haze; burnt ground dark, wet ground different from dry.</li>
+        <li><b>AGRICULTURE</b> &mdash; crop vigour, with unusually clear field
+          boundaries.</li>
+        <li><b>MOISTURE INDEX</b> &mdash; water content in vegetation. Shows
+          drought stress before true colour does, and fire risk with it.</li>
+        <li><b>NDVI</b> &mdash; a single number per pixel for living plant
+          matter. A measurement drawn as a picture, and the standard way to
+          compare one field between two dates.</li>
+        <li><b>GEOLOGY</b> &mdash; rock and soil rather than what grows on them:
+          faults, bedding, bare structure that true colour flattens.</li>
+        <li><b>BATHYMETRIC</b> &mdash; the first few metres of water depth as
+          colour. Sandbanks, reefs and channels. It says nothing about deep
+          water.</li>
+        <li><b>ATMOS PENETRATION</b> &mdash; no visible light at all. Haze and
+          thin cloud largely disappear, at the cost of colours that mean nothing
+          to the eye.</li>
       </ul>
 
       <h3>5 · Clicking things</h3>
