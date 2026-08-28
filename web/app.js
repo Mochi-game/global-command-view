@@ -395,6 +395,7 @@ const meshNodes = scene.primitives.add(new Cesium.PointPrimitiveCollection());
 const newsHeat = scene.primitives.add(new Cesium.PointPrimitiveCollection());
 const trains = scene.primitives.add(new Cesium.BillboardCollection({ scene }));
 const metarPoints = scene.primitives.add(new Cesium.PointPrimitiveCollection());
+const navaidPoints = scene.primitives.add(new Cesium.PointPrimitiveCollection());
 const swRoad = scene.primitives.add(new Cesium.PointPrimitiveCollection());
 const swRail = scene.primitives.add(new Cesium.PointPrimitiveCollection());
 let smhiPrimitive = null;
@@ -420,7 +421,7 @@ const SCALE = {
 
 const LAYER_GROUPS = [
   { name: 'Radio', ids: ['broadcast', 'radio', 'scanners', 'airports', 'aprs'] },
-  { name: 'Aviation', ids: ['runways', 'metar'] },
+  { name: 'Aviation', ids: ['runways', 'metar', 'navaids'] },
   { name: 'Moving', ids: ['flights', 'services', 'vessels', 'trains', 'capital', 'fishing'] },
   { name: 'Earth', ids: ['fires', 'quakes', 'volcanoes', 'weather'] },
   { name: 'People', ids: ['outbreaks', 'news', 'air', 'own'] },
@@ -466,6 +467,7 @@ const LAYERS = [
   { id: 'trains', name: 'Trains (US)', color: '#c4b5fd', on: false, count: 0, note: 'Amtrak — US only; Finland refuses every header tried' },
   { id: 'own', name: 'Own entries', color: '#ffb347', on: false, count: 0, note: 'hand-entered from the news — no feed saw these' },
   { id: 'capital', name: 'Capital ships (est.)', color: '#ff4d4d', on: false, count: 0, note: 'USNI Fleet Tracker, read at launch · area centres, not positions' },
+  { id: 'navaids', name: 'Navigation beacons', color: '#4fd6ff', on: false, count: 0, note: 'OurAirports — VOR, VOR-DME, VORTAC, TACAN, DME and NDB with their frequencies; no ILS exists in this data' },
   { id: 'metar', name: 'Airfield weather (METAR)', color: '#7dffab', on: false, count: 0, note: 'NOAA aviation weather — an observation at the field, not a forecast for the area; coloured by flight category and bigger where something is falling' },
   { id: 'runways', name: 'Runways & approaches', color: '#cbd5e1', on: false, count: 0, note: 'OurAirports — real runway geometry; the approach line is 10 NM of arithmetic from the published heading, not a procedure off a chart' },
   { id: 'swroad', name: 'Swedish road disruption', color: '#ff9f45', on: false, count: 0, note: 'Trafikverket Situation — roadworks, incidents and ferries, Sweden only; some are stretches of road with no single point' },
@@ -594,6 +596,7 @@ function applyVisibility() {
   for (const spec of OPERA) showOpera(spec, on(spec.id));
   if (runwayPrimitive) runwayPrimitive.show = on('runways');
   metarPoints.show = on('metar');
+  navaidPoints.show = on('navaids');
   swRoad.show = on('swroad');
   swRail.show = on('swrail');
   if (smhiPrimitive) smhiPrimitive.show = on('smhi');
@@ -1942,26 +1945,7 @@ function describePicked(type, ref) {
     ]);
     addPlayer(ref);
   } else if (type === 'airport') {
-    showDetail(ref.name, `${ref.big ? 'large' : 'medium'} airport · ${ref.icao || '?'}`, [
-      ['Codes', [ref.icao, ref.iata].filter(Boolean).join(' · ')],
-      ['Where', [ref.town, ref.country].filter(Boolean).join(', ')],
-      ['Elevation', ref.elev_ft ? `${ref.elev_ft} ft` : ''],
-      ['Position', `${ref.lat.toFixed(4)}, ${ref.lon.toFixed(4)}`],
-      ['Tower and approach', ref.icao
-        ? `https://www.liveatc.net/search/?icao=${ref.icao}`
-        : 'no ICAO code, so no feed to look up'],
-      ['How live', 'LiveATC streams live audio a few seconds behind. The '
-        + 'receivers in this app cannot reach VHF, so the tower is through that '
-        + 'link or not at all.'],
-      ['Note', 'coverage is wherever a volunteer has put a receiver, so a large '
-        + 'airport may have several feeds and a medium one none.'],
-      // Reported from use: American towers play, European ones mostly do not.
-      // Worth saying on the card rather than letting the link look broken.
-      ['Where it works', 'in practice this is North America. Most of Europe '
-        + 'restricts rebroadcasting air traffic control, so European airports '
-        + 'usually have no feed however large they are — the link will open and '
-        + 'find nothing. That is the law where the airport is, not a fault here.'],
-    ]);
+    showAirport(ref);
   } else if (type === 'aprs') {
     const mins = Math.round(ref.ago_s / 60);
     showDetail(ref.call, 'amateur radio · APRS-IS', [
@@ -2018,6 +2002,21 @@ function describePicked(type, ref) {
       ['Note', 'a curated catalogue, not a sensor. An eruption appears once '
         + 'somebody confirmed it, and one that has quietly stopped can linger '
         + 'in the list.'],
+    ]);
+  } else if (type === 'navaid') {
+    const khz = Number(ref.khz);
+    const tuned = Number.isFinite(khz)
+      ? (khz >= 100000 ? `${(khz / 1000).toFixed(3)} MHz` : `${khz} kHz`)
+      : ref.khz;
+    showDetail(`${ref.ident} ${ref.name}`, `${ref.type} · OurAirports`, [
+      ['Tune', tuned],
+      ['DME channel', ref.dme_channel || 'none'],
+      ['Belongs to', ref.airport || 'no airport listed'],
+      ['Power', ref.power || 'not published'],
+      ['Position', `${ref.lat.toFixed(4)}, ${ref.lon.toFixed(4)}`],
+      ['Note', 'a beacon, not an approach. There is no ILS in this data at '
+        + 'all — no localiser, no glideslope, no minima. Those are in the '
+        + 'national AIP.'],
     ]);
   } else if (type === 'metar') {
     showMetar(ref);
@@ -3000,6 +2999,7 @@ async function loadAirports() {
 viewer.camera.moveEnd.addEventListener(loadAirports);
 viewer.camera.moveEnd.addEventListener(() => loadRunways(false));
 viewer.camera.moveEnd.addEventListener(() => loadMetar(false));
+viewer.camera.moveEnd.addEventListener(() => loadNavaids(false));
 // Observations are issued twice an hour; this asks a little more often so
 // a change is never more than five minutes stale on screen.
 setInterval(whileOn('metar', () => loadMetar(true)), 5 * 60_000);
@@ -3204,6 +3204,7 @@ async function loadRadios() {
 LAYER_ON_DEMAND.volcanoes = () => loadVolcanoes();
 LAYER_ON_DEMAND.runways = () => loadRunways(true);
 LAYER_ON_DEMAND.metar = () => loadMetar(true);
+LAYER_ON_DEMAND.navaids = () => loadNavaids(true);
 LAYER_ON_DEMAND.swroad = () => loadSwedenRoad();
 LAYER_ON_DEMAND.swrail = () => loadSwedenRail();
 LAYER_ON_DEMAND.smhi = () => loadSmhi();
@@ -8969,6 +8970,170 @@ async function showMetar(s) {
     : forecast.error ? `could not fetch it (${forecast.error})`
     : (forecast.note || 'none issued for this field')];
   showDetail(s.icao || 'field', 'observation · NOAA aviation weather', rows);
+}
+
+/* --------------------------------------------------------- airfield detail */
+
+/*
+ * What is written on the strip of paper beside a pilot: the frequencies for the
+ * field and the beacons that belong to it.
+ *
+ * Fetched when an airport is clicked rather than for every airport on screen,
+ * because it answers a question about one field and there are eighty thousand.
+ * The card draws immediately with what the airport layer already knew and fills
+ * the rest in, the same way a train journey does.
+ *
+ * The thing this cannot give is stated on the card rather than left to be
+ * discovered: there is no ILS in it. No localiser, no glideslope, no minima.
+ * That is in each country's AIP under each country's terms, and inventing an
+ * approach would be worse than not having one.
+ */
+
+// Where each country publishes its own charts. Linked, never copied: an AIP is
+// the publisher's document and several of them say so explicitly.
+const AIP_LINKS = {
+  SE: ['LFV, Swedish AIP', 'https://aro.lfv.se/Editorial/View/IAIP'],
+  NO: ['Avinor, Norwegian AIP', 'https://avinor.no/en/ais/aipnorway/'],
+  DK: ['Naviair, Danish AIP', 'https://aim.naviair.dk/'],
+  FI: ['Fintraffic, Finnish AIP', 'https://www.ais.fi/'],
+  GB: ['NATS, UK AIP', 'https://nats-uk.ead-it.com/'],
+  DE: ['DFS, German AIP', 'https://aip.dfs.de/basicVFR/'],
+  FR: ['SIA, French AIP', 'https://www.sia.aviation-civile.gouv.fr/'],
+  NL: ['LVNL, Dutch AIP', 'https://www.lvnl.nl/eaip'],
+  US: ['FAA, free approach plates', 'https://www.faa.gov/air_traffic/flight_info/aeronav/digital_products/dtpp/'],
+};
+
+function frequencyLines(list) {
+  return (list || []).map((f) => {
+    const mhz = Number(f.mhz);
+    const shown = Number.isFinite(mhz) ? mhz.toFixed(3) : f.mhz;
+    return `${f.kind.padEnd(5)} ${shown} MHz`
+      + (f.means ? `  ${f.means}` : (f.what ? `  ${f.what}` : ''));
+  }).join('\n');
+}
+
+function navaidLines(list) {
+  return (list || []).map((n) => {
+    const khz = Number(n.khz);
+    // VOR and above are quoted in MHz on every chart; NDBs stay in kHz.
+    const tuned = Number.isFinite(khz)
+      ? (khz >= 100000 ? `${(khz / 1000).toFixed(3)} MHz` : `${khz} kHz`)
+      : n.khz;
+    return `${n.ident.padEnd(5)} ${n.type.padEnd(8)} ${tuned}`
+      + (n.dme_channel ? `  channel ${n.dme_channel}` : '');
+  }).join('\n');
+}
+
+async function showAirport(ref) {
+  const title = ref.name;
+  const base = () => [
+    ['Codes', [ref.icao, ref.iata].filter(Boolean).join(' · ')],
+    ['Where', [ref.town, ref.country].filter(Boolean).join(', ')],
+    ['Elevation', ref.elev_ft ? `${ref.elev_ft} ft` : ''],
+    ['Position', `${ref.lat.toFixed(4)}, ${ref.lon.toFixed(4)}`],
+  ];
+  const tail = () => [
+    ['Tower and approach', ref.icao
+      ? `https://www.liveatc.net/search/?icao=${ref.icao}`
+      : 'no ICAO code, so no feed to look up'],
+    ['Where it works', 'LiveATC in practice is North America. Most of Europe '
+      + 'restricts rebroadcasting air traffic control, so European airports '
+      + 'usually have no feed however large they are — the link will open and '
+      + 'find nothing. That is the law where the airport is, not a fault here.'],
+  ];
+
+  showDetail(title, `${ref.big ? 'large' : 'medium'} airport · ${ref.icao || '?'}`,
+    [...base(), ['Frequencies', 'looking…'], ...tail()]);
+  if (!ref.icao) return;
+
+  let field = null;
+  try {
+    field = await getJSON('/api/airfield?icao=' + encodeURIComponent(ref.icao));
+  } catch (err) {
+    field = { error: err.message };
+  }
+  if ($('#detail-title').textContent !== title) return;
+
+  const aip = AIP_LINKS[ref.country];
+  const rows = [...base()];
+  if (field.error) {
+    rows.push(['Frequencies', `could not fetch them (${field.error})`]);
+  } else {
+    rows.push(['Frequencies', field.frequencies && field.frequencies.length
+      ? frequencyLines(field.frequencies)
+      : 'none published for this field']);
+    rows.push(['Beacons', field.navaids && field.navaids.length
+      ? navaidLines(field.navaids)
+      : 'none listed as belonging to this field']);
+    rows.push(['No ILS here', 'this data carries NDB, VOR, VOR-DME, VORTAC, '
+      + 'TACAN and DME and nothing else — no localiser, no glideslope, no '
+      + 'minima. Those are in the national AIP, and an invented approach would '
+      + 'be worse than none.']);
+    if (aip) rows.push([aip[0], aip[1]]);
+  }
+  rows.push(...tail());
+  rows.push(['Note', 'frequencies and beacons from OurAirports, which is '
+    + 'community-maintained and public domain. It can lag a reallocation, and '
+    + 'the AIP above is the authority for the country it belongs to.']);
+  showDetail(title, `${ref.big ? 'large' : 'medium'} airport · ${ref.icao || '?'}`, rows);
+}
+
+/* ------------------------------------------------------------------ navaids */
+
+let navaidAt = '';
+
+const NAVAID_COLOUR = {
+  VOR: '#4fd6ff', 'VOR-DME': '#4fd6ff', VORTAC: '#8ab4ff',
+  TACAN: '#ff9f45', DME: '#7dffab', NDB: '#cbd5e1', 'NDB-DME': '#cbd5e1',
+};
+
+async function loadNavaids(force) {
+  if (!layerOn('navaids')) return;
+  const view = viewer.camera.computeViewRectangle();
+  if (!view) return;
+  const box = {
+    south: Cesium.Math.toDegrees(view.south),
+    west: Cesium.Math.toDegrees(view.west),
+    north: Cesium.Math.toDegrees(view.north),
+    east: Cesium.Math.toDegrees(view.east),
+  };
+  const key = [box.south, box.west, box.north, box.east].map((n) => n.toFixed(1)).join(',');
+  if (key === navaidAt && !force) return;
+  navaidAt = key;
+
+  let data;
+  try {
+    data = await getJSON('/api/navaids?'
+      + `south=${box.south.toFixed(3)}&west=${box.west.toFixed(3)}`
+      + `&north=${box.north.toFixed(3)}&east=${box.east.toFixed(3)}`);
+  } catch (err) {
+    log(`navaids unavailable (${err.message})`, 'warn');
+    return;
+  }
+
+  navaidPoints.removeAll();
+  if (data.too_wide) {
+    setCount('navaids', 0);
+    log(`navaids: ${data.note}`, 'warn');
+    applyVisibility();
+    return;
+  }
+  for (const n of data.navaids || []) {
+    navaidPoints.add({
+      position: Cesium.Cartesian3.fromDegrees(n.lon, n.lat, 0),
+      pixelSize: n.type === 'NDB' ? 5 : 7,
+      color: Cesium.Color.fromCssColorString(
+        NAVAID_COLOUR[n.type] || '#8a94a6').withAlpha(0.85),
+      outlineColor: Cesium.Color.fromCssColorString('#0b0e14').withAlpha(0.75),
+      outlineWidth: 1,
+      disableDepthTestDistance: MARK_THROUGH_M,
+      scaleByDistance: new Cesium.NearFarScalar(1e5, 1.4, 4e6, 0.4),
+      id: { type: 'navaid', ref: n },
+    });
+  }
+  setCount('navaids', (data.navaids || []).length);
+  log(`navaids: ${(data.navaids || []).length} beacons in view · OurAirports`);
+  applyVisibility();
 }
 
 /* ------------------------------------------------------------------ sweden */

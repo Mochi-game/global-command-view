@@ -6,6 +6,38 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.0.0 — frequencies and beacons, and saying plainly what is not here
+
+Asked whether the ILS information, VOR channels and frequencies published for
+airports could go on the airports. Two of those three, yes, from a file the app
+was already half using.
+
+**Frequencies.** OurAirports publish them as a sister file to the airports and
+runways: tower, ground, approach, ATIS, clearance delivery, weather office, each
+with the code that gets spoken. Clicking an airport now fills in the strip a
+pilot would have beside them. Arlanda: tower 118.500, ground 121.700, ATIS
+119.000, approach 123.750.
+
+**Beacons.** Eleven thousand navaids worldwide with frequencies and DME
+channels, on the airport card for the field they belong to and as a layer of
+their own. A VOR is quoted in MHz and an NDB in kHz, the way a chart quotes
+them, rather than both in whatever the file happened to store.
+
+**And there is no ILS in any of it.** The dataset carries NDB, VOR, VOR-DME,
+VORTAC, TACAN and DME and nothing else: no localiser, no glideslope, no minima,
+no approach plate. That is stated on the card, in the help and in the layer note
+rather than left to be discovered by somebody looking for it.
+
+What the card does instead is link to the publisher for the country the airport
+is in - LFV for Sweden, Avinor for Norway, the FAA for the United States where
+the plates are free. Pointing at the authority is honest; copying it is not, and
+an invented approach would be worse than no approach.
+
+Found while building it: a multi-line value in a detail card collapsed into one
+run-on line, because the values render with normal white space. Six frequencies
+arrived as a single unreadable string. Values keep their line breaks now, which
+also helps every other card that lists things.
+
 ## 0.99.1 — saying where the aviation switches are
 
 The flown track could not be found, and the reason was fair: it lives in the

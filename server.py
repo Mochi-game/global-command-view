@@ -38,7 +38,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "0.99.1"
+VERSION = "1.0.0"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -3385,6 +3385,156 @@ def tomtom_key():
     return json.dumps({"key": key, "source": "TomTom Traffic Flow"}).encode(), "memory"
 
 
+# --------------------------------------------------------------- frequencies
+
+# What is written on the strip of paper beside a pilot: the frequencies for the
+# field, and the navaids around it with their idents and channels.
+#
+# OurAirports publish both as sister files to the airports and runways already
+# used here, public domain and no key. Between them they answer most of what
+# somebody means by "the ILS info and the VOR channels" - with one exception,
+# and it is stated rather than papered over.
+#
+# THERE IS NO ILS IN THIS DATA. The navaid file carries NDB, VOR, VOR-DME,
+# VORTAC, TACAN and DME, and nothing else: no localiser, no glideslope, no
+# approach minima. Those live in each country's AIP, published under each
+# country's terms, and the honest thing is to link to the publisher rather than
+# to invent an approach.
+
+FREQUENCIES_URL = "https://davidmegginson.github.io/ourairports-data/airport-frequencies.csv"
+NAVAIDS_URL = "https://davidmegginson.github.io/ourairports-data/navaids.csv"
+AVIATION_TTL = 30 * 86400
+
+# What the codes mean, in the words a chart would use. Kept keyed on the code
+# because the code is what gets spoken.
+FREQUENCY_KINDS = {
+    "TWR": "Tower", "GND": "Ground", "APP": "Approach", "DEP": "Departure",
+    "ATIS": "ATIS, the recorded field report", "CLD": "Clearance delivery",
+    "AFIS": "Aerodrome flight information", "UNIC": "Unicom",
+    "CTAF": "Common traffic advisory", "A/D": "Arrival and departure",
+    "RDO": "Radio", "RDR": "Radar", "FSS": "Flight service",
+    "PMSV": "Weather office", "MIL": "Military",
+    "OPS": "Operations", "EMR": "Emergency",
+}
+
+_frequencies = {}
+_navaids = []
+_aviation_at = 0.0
+_aviation_lock = threading.Lock()
+
+
+def _load_aviation():
+    global _frequencies, _navaids, _aviation_at
+    with _aviation_lock:
+        if _frequencies and time.time() - _aviation_at < AVIATION_TTL:
+            return
+
+        def grab(url, name):
+            path = _disk_path(name)
+            if os.path.exists(path) and time.time() - os.path.getmtime(path) < AVIATION_TTL:
+                with open(path, "rb") as fh:
+                    return fh.read()
+            raw = fetch(url)
+            os.makedirs(CACHE_DIR, exist_ok=True)
+            with open(path, "wb") as fh:
+                fh.write(raw)
+            _sweep_disk()
+            return raw
+
+        try:
+            freq_raw = grab(FREQUENCIES_URL, "frequencies_csv")
+            nav_raw = grab(NAVAIDS_URL, "navaids_csv")
+        except Exception as exc:  # noqa: BLE001
+            log("aviation reference unavailable (%s)" % exc)
+            return
+
+        by_airport = {}
+        for r in csv.DictReader(io.StringIO(freq_raw.decode("utf-8", "replace"))):
+            ident = (r.get("airport_ident") or "").strip()
+            if not ident:
+                continue
+            by_airport.setdefault(ident, []).append({
+                "kind": (r.get("type") or "").strip()[:8],
+                "what": (r.get("description") or "").strip()[:40],
+                "mhz": (r.get("frequency_mhz") or "").strip(),
+            })
+
+        navs = []
+        for r in csv.DictReader(io.StringIO(nav_raw.decode("utf-8", "replace"))):
+            try:
+                lat = float(r["latitude_deg"])
+                lon = float(r["longitude_deg"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            khz = (r.get("frequency_khz") or "").strip()
+            navs.append({
+                "ident": (r.get("ident") or "").strip(),
+                "name": (r.get("name") or "")[:40],
+                "type": (r.get("type") or "").strip(),
+                "khz": khz,
+                "lat": lat, "lon": lon,
+                "dme_channel": (r.get("dme_channel") or "").strip(),
+                "country": (r.get("iso_country") or "")[:2],
+                "airport": (r.get("associated_airport") or "").strip(),
+                "power": (r.get("power") or "").strip(),
+            })
+
+        _frequencies = by_airport
+        _navaids = navs
+        _aviation_at = time.time()
+        log("aviation reference: %d fields with frequencies, %d navaids"
+            % (len(by_airport), len(navs)))
+
+
+def airfield(icao):
+    """Frequencies for one field, and the navaids that belong to it."""
+    icao = "".join(c for c in (icao or "").upper() if c.isalnum())[:4]
+    if not icao:
+        return json.dumps({"error": "no airfield given"}).encode(), "empty"
+
+    _load_aviation()
+    rows = sorted(_frequencies.get(icao, []),
+                  key=lambda f: (f["kind"] not in ("TWR", "GND", "APP", "ATIS"),
+                                 f["kind"]))
+    for row in rows:
+        row["means"] = FREQUENCY_KINDS.get(row["kind"], "")
+
+    mine = [n for n in _navaids if n["airport"] == icao]
+    return json.dumps({
+        "icao": icao,
+        "frequencies": rows,
+        "navaids": mine,
+        "source": "OurAirports, public domain",
+        "no_ils": True,
+        "note": "no ILS here. This dataset carries NDB, VOR, VOR-DME, VORTAC, "
+                "TACAN and DME and nothing else - no localiser, no glideslope, "
+                "no minima. Those are in the national AIP, published under that "
+                "country's terms.",
+    }).encode(), "network"
+
+
+def navaids(south, west, north, east):
+    """Navigation beacons in a box, with their frequencies."""
+    if not all(math.isfinite(v) for v in (south, west, north, east)):
+        return json.dumps({"navaids": [], "error": "the view did not resolve to a box"}).encode(), "refused"
+    if west > east or south > north:
+        return json.dumps({"navaids": [], "too_wide": True,
+                           "note": "the view wraps the globe - zoom in"}).encode(), "refused"
+    if north - south > 30.0 or east - west > 60.0:
+        return json.dumps({
+            "navaids": [], "too_wide": True,
+            "note": "zoom in - eleven thousand beacons at once is a smear",
+        }).encode(), "refused"
+
+    _load_aviation()
+    out = [n for n in _navaids
+           if south <= n["lat"] <= north and west <= n["lon"] <= east]
+    return json.dumps({
+        "navaids": out,
+        "source": "OurAirports, public domain",
+    }).encode(), "network"
+
+
 # -------------------------------------------------------------------- metar
 
 # The weather pilots actually read, which is not the weather anyone else reads.
@@ -6214,6 +6364,14 @@ class Handler(SimpleHTTPRequestHandler):
                 data, source = aprs_stations(tuple(float(v) for v in box))
             elif name == "train":
                 data, source = train_journey(query.get("number", [""])[0])
+            elif name == "airfield":
+                data, source = airfield(query.get("icao", [""])[0])
+            elif name == "navaids":
+                data, source = navaids(
+                    float(query.get("south", ["0"])[0]),
+                    float(query.get("west", ["0"])[0]),
+                    float(query.get("north", ["0"])[0]),
+                    float(query.get("east", ["0"])[0]))
             elif name == "metar":
                 data, source = metar(
                     float(query.get("south", ["0"])[0]),

@@ -406,6 +406,10 @@ h2 .tally {
 #detail-fields { margin: 0; display: grid; grid-template-columns: 92px 1fr; gap: 4px 10px; font-size: 12px; }
 #detail-fields dt { color: var(--dim); }
 #detail-fields dd { margin: 0; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+/* A value can be a list - the frequencies at a field, the beacons around it -
+   and those arrive with newlines in them. Without this they collapse into one
+   run-on line, which is what happened to the first frequency card. */
+#detail-fields dd { white-space: pre-line; }
 
 /* ---------- boot veil ---------- */
 
