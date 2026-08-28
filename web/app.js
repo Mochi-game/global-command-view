@@ -7755,9 +7755,9 @@ const SERVICES = [
     tier: 1,
     cost: 'free',
     adds: 'Three layers off one key. <b>1 528 road cameras</b> at full resolution; <b>road disruption</b> across the state network - roadworks, incidents and ferry notices, with severity in Trafikverket own words; and <b>where every reporting train in Sweden is</b>, updated every thirty seconds.',
-    url: 'https://data.trafikverket.se/',
+    url: 'https://data.trafikverket.se/oauth2/Account/register',
     steps: [
-      'Open <b>data.trafikverket.se</b> and register. The api.trafikinfo address this used to point at answers 404 at its root.',
+      'The button below opens the registration form directly. The old api.trafikinfo.trafikverket.se address answers 404 now, so ignore it if you meet it in an older guide.',
       'Confirm the address in the email they send.',
       'Under <b>Mina nycklar</b>, copy the authentication key.',
       'Paste it below, reload, and switch on <b>Swedish road disruption</b> and <b>Swedish trains</b> under Sweden. The cameras appear under Infrastructure.',
@@ -7826,9 +7826,10 @@ const SERVICES = [
     url: 'https://developer.tomtom.com/',
     fields: ['tomtom'],
     steps: [
-      'Register at developer.tomtom.com and create a key. The free tier is generous.',
-      'Paste it below, reload, and switch on <b>Traffic flow</b> under Infrastructure.',
-      'Restrict the key by referrer to this address, the way the Google one is. The browser fetches the tiles directly, so the key reaches the page.',
+      'Register at developer.tomtom.com. The free tier is generous.',
+      'The key is not where the developer site suggests. Once signed in, go to <b>MyTomTom</b> and open <b>API &amp; SDK Keys</b> — the key is on a row there, behind the <b>&hellip;</b> menu at its right. The developer.tomtom.com/user/me/apps address answers but renders empty, which is a dead end worth not walking into.',
+      'Paste it below, reload, and switch on <b>Traffic flow</b> and <b>Jams &amp; roadworks</b> under Infrastructure.',
+      'Restrict the key by referrer to <code>127.0.0.1:8820</code>, the way the Google one is. The browser fetches the traffic tiles directly, so the key reaches the page and a copied one is worth much less with the rule in place.',
     ],
   },
   {

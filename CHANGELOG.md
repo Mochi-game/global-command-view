@@ -19,9 +19,24 @@ person clicking it is somebody deciding whether this is worth the trouble of an
 account. The same thing cost real time here once already with a TomTom address.
 
 - OpenAQ: `openaq.org/developers` → `explore.openaq.org/register`
-- Trafikverket: `api.trafikinfo.trafikverket.se` → `data.trafikverket.se`
+- Trafikverket: `api.trafikinfo.trafikverket.se` →
+  `data.trafikverket.se/oauth2/Account/register`
 - Windy, which was not broken, now points at the key page rather than at the
   pricing page it was redirecting to.
+
+The Trafikverket one landed on the site root first, which answers 200 and has no
+title — a page, not the form. Checking what each link actually *lands on* rather
+than whether it answers found that: the registration form is one level down, and
+that is where it points now. Answering and being useful are not the same test,
+and the smoke check only performs the first one.
+
+**TomTom got the treatment it deserved two months ago.** Its steps said
+"register and create a key", which is true and useless: the key is not on the
+developer site where that implies. It is under MyTomTom, in **API & SDK Keys**,
+behind the `…` menu on the row. The `developer.tomtom.com/user/me/apps` address
+answers 200 and renders empty, which is exactly the dead end that cost real time
+here. The card now says all of that, including which address not to bother
+with.
 
 Both cards say in their steps that the old address is dead, so anyone following
 an older screenshot is not left wondering.
