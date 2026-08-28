@@ -38,7 +38,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.2.0"
+VERSION = "1.2.1"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -5851,10 +5851,16 @@ def cameras():
 # request that fails on one usually succeeds on the next.
 # Planet-wide instances only. Regional mirrors (overpass.osm.ch, for one) answer
 # fast and empty outside their country, which poisons the cache silently.
+# Ordered by operator, not by speed. Three of these used to sit at the top of
+# the list and all three belong to overpass-api.de, so an outage there took the
+# whole list with it - which happened, for over a quarter of an hour, and the
+# layers that depend on Overpass had no source at all. The two independent
+# operators go first now, so one organisation having a bad day costs two
+# attempts rather than four.
 OVERPASS_MIRRORS = [
-    "https://overpass-api.de/api/interpreter",
     "https://overpass.kumi.systems/api/interpreter",
     "https://overpass.private.coffee/api/interpreter",
+    "https://overpass-api.de/api/interpreter",
     "https://lz4.overpass-api.de/api/interpreter",
 ]
 OVERPASS_TIMEOUT = 15  # fail over quickly rather than waiting out a busy mirror
@@ -5948,6 +5954,24 @@ def aeroway(south, west, north, east):
     if hit and time.time() - hit[0] < AEROWAY_TTL:
         return hit[1], "memory"
 
+    # Disk, before the network. Overpass has four mirrors in the list and three
+    # of them belong to one operator, so when that operator is down the layer
+    # has effectively no source at all - which is exactly what happened, for
+    # over a quarter of an hour, across nine instances tested by hand.
+    #
+    # A taxiway does not move. Once an airport has been fetched it is kept for a
+    # week and survives a restart, so the outage costs somebody who has already
+    # looked at that airport nothing at all.
+    path = _disk_path(cache)
+    if os.path.exists(path) and time.time() - os.path.getmtime(path) < AEROWAY_TTL:
+        try:
+            with open(path, "rb") as fh:
+                raw = fh.read()
+            _mem_put(cache, raw)
+            return raw, "disk"
+        except Exception:  # noqa: BLE001 - a bad cache file is not a reason to fail
+            pass
+
     query = AEROWAY_QUERY.format(s=south, w=west, n=north, e=east)
     try:
         # overpass() hands back the raw bytes it fetched, not parsed JSON - the
@@ -5983,6 +6007,13 @@ def aeroway(south, west, north, east):
                 "map of the ground, not a clearance to drive on it.",
     }).encode()
     _mem_put(cache, data)
+    try:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        with open(path, "wb") as fh:
+            fh.write(data)
+        _sweep_disk()
+    except Exception as exc:  # noqa: BLE001
+        log("aeroway: could not keep it on disk (%s)" % exc)
     log("aeroway: %d taxiways and aprons, %d with a designator" % (len(out), labelled))
     return data, "network"
 

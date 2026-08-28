@@ -6,6 +6,33 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.2.1 — one source, four mirrors, one operator
+
+The taxiways stayed at zero, and this time it was not the app. Overpass was
+down: every one of the four mirrors, for over a quarter of an hour. Nine public
+instances were tried by hand and none of them served the query.
+
+That test found the fragility underneath. **Three of the four mirrors belong to
+the same operator** — overpass-api.de, z.overpass-api.de and lz4.overpass-api.de
+are one organisation — so a bad day there took three quarters of the list with
+it, and the layer had effectively one source rather than four. The two
+independent operators are tried first now, so one organisation having an outage
+costs two attempts instead of four.
+
+Adding more mirrors did not help. The five candidates tested either refused the
+connection or, in the case of overpass.osm.ch, answered **200 with zero
+elements** — which is the exact trap the existing comment in this file already
+warned about, and the reason regional mirrors are excluded deliberately.
+
+What does help: **taxiways are kept on disk for a week now.** A taxiway does not
+move. Fetched once, an airport survives a restart and an outage, so the source
+being down costs nothing to anybody who has already looked at that airport.
+Verified by writing a cache file and watching the request come back reading
+`disk` without touching the network.
+
+The circuit breaker continues to do its job through all of this: 0.1 seconds and
+a plain reason instead of seventy-five seconds walking dead mirrors.
+
 ## 1.2.0 — layers remembered, a box that fits an airport, and errors that stop deleting themselves
 
 Reported that the taxiways had gone. Three separate faults came out of chasing
