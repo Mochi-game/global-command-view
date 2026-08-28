@@ -9,6 +9,10 @@ launches. Thirty-seven layers.
 simulated, nothing is smoothed, and when a feed has nothing to say the app says
 that rather than drawing an empty map.
 
+**It opens empty.** No layer is on until you switch one on, so the first thing
+you turn on is the first thing you see. A welcome page says what to try first;
+tick the box and it stays gone, and **WELCOME** in the top bar brings it back.
+
 ![Everything on at once: the night side of Earth with satellite designators,
 fire clusters, submarine cables, and the layer panel counting each
 feed](docs/globe.jpg)

@@ -1309,3 +1309,145 @@ audio.stream-player {
   margin-bottom: 6px;
 }
 .key-safety li b { color: var(--ink); }
+
+/* -------------------------------------------------------------- welcome */
+
+/* First run used to open the whole guide, which is a manual in the face of
+   somebody who has not yet seen the thing it documents. This is the other
+   approach: what it is, three things to try, and a way out in either
+   direction. */
+
+#welcome {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(2, 4, 10, 0.82);
+  backdrop-filter: blur(3px);
+}
+#welcome[hidden] { display: none; }
+
+.welcome-card {
+  position: relative;
+  width: min(760px, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 26px 30px 22px;
+  background: var(--panel, #0b0e14);
+  border: 1px solid var(--line);
+  border-top: 2px solid var(--amber);
+}
+#welcome-close {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  background: none;
+  border: 0;
+  color: var(--dim);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+#welcome-close:hover { color: var(--ink); }
+
+.welcome-eyebrow {
+  margin: 0 0 6px;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+.welcome-card h2 {
+  margin: 0 0 12px;
+  font-size: 21px;
+  line-height: 1.25;
+  color: var(--ink);
+  font-weight: 500;
+}
+.welcome-lead {
+  margin: 0 0 20px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--dim);
+}
+.welcome-lead b { color: var(--ink); }
+
+.welcome-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.welcome-step {
+  border: 1px solid var(--line);
+  padding: 12px 13px;
+}
+.welcome-step .n {
+  display: inline-block;
+  min-width: 18px;
+  margin-bottom: 6px;
+  text-align: center;
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--amber);
+  border: 1px solid var(--line);
+}
+.welcome-step h4 {
+  margin: 0 0 5px;
+  font-size: 12.5px;
+  color: var(--ink);
+  font-weight: 500;
+}
+.welcome-step p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--dim);
+}
+.welcome-step b { color: var(--ink); }
+
+.welcome-note {
+  margin: 0 0 18px;
+  padding-left: 11px;
+  border-left: 2px solid var(--line);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--dim);
+}
+.welcome-note b { color: var(--ink); }
+
+.welcome-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.welcome-again {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--dim);
+  cursor: pointer;
+}
+.welcome-buttons { display: flex; gap: 8px; }
+.welcome-buttons .chip { font-size: 11px; padding: 7px 14px; }
+.welcome-buttons .chip.primary {
+  color: #0b0e14;
+  background: var(--amber);
+  border-color: var(--amber);
+}
+
+/* A checkbox that hides something for good needs a door back in, or it is a
+   trap rather than a preference. This is the sentence that says where. */
+.welcome-back {
+  margin: 10px 0 0;
+  font-size: 11px;
+  color: var(--dim);
+}
+.welcome-back b { color: var(--ink); }

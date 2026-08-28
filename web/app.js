@@ -422,8 +422,8 @@ const LAYERS = [
   { id: 'services', name: 'Police & state air', color: '#4fa3ff', on: false, count: 0, note: 'picked out of the same ADS-B feed by registry — police, medical, coastguard and military airframes' },
   { id: 'vessels', name: 'Vessels (AIS)', color: '#4fd6ff', on: false, count: 0, note: 'Digitraffic covers the Baltic; an aisstream key opens the rest — ships report their own position' },
   { id: 'cables', name: 'Submarine cables', color: '#b58cff', on: false, count: 0, note: 'TeleGeography — fine to watch; ask them before monetising' },
-  { id: 'cameras', name: 'Public cameras', color: '#7dffab', on: true, count: 0, note: 'Digitraffic, TfL, Trafikverket and Windy merged — a still from the camera, not a live stream' },
-  { id: 'names', name: 'Names & borders', color: '#cbd5e1', on: true, count: 0, note: 'Natural Earth lines, CARTO labels \u2014 works over satellite too' },
+  { id: 'cameras', name: 'Public cameras', color: '#7dffab', on: false, count: 0, note: 'Digitraffic, TfL, Trafikverket and Windy merged — a still from the camera, not a live stream' },
+  { id: 'names', name: 'Names & borders', color: '#cbd5e1', on: false, count: 0, note: 'Natural Earth lines, CARTO labels \u2014 works over satellite too' },
   { id: 'sar', name: 'Radar backscatter', color: '#8fbcd4', on: false, count: 0, note: 'NASA OPERA Sentinel-1 \u2014 sees through cloud and darkness', noCount: true },
   { id: 'disturb', name: 'Ground disturbance', color: '#e879a0', on: false, count: 0, note: 'NASA OPERA DIST-ALERT \u2014 vegetation lost since a baseline', noCount: true },
   { id: 'water', name: 'Surface water / flood', color: '#38bdf8', on: false, count: 0, note: 'NASA OPERA DSWx \u2014 radar, so cloud does not hide the flood', noCount: true },
@@ -8148,11 +8148,41 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !$('#guide').hidden) $('#guide').hidden = true;
 });
 
-// First run on this machine: open the guide rather than leaving a blank globe.
-if (!localStorage.getItem('gcv.seen')) {
-  localStorage.setItem('gcv.seen', '1');
-  setTimeout(() => openGuide('use'), 2500);
+/*
+ * First run used to open the whole guide after two and a half seconds, which is
+ * a manual in the face of somebody who has not yet seen the thing it documents.
+ *
+ * A welcome page instead: what this is, three things to try, and a way out in
+ * either direction. It is dismissible for good, and reachable afterwards from
+ * WELCOME in the top bar - a checkbox that hides something permanently needs a
+ * door back in, or it is a trap rather than a preference.
+ */
+function showWelcome() {
+  $('#welcome-hide').checked = localStorage.getItem('gcv-welcome') === 'hidden';
+  $('#welcome').hidden = false;
 }
+
+function closeWelcome() {
+  localStorage.setItem('gcv-welcome',
+    $('#welcome-hide').checked ? 'hidden' : 'shown');
+  $('#welcome').hidden = true;
+}
+
+$('#welcome-start').onclick = closeWelcome;
+$('#welcome-close').onclick = closeWelcome;
+$('#welcome-tour').onclick = () => { closeWelcome(); openGuide('use'); };
+$('#tab-welcome').onclick = showWelcome;
+
+// Escape closes it, the same as the guide, and remembers the checkbox either way.
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !$('#welcome').hidden) closeWelcome();
+});
+
+if (localStorage.getItem('gcv-welcome') !== 'hidden') {
+  // A beat, so the globe is drawn behind it rather than a blank screen.
+  setTimeout(showWelcome, 1200);
+}
+localStorage.setItem('gcv.seen', '1');
 
 /* ------------------------------------------------------------ panel folds */
 

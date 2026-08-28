@@ -6,6 +6,41 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.96.0 — the globe opens empty, and says why
+
+Asked for a first run that starts with nothing on and welcomes people properly.
+Both halves of that were fair.
+
+**Nothing is on now.** Names and borders and the public cameras used to be
+switched on at boot, which meant the first thing anyone saw was four thousand
+camera markers over a world they had not asked about yet. The globe opens empty
+and the first thing you turn on is the first thing you see. Layer choices were
+never saved between visits, so this is simply the new default for everybody.
+
+**And first run used to open the entire guide** after two and a half seconds:
+a manual in the face of somebody who has not yet seen the thing it documents.
+
+A welcome page instead. What this is in two sentences, then three things to try
+— turn a layer on, use the Jump to box, click what you find — and a note that it
+all runs locally and needs no account. Two ways out: **SHOW ME AROUND**, which
+hands over to the guide, or **START LOOKING**, which gets out of the way.
+
+There is a **Do not show this again** box, and next to it a line saying where the
+door back in is: **WELCOME** in the top bar, which works whichever way the box is
+ticked. A checkbox that hides something permanently without a way back is a trap
+rather than a preference, and the page says so on itself rather than leaving it
+to be discovered.
+
+Verified through every path: first visit shows it with zero layers on and the
+guide shut; SHOW ME AROUND closes it and opens the guide; the top-bar button
+reopens it; ticking the box and closing saves; a reload after that draws the
+globe with no welcome and no layers; and the button still opens it, with the box
+remembered as ticked.
+
+The help text that said everything starts off "except names and borders and the
+public cameras" now says everything starts off, and names the two rows to click
+if you want the old opening picture back.
+
 ## 0.95.0 — saying where the idea came from
 
 The idea came from Bilawal Sidhu's gods-eye-view, seen on YouTube. That is now

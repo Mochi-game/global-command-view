@@ -20,6 +20,7 @@
     <span class="sub">open source spatial intelligence</span>
   </div>
   <div class="tabs">
+    <button id="tab-welcome" class="tab">WELCOME</button>
     <button id="tab-help" class="tab">HELP</button>
     <button id="tab-setup" class="tab">SETUP</button>
   </div>
@@ -367,12 +368,17 @@
       <h3>2 · Layers</h3>
       <p>
         Each row in <b>Layers</b> is a feed with a live count. Click to switch it
-        off. Most layers only load what is in view, so panning somewhere new
+        on. Most layers only load what is in view, so panning somewhere new
         fetches that area rather than the whole planet.
       </p>
-      <p>Everything starts <b>off</b> except names and borders and the public
-        cameras, and a layer that is off is not fetched at all &mdash; switching
-        it on is what loads it. That keeps the start quiet and the bill small.</p>
+      <p><b>Everything starts off.</b> The globe opens empty on purpose, so the
+        first thing you switch on is the first thing you see. A layer that is off
+        is not fetched at all &mdash; switching it on is what loads it, which
+        keeps the start quiet, the bill small, and a count of nothing honestly
+        blank rather than a zero.</p>
+      <p>If you want the old opening picture back, <b>Names &amp; borders</b>
+        under Reference and <b>Public cameras</b> under Infrastructure are the
+        two that used to be on.</p>
 
       <p><b>Ground change</b> is the group worth knowing about. Radar
         backscatter, ground disturbance and surface water all come from NASA's
@@ -905,6 +911,63 @@
     <span id="lightbox-title">—</span>
     <span id="lightbox-zoom">100%</span>
     <span class="hint">scroll to zoom · drag to pan · esc to close</span>
+  </div>
+</div>
+
+<div id="welcome" hidden>
+  <div class="welcome-card">
+    <button id="welcome-close" aria-label="Close">&times;</button>
+
+    <p class="welcome-eyebrow">Global Command View</p>
+    <h2>The globe starts empty. That is on purpose.</h2>
+    <p class="welcome-lead">
+      Nothing is switched on, so the first thing you turn on is the first thing
+      you see. Thirty-seven layers of live public data are waiting in the panel
+      on the left, and <b>most of them need no account at all</b>.
+    </p>
+
+    <div class="welcome-steps">
+      <div class="welcome-step">
+        <span class="n">1</span>
+        <h4>Turn something on</h4>
+        <p>Open <b>Layers</b> and click a row. <b>Public cameras</b> gives you
+          four thousand of them straight away. <b>Names &amp; borders</b> tells
+          you where you are.</p>
+      </div>
+      <div class="welcome-step">
+        <span class="n">2</span>
+        <h4>Go somewhere</h4>
+        <p>Under <b>Jump to</b> there is a box that takes a coordinate, an
+          airport code or a town. Type <b>Varberg</b>, or
+          <b>67.8548, 20.5236</b>, and press GO.</p>
+      </div>
+      <div class="welcome-step">
+        <span class="n">3</span>
+        <h4>Click what you find</h4>
+        <p>Every marker opens a card saying where the data came from and how
+          sure it is. A count of zero means the feed answered and had nothing —
+          never that nothing was asked.</p>
+      </div>
+    </div>
+
+    <p class="welcome-note">
+      Everything runs on your own machine. Nothing is simulated and nothing is
+      smoothed. Optional keys under <b>Setup</b> add more, and the first two are
+      free and take about two minutes.
+    </p>
+
+    <div class="welcome-foot">
+      <label class="welcome-again">
+        <input type="checkbox" id="welcome-hide">
+        <span>Do not show this again</span>
+      </label>
+      <div class="welcome-buttons">
+        <button id="welcome-tour" class="chip">SHOW ME AROUND</button>
+        <button id="welcome-start" class="chip primary">START LOOKING</button>
+      </div>
+    </div>
+    <p class="welcome-back">You can open this again from <b>WELCOME</b> in the
+      top bar, whichever box you tick.</p>
   </div>
 </div>
 
