@@ -3038,9 +3038,18 @@ async function loadAirports() {
       // to, so it is now the largest and reads as the ring they sit inside.
       airports.add({
         position: Cesium.Cartesian3.fromDegrees(a.lon, a.lat, 0),
-        pixelSize: a.big ? 14 : 8,
-        color: Cesium.Color.fromCssColorString('#fcd34d').withAlpha(a.big ? 0.35 : 0.25),
-        outlineColor: Cesium.Color.fromCssColorString('#fcd34d').withAlpha(0.95),
+        pixelSize: a.big ? 16 : 9,
+        // White, not amber. It was amber, and then the taxiway layer arrived
+        // painted in the same #fcd34d - which is the right colour for taxiway
+        // paint and the wrong one for the marker sitting in the middle of four
+        // hundred taxiway lines and letters. Reported as the airport dot having
+        // disappeared; it had not, it had become one yellow thing among many.
+        //
+        // Nothing else at an airfield is white: runways are grey, approach
+        // lines green, weather green through red, beacons blue. So the anchor
+        // gets the one colour with no competition.
+        color: Cesium.Color.WHITE.withAlpha(a.big ? 0.18 : 0.12),
+        outlineColor: Cesium.Color.WHITE.withAlpha(0.95),
         outlineWidth: 2,
         disableDepthTestDistance: MARK_THROUGH_M,
         scaleByDistance: new Cesium.NearFarScalar(1e5, 1.3, 2e7, 0.5),
@@ -9281,7 +9290,7 @@ async function loadAeroway(force) {
       attributes: {
         color: Cesium.ColorGeometryInstanceAttribute.fromColor(
           isApron ? apron.withAlpha(0.35)
-            : taxi.withAlpha(way.kind === 'taxilane' ? 0.4 : 0.7)),
+            : taxi.withAlpha(way.kind === 'taxilane' ? 0.3 : 0.55)),
       },
       id: { type: 'aeroway', ref: way },
     }));

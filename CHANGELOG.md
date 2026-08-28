@@ -6,6 +6,30 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.1.1 — the airport dot, lost in its own colour
+
+Reported straight after the taxiways landed: the airport marker had gone again.
+
+It had not. It was there, sixteen pixels, drawn on top of everything. But I had
+painted the taxiways in `#fcd34d` — the correct colour for taxiway paint, and
+the exact colour the airport marker had been given the day before. So the anchor
+became one yellow thing among two hundred and forty-eight yellow lines and one
+hundred and ninety-one yellow letters, all of them on the same few square
+kilometres.
+
+That is the second time this marker has disappeared in two days, and both times
+because something else arrived beside it. The first was a depth test; this was a
+palette.
+
+The airport is **white** now. Nothing else on an airfield is: runways are grey,
+approach lines green, weather green through red, beacons blue, taxiways amber.
+The anchor gets the one colour with no competition, and it stops being a colour
+anybody else can take. The taxiway lines are also dimmed a little so they read
+as a surface rather than as markers, which is what they are.
+
+The help section on which dot is which is rewritten, and now covers all five
+things a busy airfield draws rather than the three it listed yesterday.
+
 ## 1.1.0 — taxiways, with the letters a controller speaks
 
 Asked whether taxiways were possible. OurAirports has runways and stops there,
