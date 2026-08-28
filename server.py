@@ -3385,6 +3385,142 @@ def tomtom_key():
     return json.dumps({"key": key, "source": "TomTom Traffic Flow"}).encode(), "memory"
 
 
+# ------------------------------------------------------------------ runways
+
+# A dot on a globe says an airport is somewhere. It does not say which way you
+# would land, which is most of what anyone wants to know when they look at one.
+#
+# OurAirports publish the runways as a sister file to the airports this already
+# uses: both threshold coordinates, length, width, surface, lighting, and the
+# true heading of each direction. Public domain, same source, no key.
+#
+# The extended centreline is computed here rather than drawn from a chart,
+# because a published approach plate is somebody's copyright and the geometry is
+# not. Ten nautical miles out along the runway heading is where an aircraft on a
+# straight-in approach will be, and it is arithmetic rather than a citation.
+
+RUNWAYS_URL = "https://davidmegginson.github.io/ourairports-data/runways.csv"
+RUNWAYS_TTL = 30 * 86400
+CENTRELINE_NM = 10.0
+
+_runways = []
+_runways_at = 0.0
+_runways_lock = threading.Lock()
+
+
+def _load_runways():
+    global _runways, _runways_at
+    with _runways_lock:
+        if _runways and time.time() - _runways_at < RUNWAYS_TTL:
+            return
+        path = _disk_path("runways_csv")
+        raw = None
+        if os.path.exists(path) and time.time() - os.path.getmtime(path) < RUNWAYS_TTL:
+            with open(path, "rb") as fh:
+                raw = fh.read()
+        if raw is None:
+            try:
+                raw = fetch(RUNWAYS_URL)
+                os.makedirs(CACHE_DIR, exist_ok=True)
+                with open(path, "wb") as fh:
+                    fh.write(raw)
+                _sweep_disk()
+            except Exception as exc:  # noqa: BLE001
+                log("runways unavailable (%s)" % exc)
+                return
+
+        rows = []
+        reader = csv.DictReader(io.StringIO(raw.decode("utf-8", "replace")))
+        for r in reader:
+            # A runway with no coordinates for both ends cannot be drawn, and
+            # there are thousands of those: small strips catalogued by name only.
+            try:
+                le_lat = float(r["le_latitude_deg"])
+                le_lon = float(r["le_longitude_deg"])
+                he_lat = float(r["he_latitude_deg"])
+                he_lon = float(r["he_longitude_deg"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            try:
+                length = int(float(r.get("length_ft") or 0))
+            except ValueError:
+                length = 0
+            rows.append({
+                "airport": (r.get("airport_ident") or "").strip(),
+                "le": (r.get("le_ident") or "").strip(),
+                "he": (r.get("he_ident") or "").strip(),
+                "le_lat": le_lat, "le_lon": le_lon,
+                "he_lat": he_lat, "he_lon": he_lon,
+                "length_ft": length,
+                "width_ft": (r.get("width_ft") or "").strip(),
+                "surface": (r.get("surface") or "").strip()[:12],
+                "lit": r.get("lighted") == "1",
+                "closed": r.get("closed") == "1",
+                "le_heading": (r.get("le_heading_degT") or "").strip(),
+                "he_heading": (r.get("he_heading_degT") or "").strip(),
+            })
+        _runways = rows
+        _runways_at = time.time()
+        log("runways: %d with both thresholds, from OurAirports" % len(rows))
+
+
+def _extend(from_lat, from_lon, to_lat, to_lon, nm):
+    """Carry on past a threshold along the runway line, nm nautical miles."""
+    # Flat-earth arithmetic, which over ten miles is wrong by metres and is the
+    # same approximation the rest of this file uses for short distances.
+    dlat = from_lat - to_lat
+    dlon = (from_lon - to_lon) * math.cos(math.radians(from_lat))
+    length = math.hypot(dlat, dlon)
+    if length == 0:
+        return None
+    step = (nm / 60.0) / length
+    return (from_lat + dlat * step,
+            from_lon + (dlon * step) / max(1e-9, math.cos(math.radians(from_lat))))
+
+
+def runways(south, west, north, east):
+    """Runway geometry in a box, with the extended centreline of each end."""
+    if not all(math.isfinite(v) for v in (south, west, north, east)):
+        return json.dumps({"runways": [], "error": "the view did not resolve to a box"}).encode(), "refused"
+    if west > east or south > north:
+        return json.dumps({
+            "runways": [], "too_wide": True,
+            "note": "the view wraps the globe - zoom in",
+        }).encode(), "refused"
+    # Runways are a few thousand feet long. Drawn from orbit height they are a
+    # smear of hairlines over a continent, so the whole planet is refused rather
+    # than served as noise.
+    if north - south > 12.0 or east - west > 24.0:
+        return json.dumps({
+            "runways": [], "too_wide": True,
+            "note": "zoom in - a runway is two kilometres long and needs to be "
+                    "looked at from closer than a continent",
+        }).encode(), "refused"
+
+    _load_runways()
+    out = []
+    for r in _runways:
+        if not (south <= r["le_lat"] <= north and west <= r["le_lon"] <= east):
+            continue
+        row = dict(r)
+        # Each end gets the line an aircraft would fly straight in on. Named for
+        # the end you land on, which is the end you would call.
+        row["le_approach"] = _extend(r["le_lat"], r["le_lon"],
+                                     r["he_lat"], r["he_lon"], CENTRELINE_NM)
+        row["he_approach"] = _extend(r["he_lat"], r["he_lon"],
+                                     r["le_lat"], r["le_lon"], CENTRELINE_NM)
+        out.append(row)
+
+    return json.dumps({
+        "runways": out,
+        "centreline_nm": CENTRELINE_NM,
+        "source": "OurAirports, public domain",
+        "note": "the centreline is computed from the runway heading, not taken "
+                "from a published approach chart - it is where a straight-in "
+                "would be, not a procedure",
+    }).encode(), "network"
+
+
 # ---------------------------------------------------------------- sweden road
 
 # Trafikverket already had a key here, and it was being used for exactly one
@@ -5939,6 +6075,12 @@ class Handler(SimpleHTTPRequestHandler):
                 data, source = aprs_stations(tuple(float(v) for v in box))
             elif name == "train":
                 data, source = train_journey(query.get("number", [""])[0])
+            elif name == "runways":
+                data, source = runways(
+                    float(query.get("south", ["0"])[0]),
+                    float(query.get("west", ["0"])[0]),
+                    float(query.get("north", ["0"])[0]),
+                    float(query.get("east", ["0"])[0]))
             elif name == "sweden-road":
                 data, source = sweden_road()
             elif name == "sweden-rail":

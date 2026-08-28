@@ -419,6 +419,7 @@ const SCALE = {
 
 const LAYER_GROUPS = [
   { name: 'Radio', ids: ['broadcast', 'radio', 'scanners', 'airports', 'aprs'] },
+  { name: 'Aviation', ids: ['runways'] },
   { name: 'Moving', ids: ['flights', 'services', 'vessels', 'trains', 'capital', 'fishing'] },
   { name: 'Earth', ids: ['fires', 'quakes', 'volcanoes', 'weather'] },
   { name: 'People', ids: ['outbreaks', 'news', 'air', 'own'] },
@@ -464,6 +465,7 @@ const LAYERS = [
   { id: 'trains', name: 'Trains (US)', color: '#c4b5fd', on: false, count: 0, note: 'Amtrak — US only; Finland refuses every header tried' },
   { id: 'own', name: 'Own entries', color: '#ffb347', on: false, count: 0, note: 'hand-entered from the news — no feed saw these' },
   { id: 'capital', name: 'Capital ships (est.)', color: '#ff4d4d', on: false, count: 0, note: 'USNI Fleet Tracker, read at launch · area centres, not positions' },
+  { id: 'runways', name: 'Runways & approaches', color: '#cbd5e1', on: false, count: 0, note: 'OurAirports — real runway geometry; the approach line is 10 NM of arithmetic from the published heading, not a procedure off a chart' },
   { id: 'swroad', name: 'Swedish road disruption', color: '#ff9f45', on: false, count: 0, note: 'Trafikverket Situation — roadworks, incidents and ferries, Sweden only; some are stretches of road with no single point' },
   { id: 'swrail', name: 'Swedish trains', color: '#5fe3c0', on: false, count: 0, note: 'Trafikverket TrainPosition — where trains report themselves, Sweden only; a stale position is dropped rather than shown standing still' },
   { id: 'smhi', name: 'SMHI warnings', color: '#ffd166', on: false, count: 0, note: 'SMHI — areas, not points: a warning covers a coastline rather than a spot on it. Sweden only, no key needed' },
@@ -588,6 +590,7 @@ function applyVisibility() {
   fishingMarks.show = on('fishing');
   showNames(on('names'));
   for (const spec of OPERA) showOpera(spec, on(spec.id));
+  if (runwayPrimitive) runwayPrimitive.show = on('runways');
   swRoad.show = on('swroad');
   swRail.show = on('swrail');
   if (smhiPrimitive) smhiPrimitive.show = on('smhi');
@@ -1954,6 +1957,31 @@ function describePicked(type, ref) {
         + 'somebody confirmed it, and one that has quietly stopped can linger '
         + 'in the list.'],
     ]);
+  } else if (type === 'runway') {
+    const r = ref;
+    const landing = ref.end === 'he' ? r.he : r.le;
+    const heading = ref.end === 'he' ? r.he_heading : r.le_heading;
+    showDetail(`${r.airport} runway ${r.le}/${r.he}`,
+      ref.end ? `approach line to ${landing} \u00b7 OurAirports`
+                 : 'runway \u00b7 OurAirports', [
+        ['Length', r.length_ft
+          ? `${r.length_ft.toLocaleString('en-US')} ft (${Math.round(r.length_ft * 0.3048).toLocaleString('en-US')} m)`
+          : 'not published'],
+        ['Width', r.width_ft ? `${r.width_ft} ft` : 'not published'],
+        ['Surface', r.surface || 'not published'],
+        ['Lit', r.lit ? 'yes' : 'not according to the record'],
+        ['Headings', `${r.le} at ${r.le_heading}\u00b0 true, `
+          + `${r.he} at ${r.he_heading}\u00b0 true`],
+        ref.end ? ['Landing on', `${landing}, heading ${heading}\u00b0 true`] : null,
+        r.closed ? ['Closed', 'this runway is marked closed in the record'] : null,
+        ['The green line', 'ten nautical miles along the runway bearing, '
+          + 'computed here. It is where a straight-in approach would be, and it '
+          + 'is not a procedure: real approaches have step-downs, offsets and '
+          + 'turns that only a published chart carries, and those charts are '
+          + 'licensed. Do not fly this.'],
+        ['Note', 'geometry from OurAirports, which is community-maintained and '
+          + 'public domain. It can lag a resurfacing or a renumbering.'],
+      ].filter(Boolean));
   } else if (type === 'swroad') {
     const kind = ROAD_KIND_SHORT[ref.kind] || ref.kind || 'disruption';
     showDetail(ref.road || ref.where.slice(0, 40) || 'Road disruption',
@@ -2906,6 +2934,7 @@ async function loadAirports() {
 }
 
 viewer.camera.moveEnd.addEventListener(loadAirports);
+viewer.camera.moveEnd.addEventListener(() => loadRunways(false));
 
 /* ------------------------------------------------------------------- aprs */
 
@@ -3105,6 +3134,7 @@ async function loadRadios() {
  */
 
 LAYER_ON_DEMAND.volcanoes = () => loadVolcanoes();
+LAYER_ON_DEMAND.runways = () => loadRunways(true);
 LAYER_ON_DEMAND.swroad = () => loadSwedenRoad();
 LAYER_ON_DEMAND.swrail = () => loadSwedenRail();
 LAYER_ON_DEMAND.smhi = () => loadSmhi();
@@ -8608,6 +8638,118 @@ async function showTrain(ref) {
   if ($('#detail-title').textContent !== title) return;
   showDetail(title, 'position report · Trafikverket',
     trainFields(ref, journey));
+}
+
+/* ----------------------------------------------------------------- runways */
+
+/*
+ * A dot says an airport is somewhere. It does not say which way you would land,
+ * which is most of what anyone wants to know when they look at one.
+ *
+ * The runway is drawn as the thing it is - two thresholds and the strip between
+ * them - and each end gets the line an aircraft on a straight-in would fly down.
+ * That line is arithmetic from the published heading, not a procedure lifted off
+ * a chart: Jeppesen's plates are licensed per pilot and are not going in here.
+ * Ten miles along the runway bearing is where a straight-in would be, and the
+ * card says exactly that so nobody mistakes it for an approach.
+ *
+ * Fetched for the view, like the OSM layer, because there are forty thousand
+ * runways and a screen wants dozens.
+ */
+
+let runwayPrimitive = null;
+let runwaysAt = '';
+
+const RUNWAY_COLOUR = '#cbd5e1';
+const CENTRELINE_COLOUR = '#7dffab';
+
+async function loadRunways(force) {
+  if (!layerOn('runways')) return;
+  const view = viewer.camera.computeViewRectangle();
+  if (!view) return;
+  const box = {
+    south: Cesium.Math.toDegrees(view.south),
+    west: Cesium.Math.toDegrees(view.west),
+    north: Cesium.Math.toDegrees(view.north),
+    east: Cesium.Math.toDegrees(view.east),
+  };
+  const key = [box.south, box.west, box.north, box.east].map((n) => n.toFixed(1)).join(',');
+  if (key === runwaysAt && !force) return;
+  runwaysAt = key;
+
+  let data;
+  try {
+    data = await getJSON('/api/runways?'
+      + `south=${box.south.toFixed(3)}&west=${box.west.toFixed(3)}`
+      + `&north=${box.north.toFixed(3)}&east=${box.east.toFixed(3)}`);
+  } catch (err) {
+    log(`runways unavailable (${err.message})`, 'warn');
+    return;
+  }
+
+  if (runwayPrimitive) {
+    scene.primitives.remove(runwayPrimitive);
+    runwayPrimitive = null;
+  }
+  if (data.too_wide) {
+    setCount('runways', 0);
+    log(`runways: ${data.note}`, 'warn');
+    return;
+  }
+
+  const instances = [];
+  const strip = Cesium.Color.fromCssColorString(RUNWAY_COLOUR);
+  const line = Cesium.Color.fromCssColorString(CENTRELINE_COLOUR).withAlpha(0.55);
+
+  for (const r of data.runways || []) {
+    const closed = r.closed;
+    instances.push(new Cesium.GeometryInstance({
+      geometry: new Cesium.GroundPolylineGeometry({
+        positions: Cesium.Cartesian3.fromDegreesArray(
+          [r.le_lon, r.le_lat, r.he_lon, r.he_lat]),
+        width: Math.max(3, Math.min(9, (r.length_ft || 3000) / 1400)),
+        arcType: Cesium.ArcType.GEODESIC,
+      }),
+      attributes: {
+        color: Cesium.ColorGeometryInstanceAttribute.fromColor(
+          closed ? strip.withAlpha(0.25) : strip.withAlpha(0.9)),
+      },
+      id: { type: 'runway', ref: r },
+    }));
+
+    // A closed runway has no approach worth drawing down.
+    if (closed) continue;
+    for (const [end, point] of [['le', r.le_approach], ['he', r.he_approach]]) {
+      if (!point) continue;
+      const thresholdLat = end === 'le' ? r.le_lat : r.he_lat;
+      const thresholdLon = end === 'le' ? r.le_lon : r.he_lon;
+      instances.push(new Cesium.GeometryInstance({
+        geometry: new Cesium.GroundPolylineGeometry({
+          positions: Cesium.Cartesian3.fromDegreesArray(
+            [thresholdLon, thresholdLat, point[1], point[0]]),
+          width: 1.4,
+          arcType: Cesium.ArcType.GEODESIC,
+        }),
+        attributes: { color: Cesium.ColorGeometryInstanceAttribute.fromColor(line) },
+        // The end travels inside ref because describePicked only receives
+        // type and ref, and which threshold you clicked is the whole point
+        // of clicking an approach line rather than the strip itself.
+        id: { type: 'runway', ref: { ...r, end } },
+      }));
+    }
+  }
+
+  if (instances.length) {
+    runwayPrimitive = scene.primitives.add(new Cesium.GroundPolylinePrimitive({
+      geometryInstances: instances,
+      appearance: new Cesium.PolylineColorAppearance({ translucent: true }),
+      asynchronous: true,
+    }));
+    runwayPrimitive.show = layerOn('runways');
+  }
+  setCount('runways', (data.runways || []).length);
+  log(`runways: ${(data.runways || []).length} in view · OurAirports · `
+    + `centrelines are ${data.centreline_nm} NM of arithmetic, not a procedure`);
 }
 
 /* ------------------------------------------------------------------ sweden */
