@@ -394,6 +394,7 @@ const netOut = scene.primitives.add(new Cesium.PointPrimitiveCollection());
 const meshNodes = scene.primitives.add(new Cesium.PointPrimitiveCollection());
 const newsHeat = scene.primitives.add(new Cesium.PointPrimitiveCollection());
 const trains = scene.primitives.add(new Cesium.BillboardCollection({ scene }));
+const metarPoints = scene.primitives.add(new Cesium.PointPrimitiveCollection());
 const swRoad = scene.primitives.add(new Cesium.PointPrimitiveCollection());
 const swRail = scene.primitives.add(new Cesium.PointPrimitiveCollection());
 let smhiPrimitive = null;
@@ -419,7 +420,7 @@ const SCALE = {
 
 const LAYER_GROUPS = [
   { name: 'Radio', ids: ['broadcast', 'radio', 'scanners', 'airports', 'aprs'] },
-  { name: 'Aviation', ids: ['runways'] },
+  { name: 'Aviation', ids: ['runways', 'metar'] },
   { name: 'Moving', ids: ['flights', 'services', 'vessels', 'trains', 'capital', 'fishing'] },
   { name: 'Earth', ids: ['fires', 'quakes', 'volcanoes', 'weather'] },
   { name: 'People', ids: ['outbreaks', 'news', 'air', 'own'] },
@@ -465,6 +466,7 @@ const LAYERS = [
   { id: 'trains', name: 'Trains (US)', color: '#c4b5fd', on: false, count: 0, note: 'Amtrak — US only; Finland refuses every header tried' },
   { id: 'own', name: 'Own entries', color: '#ffb347', on: false, count: 0, note: 'hand-entered from the news — no feed saw these' },
   { id: 'capital', name: 'Capital ships (est.)', color: '#ff4d4d', on: false, count: 0, note: 'USNI Fleet Tracker, read at launch · area centres, not positions' },
+  { id: 'metar', name: 'Airfield weather (METAR)', color: '#7dffab', on: false, count: 0, note: 'NOAA aviation weather — an observation at the field, not a forecast for the area; coloured by flight category and bigger where something is falling' },
   { id: 'runways', name: 'Runways & approaches', color: '#cbd5e1', on: false, count: 0, note: 'OurAirports — real runway geometry; the approach line is 10 NM of arithmetic from the published heading, not a procedure off a chart' },
   { id: 'swroad', name: 'Swedish road disruption', color: '#ff9f45', on: false, count: 0, note: 'Trafikverket Situation — roadworks, incidents and ferries, Sweden only; some are stretches of road with no single point' },
   { id: 'swrail', name: 'Swedish trains', color: '#5fe3c0', on: false, count: 0, note: 'Trafikverket TrainPosition — where trains report themselves, Sweden only; a stale position is dropped rather than shown standing still' },
@@ -591,6 +593,7 @@ function applyVisibility() {
   showNames(on('names'));
   for (const spec of OPERA) showOpera(spec, on(spec.id));
   if (runwayPrimitive) runwayPrimitive.show = on('runways');
+  metarPoints.show = on('metar');
   swRoad.show = on('swroad');
   swRail.show = on('swrail');
   if (smhiPrimitive) smhiPrimitive.show = on('smhi');
@@ -687,6 +690,15 @@ async function pollFlights() {
         vRate: vRate || 0,
         stamp: now,
       });
+      // The reported fixes, not the dead-reckoned drift between them - the same
+      // rule the ship wakes follow, and for the same reason: this is meant to be
+      // where the aircraft was, not where the app guessed it would be.
+      if (!f.onGround) {
+        (f.trail = f.trail || []).push([f.lon, f.lat, f.alt]);
+        if (f.trail.length > TRACK_POINTS) f.trail.shift();
+      } else if (f.trail) {
+        f.trail.length = 0;
+      }
     }
     for (const [icao, f] of flights) {
       if (!seen.has(icao)) {
@@ -712,6 +724,10 @@ async function pollFlights() {
     }
     setCount('flights', collections.flights.length);
     setCount('services', collections.services.length);
+    // The track lines live in the same rebuild as the ship wakes, and that was
+    // only ever called from the vessel poll - so with vessels off the aircraft
+    // trails were collected faithfully and never drawn once.
+    if (wantTracks) rebuildTracks();
     const mil = [...flights.values()].filter((f) => f.military).length;
     const sample = data.sampled && !data.sampled.covers_view
       ? ` · sampled ${data.sampled.circles}×${data.sampled.radius_nm} nm around centre — zoom in for the rest`
@@ -834,7 +850,24 @@ setInterval(enrichRotorcraft, 4000);
 
 const courseVectors = scene.primitives.add(new Cesium.PolylineCollection());
 const wakes = scene.primitives.add(new Cesium.PolylineCollection());
+const flightTracks = scene.primitives.add(new Cesium.PolylineCollection());
 const VECTOR_MINUTES = 10;
+/*
+ * The same idea as a ship's wake, and a better argument for it.
+ *
+ * A published approach plate says what should happen. ADS-B says what did. The
+ * app already receives every position report; keeping the last of them and
+ * drawing the line through them turns the aircraft layer into the one kind of
+ * approach chart nobody can charge for - the one aircraft actually flew.
+ *
+ * Drawn at altitude rather than on the ground, because the descent is the part
+ * worth seeing: fifteen aircraft queuing for one runway draw the real pattern,
+ * step-downs and all, without a single licensed chart involved.
+ */
+const TRACK_POINTS = 40;   // about ten minutes at a fifteen-second poll
+const TRACK_LIMIT = 200;   // lines for two thousand aircraft is a frame budget
+let wantTracks = false;
+
 const WAKE_POINTS = 8;
 const WAKE_LIMIT = 150;   // full wakes for 700 ships cost 30 ms a frame
 let wantVectors = true;
@@ -845,6 +878,9 @@ const VECTOR_MATERIAL = Cesium.Material.fromType('Color', {
 });
 const WAKE_MATERIAL = Cesium.Material.fromType('Color', {
   color: Cesium.Color.fromCssColorString('#7dffab').withAlpha(0.35),
+});
+const TRACK_MATERIAL = Cesium.Material.fromType('Color', {
+  color: Cesium.Color.fromCssColorString('#ffb347').withAlpha(0.42),
 });
 
 function projectAhead(lat, lon, trackDegrees, speedMs, seconds) {
@@ -893,6 +929,25 @@ function rebuildTracks() {
     }
   }
 
+  // Aircraft tracks. Drawn from the height array rather than flattened, so the
+  // line falls as the aircraft does and an approach reads as a descent instead
+  // of as a squiggle on the ground.
+  flightTracks.removeAll();
+  if (wantTracks && collections.flights.show) {
+    let drawn = 0;
+    for (const f of flights.values()) {
+      if (drawn >= TRACK_LIMIT) break;
+      if (!f.trail || f.trail.length < 2) continue;
+      if (!inView(f.lon, f.lat)) continue;
+      flightTracks.add({
+        positions: Cesium.Cartesian3.fromDegreesArrayHeights(f.trail.flat()),
+        width: 1.5,
+        material: TRACK_MATERIAL,
+      });
+      drawn += 1;
+    }
+  }
+
   const cost = performance.now() - started;
   $('#track-cost').textContent =
     `${courseVectors.length + wakes.length} lines · ${cost.toFixed(1)} ms per poll`;
@@ -900,6 +955,13 @@ function rebuildTracks() {
 
 $('#vectors').onchange = (e) => { wantVectors = e.target.checked; rebuildTracks(); };
 $('#wakes').onchange = (e) => { wantWakes = e.target.checked; rebuildTracks(); };
+$('#tracks').onchange = (e) => {
+  wantTracks = e.target.checked;
+  rebuildTracks();
+  log(wantTracks
+    ? 'flown tracks on · the last 40 reports per aircraft, at altitude'
+    : 'flown tracks off');
+};
 
 /* --------------------------------------------------------------- vessels */
 
@@ -1957,6 +2019,8 @@ function describePicked(type, ref) {
         + 'somebody confirmed it, and one that has quietly stopped can linger '
         + 'in the list.'],
     ]);
+  } else if (type === 'metar') {
+    showMetar(ref);
   } else if (type === 'runway') {
     const r = ref;
     const landing = ref.end === 'he' ? r.he : r.le;
@@ -2935,6 +2999,10 @@ async function loadAirports() {
 
 viewer.camera.moveEnd.addEventListener(loadAirports);
 viewer.camera.moveEnd.addEventListener(() => loadRunways(false));
+viewer.camera.moveEnd.addEventListener(() => loadMetar(false));
+// Observations are issued twice an hour; this asks a little more often so
+// a change is never more than five minutes stale on screen.
+setInterval(whileOn('metar', () => loadMetar(true)), 5 * 60_000);
 
 /* ------------------------------------------------------------------- aprs */
 
@@ -3135,6 +3203,7 @@ async function loadRadios() {
 
 LAYER_ON_DEMAND.volcanoes = () => loadVolcanoes();
 LAYER_ON_DEMAND.runways = () => loadRunways(true);
+LAYER_ON_DEMAND.metar = () => loadMetar(true);
 LAYER_ON_DEMAND.swroad = () => loadSwedenRoad();
 LAYER_ON_DEMAND.swrail = () => loadSwedenRail();
 LAYER_ON_DEMAND.smhi = () => loadSmhi();
@@ -8750,6 +8819,156 @@ async function loadRunways(force) {
   setCount('runways', (data.runways || []).length);
   log(`runways: ${(data.runways || []).length} in view · OurAirports · `
     + `centrelines are ${data.centreline_nm} NM of arithmetic, not a procedure`);
+}
+
+/* ------------------------------------------------------------------- metar */
+
+/*
+ * The weather pilots read, which is not the weather anyone else reads.
+ *
+ * A METAR is an observation at a field: wind, visibility, cloud, temperature,
+ * and what is falling out of the sky right now. Free from NOAA for the whole
+ * planet with no account, which is why this layer needs no key while the air
+ * quality one does. It was nearly built against OpenAIP, which does not carry
+ * weather at all.
+ *
+ * The colours are the ones aviation already uses, and they are kept rather than
+ * translated. VFR and IFR mean something precise about whether you may fly by
+ * looking out of the window, and calling them "good" and "bad" would lose it.
+ */
+
+const FLIGHT_CAT_COLOUR = {
+  VFR: '#7dffab',    // clear enough to fly by eye
+  MVFR: '#4fd6ff',   // marginal
+  IFR: '#ff9f45',    // instruments
+  LIFR: '#ff5c5c',   // low instruments, the worst of it
+};
+
+let metarAt = '';
+
+async function loadMetar(force) {
+  if (!layerOn('metar')) return;
+  const view = viewer.camera.computeViewRectangle();
+  if (!view) return;
+  const box = {
+    south: Cesium.Math.toDegrees(view.south),
+    west: Cesium.Math.toDegrees(view.west),
+    north: Cesium.Math.toDegrees(view.north),
+    east: Cesium.Math.toDegrees(view.east),
+  };
+  const key = [box.south, box.west, box.north, box.east].map((n) => n.toFixed(1)).join(',');
+  if (key === metarAt && !force) return;
+  metarAt = key;
+
+  let data;
+  try {
+    data = await getJSON('/api/metar?'
+      + `south=${box.south.toFixed(3)}&west=${box.west.toFixed(3)}`
+      + `&north=${box.north.toFixed(3)}&east=${box.east.toFixed(3)}`);
+  } catch (err) {
+    log(`metar unavailable (${err.message})`, 'warn');
+    return;
+  }
+
+  metarPoints.removeAll();
+  if (data.too_wide) {
+    setCount('metar', 0);
+    log(`metar: ${data.note}`, 'warn');
+    applyVisibility();
+    return;
+  }
+
+  for (const s of data.stations || []) {
+    metarPoints.add({
+      position: Cesium.Cartesian3.fromDegrees(s.lon, s.lat, 0),
+      // Weather at the field makes the mark bigger, because a field reporting
+      // rain is the one you are looking for among fifty that are not.
+      pixelSize: s.weather ? 9 : 6,
+      color: Cesium.Color.fromCssColorString(
+        FLIGHT_CAT_COLOUR[s.category] || '#8a94a6').withAlpha(0.9),
+      outlineColor: Cesium.Color.fromCssColorString('#0b0e14').withAlpha(0.75),
+      outlineWidth: 1,
+      disableDepthTestDistance: MARK_THROUGH_M,
+      scaleByDistance: new Cesium.NearFarScalar(1e5, 1.4, 4e6, 0.45),
+      id: { type: 'metar', ref: s },
+    });
+  }
+  setCount('metar', (data.stations || []).length);
+  log(`metar: ${(data.stations || []).length} fields reporting · NOAA · `
+    + `${data.reporting_weather} with weather at the field`);
+  applyVisibility();
+}
+
+/*
+ * Present weather comes as the codes the message uses, and they are kept. A
+ * pilot reads -RA as light rain without thinking; anyone else needs it once,
+ * and having both means the card teaches the code rather than replacing it.
+ */
+const WX_WORDS = {
+  RA: 'rain', SN: 'snow', DZ: 'drizzle', GR: 'hail', GS: 'small hail',
+  BR: 'mist', FG: 'fog', HZ: 'haze', FU: 'smoke', SA: 'sand', DU: 'dust',
+  TS: 'thunderstorm', SH: 'showers', FZ: 'freezing', PL: 'ice pellets',
+  SQ: 'squall', VA: 'volcanic ash', UP: 'unidentified precipitation',
+};
+
+function readWeather(code) {
+  if (!code) return '';
+  return code.split(/\s+/).map((token) => {
+    let rest = token;
+    let strength = '';
+    if (rest.startsWith('-')) { strength = 'light '; rest = rest.slice(1); }
+    else if (rest.startsWith('+')) { strength = 'heavy '; rest = rest.slice(1); }
+    else if (rest.startsWith('VC')) { strength = 'in the vicinity, '; rest = rest.slice(2); }
+    const words = [];
+    for (let i = 0; i + 1 < rest.length + 1; i += 2) {
+      const pair = rest.slice(i, i + 2);
+      if (WX_WORDS[pair]) words.push(WX_WORDS[pair]);
+    }
+    return words.length ? `${token} — ${strength}${words.join(' ')}` : token;
+  }).join(' · ');
+}
+
+async function showMetar(s) {
+  const cloud = (s.clouds || [])
+    .map((c) => `${c.cover}${c.base != null ? ` at ${c.base} ft` : ''}`)
+    .join(', ');
+  const rows = [
+    ['Field', s.name || s.icao],
+    ['Category', s.category
+      ? `${s.category} — ${ {VFR: 'clear enough to fly by eye',
+          MVFR: 'marginal', IFR: 'instruments required',
+          LIFR: 'low instrument conditions'}[s.category] || '' }`
+      : 'not stated'],
+    ['Weather', s.weather ? readWeather(s.weather) : 'nothing falling'],
+    ['Wind', s.wind_kt != null
+      ? `${s.wind_dir}° at ${s.wind_kt} kt` : 'not reported'],
+    ['Visibility', s.visibility != null ? `${s.visibility} statute miles` : 'not reported'],
+    ['Cloud', cloud || 'none reported'],
+    ['Temperature', s.temp_c != null
+      ? `${s.temp_c}°C, dewpoint ${s.dewpoint_c}°C` : 'not reported'],
+    ['Pressure', s.altimeter != null ? `${Math.round(s.altimeter)} hPa` : 'not reported'],
+    ['Observed', (s.observed || '').replace('T', ' ').slice(0, 16) + ' UTC'],
+    ['Forecast', 'looking…'],
+    ['As issued', s.raw],
+    ['Note', 'an observation at that field, not a forecast for the area around '
+      + 'it. The raw line is the message as issued and is the authority; '
+      + 'everything above it is this app reading it for you.'],
+  ];
+  showDetail(s.icao || 'field', 'observation · NOAA aviation weather', rows);
+
+  // The forecast is a second request, so it arrives after the card rather than
+  // holding it back. Most fields do not have one.
+  let forecast = null;
+  try {
+    forecast = await getJSON('/api/taf?icao=' + encodeURIComponent(s.icao));
+  } catch (err) {
+    forecast = { error: err.message };
+  }
+  if ($('#detail-title').textContent !== (s.icao || 'field')) return;
+  rows[9] = ['Forecast', forecast.raw ? forecast.raw
+    : forecast.error ? `could not fetch it (${forecast.error})`
+    : (forecast.note || 'none issued for this field')];
+  showDetail(s.icao || 'field', 'observation · NOAA aviation weather', rows);
 }
 
 /* ------------------------------------------------------------------ sweden */

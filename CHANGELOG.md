@@ -6,6 +6,56 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.99.0 — aviation: runways, the track that was flown, and the weather pilots read
+
+Asked what could be had in the aviation direction — approach routes, Jeppesen
+charts, that sort of thing.
+
+**Jeppesen is closed.** Commercial, licensed per pilot, no open API, and putting
+their plates in an app would be a straight licence breach. That is the honest
+answer and there is no way around it. But three things next to it are open, and
+two of them turned out better than the question assumed.
+
+**Runways.** OurAirports publish them as a sister file to the airports already
+used here: both threshold coordinates, length, width, surface, lighting and the
+true heading of each direction. Public domain, no key. Drawn as the thing it is,
+fetched for the view because there are forty thousand of them.
+
+Each end carries ten nautical miles of extended centreline, computed from the
+published heading. The card is explicit about what that is: where a straight-in
+would be, not a procedure. Real approaches have step-downs, offsets and turns
+that only a chart carries, and the card says *do not fly this*.
+
+**The track that was flown.** A published plate says what should happen; ADS-B
+says what did. The app already received every position report and threw them
+away. It keeps the last forty now and draws the line through them *at altitude*,
+so a descent reads as a descent. Fifteen aircraft queuing for one runway draw the
+real pattern, and no licensed chart is involved anywhere.
+
+That one exposed a bug that had been sitting there: the redraw was only ever
+called from the vessel poll, so with ships switched off the aircraft trails were
+collected faithfully and never drawn once.
+
+**METAR and TAF.** Asked whether an OpenAIP key was needed for this. It is not,
+and OpenAIP would not have helped: it carries airspaces and navaids, not
+weather. NOAA's Aviation Weather Center serves official observations and
+forecasts for the whole planet **with no account at all**. Asking the right
+service turned a key into no key.
+
+Fields are coloured by flight category in the colours aviation already uses —
+VFR, MVFR, IFR, LIFR are kept as the terms they are, because they mean something
+precise about whether you may fly by looking out of the window and "good" and
+"bad" would lose it. A field with something falling is drawn larger, because
+that is the one you are looking for among fifty that are not. The card decodes
+the present-weather codes and keeps them: `+RA — heavy rain` teaches the code
+rather than replacing it. The raw line is shown last and labelled as the
+authority.
+
+Verified over the Nordics: 51 fields reporting, 11 with weather, EKAH Tirstrup
+reading MVFR with heavy rain, its TAF arriving after the card as a second
+request. Three ESSA runways with 01L/19R at 10,830 ft and its approach line
+landing 9.8 NM out on bearing 010.
+
 ## 0.98.0 — two tiles that answer 200 and say nothing
 
 Two reports in a row, and they turned out to be the same bug wearing different

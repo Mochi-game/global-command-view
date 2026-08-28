@@ -38,7 +38,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "0.98.1"
+VERSION = "0.99.0"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -3385,6 +3385,145 @@ def tomtom_key():
     return json.dumps({"key": key, "source": "TomTom Traffic Flow"}).encode(), "memory"
 
 
+# -------------------------------------------------------------------- metar
+
+# The weather pilots actually read, which is not the weather anyone else reads.
+#
+# A METAR is an observation at an airfield: wind, visibility, cloud, temperature,
+# pressure, and what is falling out of the sky right now. A TAF is the forecast
+# for the same field. Both are official, both are free, and NOAA serve them for
+# the whole planet with no account at all - which is rarer than it sounds and is
+# why this needs no key while the air quality layer does.
+#
+# It was nearly built against OpenAIP, which does not carry weather. OpenAIP is
+# airspaces and navaids. Asking the right service turned a key into no key.
+
+METAR_URL = "https://aviationweather.gov/api/data/metar"
+TAF_URL = "https://aviationweather.gov/api/data/taf"
+METAR_TTL = 300          # they are issued twice an hour; five minutes is polite
+
+# Flight categories, in the order a pilot would read them as getting worse.
+# Kept as the letters they are: VFR and IFR mean something precise, and
+# translating them into "good" and "bad" would lose exactly that.
+FLIGHT_CATEGORY = {"VFR": 0, "MVFR": 1, "IFR": 2, "LIFR": 3}
+
+
+def metar(south, west, north, east):
+    """Current observations at every reporting airfield in a box."""
+    if not all(math.isfinite(v) for v in (south, west, north, east)):
+        return json.dumps({"stations": [], "error": "the view did not resolve to a box"}).encode(), "refused"
+    if west > east or south > north:
+        return json.dumps({
+            "stations": [], "too_wide": True,
+            "note": "the view wraps the globe - zoom in",
+        }).encode(), "refused"
+    if north - south > 40.0 or east - west > 80.0:
+        return json.dumps({
+            "stations": [], "too_wide": True,
+            "note": "zoom in - this asks NOAA for every field in the box and a "
+                    "hemisphere is thousands of them",
+        }).encode(), "refused"
+
+    box = "%.2f,%.2f,%.2f,%.2f" % (south, west, north, east)
+    cache = "metar_" + box.replace(",", "_").replace(".", "p").replace("-", "m")
+    hit = _mem_get(cache)
+    if hit and time.time() - hit[0] < METAR_TTL:
+        return hit[1], "memory"
+
+    url = "%s?bbox=%s&format=json" % (METAR_URL, urllib.parse.quote(box))
+    try:
+        rows = json.loads(fetch(url))
+    except Exception as exc:  # noqa: BLE001
+        log("metar: %s" % exc)
+        return json.dumps({"stations": [], "error": str(exc)[:120]}).encode(), "error"
+
+    if not isinstance(rows, list):
+        held = ", ".join(sorted(rows)[:6]) if isinstance(rows, dict) else type(rows).__name__
+        log("metar: answered, but not with a list - held: %s" % held)
+        return json.dumps({
+            "stations": [],
+            "error": "the feed answered in a shape this does not recognise (%s)" % held,
+        }).encode(), "error"
+
+    out, raining = [], 0
+    for r in rows:
+        try:
+            lat = float(r["lat"])
+            lon = float(r["lon"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        weather = (r.get("wxString") or "").strip()
+        if weather:
+            raining += 1
+        out.append({
+            "icao": r.get("icaoId") or "",
+            "name": (r.get("name") or "")[:60],
+            "lat": lat, "lon": lon,
+            "elev_m": r.get("elev"),
+            "category": r.get("fltCat") or "",
+            "rank": FLIGHT_CATEGORY.get(r.get("fltCat") or "", -1),
+            "temp_c": r.get("temp"),
+            "dewpoint_c": r.get("dewp"),
+            "wind_dir": r.get("wdir"),
+            "wind_kt": r.get("wspd"),
+            "visibility": r.get("visib"),
+            "altimeter": r.get("altim"),
+            "weather": weather,
+            "clouds": r.get("clouds") or [],
+            "observed": r.get("reportTime") or "",
+            "raw": (r.get("rawOb") or "")[:200],
+        })
+
+    data = json.dumps({
+        "stations": out,
+        "reporting_weather": raining,
+        "source": "NOAA Aviation Weather Center",
+        "note": "an observation at the field, not a forecast for the area. The "
+                "raw line is the message as issued - it is the authority, and "
+                "everything above it is this app reading it for you.",
+    }).encode()
+    _mem_put(cache, data)
+    log("metar: %d fields reporting, %d with weather" % (len(out), raining))
+    return data, "network"
+
+
+def taf(icao):
+    """The forecast for one field, as issued."""
+    icao = "".join(c for c in (icao or "").upper() if c.isalnum())[:4]
+    if not icao:
+        return json.dumps({"error": "no airfield given"}).encode(), "empty"
+
+    cache = "taf_" + icao
+    hit = _mem_get(cache)
+    if hit and time.time() - hit[0] < METAR_TTL:
+        return hit[1], "memory"
+
+    try:
+        rows = json.loads(fetch("%s?ids=%s&format=json" % (TAF_URL, icao)))
+    except Exception as exc:  # noqa: BLE001
+        log("taf %s: %s" % (icao, exc))
+        return json.dumps({"error": str(exc)[:120]}).encode(), "error"
+
+    if not rows:
+        return json.dumps({
+            "icao": icao,
+            "raw": "",
+            "note": "no forecast is issued for this field. Most are not: a TAF "
+                    "is written for airports with the traffic to justify one.",
+        }).encode(), "network"
+
+    row = rows[0]
+    data = json.dumps({
+        "icao": icao,
+        "issued": row.get("issueTime") or "",
+        "valid_from": row.get("validTimeFrom"),
+        "valid_to": row.get("validTimeTo"),
+        "raw": (row.get("rawTAF") or "")[:900],
+    }).encode()
+    _mem_put(cache, data)
+    return data, "network"
+
+
 # ------------------------------------------------------------------ runways
 
 # A dot on a globe says an airport is somewhere. It does not say which way you
@@ -6075,6 +6214,14 @@ class Handler(SimpleHTTPRequestHandler):
                 data, source = aprs_stations(tuple(float(v) for v in box))
             elif name == "train":
                 data, source = train_journey(query.get("number", [""])[0])
+            elif name == "metar":
+                data, source = metar(
+                    float(query.get("south", ["0"])[0]),
+                    float(query.get("west", ["0"])[0]),
+                    float(query.get("north", ["0"])[0]),
+                    float(query.get("east", ["0"])[0]))
+            elif name == "taf":
+                data, source = taf(query.get("icao", [""])[0])
             elif name == "runways":
                 data, source = runways(
                     float(query.get("south", ["0"])[0]),
