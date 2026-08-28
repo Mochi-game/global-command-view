@@ -2977,12 +2977,24 @@ async function loadAirports() {
     const data = await getJSON(`/api/airports?bbox=${bbox.map((v) => v.toFixed(3)).join(',')}`);
     airports.removeAll();
     for (const a of data.airports) {
+      // Reported as invisible at an airport with three aviation layers on:
+      // the beacon and the weather station were there and this was not. Two
+      // reasons, both fixed here.
+      //
+      // It had no depth-test exemption while the other two did, so a marker on
+      // the ground disappeared behind a terminal building the moment you came
+      // down to look at it - which is exactly when you want it.
+      //
+      // And it was the faintest of the three at 0.7 alpha against their 0.85 and
+      // 0.9, on the smallest dot. The airport is the thing the other two belong
+      // to, so it is now the largest and reads as the ring they sit inside.
       airports.add({
         position: Cesium.Cartesian3.fromDegrees(a.lon, a.lat, 0),
-        pixelSize: a.big ? 9 : 5,
-        color: Cesium.Color.fromCssColorString('#fcd34d').withAlpha(a.big ? 0.7 : 0.4),
-        outlineColor: Cesium.Color.fromCssColorString('#fde68a'),
-        outlineWidth: 1,
+        pixelSize: a.big ? 14 : 8,
+        color: Cesium.Color.fromCssColorString('#fcd34d').withAlpha(a.big ? 0.35 : 0.25),
+        outlineColor: Cesium.Color.fromCssColorString('#fcd34d').withAlpha(0.95),
+        outlineWidth: 2,
+        disableDepthTestDistance: MARK_THROUGH_M,
         scaleByDistance: new Cesium.NearFarScalar(1e5, 1.3, 2e7, 0.5),
         id: { type: 'airport', ref: a },
       });

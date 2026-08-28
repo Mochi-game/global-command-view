@@ -6,6 +6,33 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.0.1 — the airport you could not see
+
+Reported straight after the last release: clicking the blue dot at Arlanda gave
+the beacon, and the airport carrying the frequencies could not be found at all.
+Only a green dot and a blue one were visible.
+
+The airport marker was there and was invisible for two reasons, and the second
+one is the interesting one.
+
+It had **no depth-test exemption** while the weather and beacon layers both did.
+A marker on the ground therefore vanished behind a terminal building the moment
+you descended to look at it — which is precisely when you want it. The other two
+drew through and it did not, so at close range the airport was the one thing
+missing from its own airfield.
+
+And it was **the faintest of the three**: 0.7 alpha on a 9-pixel dot against
+0.85 and 0.9 on the others. Three layers competing on the same ground, and the
+one everything else belongs to was drawn quietest.
+
+It is now the largest of them — a 14-pixel amber ring with a solid edge, drawn
+through buildings like its neighbours. The other two sit inside it, which is the
+right relationship: the weather and the beacon belong to the airport.
+
+The help now says which dot is which, because three layers putting dots on one
+airfield is a guess otherwise, and the previous instructions said "click the
+airport dot" without ever mentioning its colour.
+
 ## 1.0.0 — frequencies and beacons, and saying plainly what is not here
 
 Asked whether the ILS information, VOR channels and frequencies published for
