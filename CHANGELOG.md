@@ -6,6 +6,36 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.95.0 — saying where the idea came from
+
+The idea came from Bilawal Sidhu's gods-eye-view, seen on YouTube. That is now
+in the README and in the app's WHAT THIS IS tab, because silence is what looks
+like copying if somebody puts it together, and saying it plainly removes the
+question.
+
+Measured before writing it, rather than asserted. 944 kB of his code against
+664 kB of this one: 28 identical ten-word sequences out of roughly 101 000 and
+85 000, and every one of them is either the standard HTML head or the single
+line Cesium gives you for turning a position into degrees. There is no other way
+to write that line. No shared prose, no shared naming, no shared structure. His
+is a Vite and npm application in JavaScript; this is one Python file with no
+dependencies serving plain JavaScript. Same idea, built independently from the
+other end.
+
+The wording points at his project as the more finished one and lists what is
+different here rather than claiming to be better. A README that argues it beats
+another project is weaker than one that says what it does instead, and the
+difference is real enough to stand on its own: nothing to install past Python,
+Swedish road and rail and weather, and an editorial rule taken further than is
+comfortable.
+
+Also in this release: LICENSE is plain MIT again so it is recognised as MIT — the
+note about third-party data that used to sit under a rule at the bottom of it now
+lives in DATA-LICENCES.md, because an appended paragraph is exactly what stops a
+licence detector matching the file. The repository has topics and a description
+that says what it does. And the README still claimed thirty-four layers; it is
+thirty-seven.
+
 ## 0.94.1 — two GET THE KEY buttons that led to a 404
 
 Handed the working OpenAQ registration link, because the one in the app was
