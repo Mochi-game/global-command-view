@@ -38,11 +38,22 @@ look like. So the Copernicus optics are held back below zoom level 8, and say so
 rather than drawing nothing in silence. That costs nothing real: a 10 m product
 read from orbit height was never showing anything 10 m wide.
 
-Whether `showLogo=false` would remove it is **not known**. Probing for it hit
-429 on the account's rate limit, and the honest thing was to stop spending
-somebody else's quota guessing rather than keep trying. If the Configuration
-Utility has a logo setting, turning it off there would make the zoom gate
-unnecessary — but the gate is right on its own terms anyway.
+**`showLogo=false` removes it.** The rate limit that stopped the first attempt
+reopened, one more request went out, and the tile came back clean — same
+imagery, no logo. The request carries it now, and the credit line underneath
+carries the attribution where attribution belongs.
+
+The zoom gate stays, for two reasons that both survive the logo going away. A
+10 m product read from orbit height shows nothing 10 m wide. And every tile is
+one request against a monthly allowance of thirty thousand, so a screen filled
+at continental zoom spends thirty of them on a blur. Requests are the quota
+anyone meets first, and this is the cheapest place not to waste them. The
+message says that now instead of talking about logos.
+
+One thing worth knowing that is not a fault: **Sentinel-2 is optical.** The
+first clean tile fetched over Skåne farmland is mostly cloud, because Skåne was
+under cloud that week. That is what the satellite saw. SWIR and the radar layers
+are the ones that see through it.
 
 ## 0.97.1 — an address in the DNS box is a question, not a mistake
 

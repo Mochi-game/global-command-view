@@ -5986,18 +5986,14 @@ const OPERA = [
 const OPERA_MIN_LEVEL = 5;
 
 /*
- * Copernicus watermarks every tile with the Copernicus logo - not a no-data
- * placeholder, but attribution burned into each 256-pixel square, over real
- * imagery as much as over empty ocean.
+ * Held back until it is worth drawing, for two reasons that both survive the
+ * logo being switched off.
  *
- * That makes the arithmetic decide how it looks. At continental zoom a screen
- * holds thirty tiles, so thirty logos: a wall of them, and the picture is gone.
- * Zoomed in, one tile covers a good part of the screen and it is one mark in a
- * corner, which is what attribution is supposed to look like.
- *
- * So the layer is held back until it is worth drawing. That costs nothing real:
- * a 10 m product read from orbit height shows nothing 10 m wide anyway, which
- * is the same argument the OPERA layers are held back on.
+ * A 10 m product read from orbit height shows nothing 10 m wide, which is the
+ * same argument the OPERA layers are held back on. And every tile is one
+ * request against a monthly allowance of thirty thousand, so a screen filled at
+ * continental zoom spends thirty of them to show a blur. Requests are the quota
+ * anyone meets first, and this is the cheapest place to not waste them.
  */
 const CDSE_MIN_LEVEL = 8;
 const CDSE_HINT_M = 400_000;
@@ -7518,8 +7514,8 @@ function selectStyle(key, byHandover) {
   // Turned on from too far out it draws nothing, and silence reads as broken.
   if (spec && spec.cdse && scene.camera.positionCartographic.height > CDSE_HINT_M) {
     log(`${spec.label.toLowerCase()}: too far out to draw · zoom in to about `
-      + 'a county and it appears · held back because every tile carries the '
-      + 'Copernicus logo, and thirty of them is a wall', 'warn');
+      + 'a county and it appears · held back because 10 m imagery shows '
+      + 'nothing from here, and every tile spends a request', 'warn');
   }
   localStorage.setItem('gcv-style', key);
   rebuildImagery();
@@ -8898,7 +8894,12 @@ async function loadCopernicus() {
         + '&LAYER=' + encodeURIComponent(layer.id)
         + '&TILEMATRIXSET=' + encodeURIComponent(matrix)
         + '&TILEMATRIX={z}&TILEROW={y}&TILECOL={x}'
-        + '&FORMAT=image/jpeg&TIME={window}',
+        // Every tile came back with the Copernicus logo burned into its
+        // corner, which at 256 pixels a tile is a wall of them across the
+        // screen rather than an attribution. They will leave it off if
+        // asked, and the credit line below carries the attribution where
+        // attribution belongs.
+        + '&FORMAT=image/jpeg&showLogo=false&TIME={window}',
       // Copernicus Sentinel data is free to use, commercial use included, so
       // long as the modification is declared. That makes these usable in
       // commercial-safe mode, which the sharp Esri imagery is not.
