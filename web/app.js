@@ -7741,7 +7741,7 @@ const SERVICES = [
     tier: 2,
     cost: 'free',
     adds: 'About a thousand webcams worldwide, and more wherever you look.',
-    url: 'https://api.windy.com/webcams',
+    url: 'https://api.windy.com/keys',
     steps: [
       'Open api.windy.com/webcams and press <b>Get API key</b> under the free column.',
       'Sign in with a Windy account, or make one — it is free and takes a minute.',
@@ -7755,9 +7755,9 @@ const SERVICES = [
     tier: 1,
     cost: 'free',
     adds: 'Three layers off one key. <b>1 528 road cameras</b> at full resolution; <b>road disruption</b> across the state network - roadworks, incidents and ferry notices, with severity in Trafikverket own words; and <b>where every reporting train in Sweden is</b>, updated every thirty seconds.',
-    url: 'https://api.trafikinfo.trafikverket.se/',
+    url: 'https://data.trafikverket.se/',
     steps: [
-      'Open api.trafikinfo.trafikverket.se and press <b>Registrera</b>.',
+      'Open <b>data.trafikverket.se</b> and register. The api.trafikinfo address this used to point at answers 404 at its root.',
       'Confirm the address in the email they send.',
       'Under <b>Mina nycklar</b>, copy the authentication key.',
       'Paste it below, reload, and switch on <b>Swedish road disruption</b> and <b>Swedish trains</b> under Sweden. The cameras appear under Infrastructure.',
@@ -7796,10 +7796,10 @@ const SERVICES = [
     tier: 3,
     cost: 'free',
     adds: 'Air quality, as PM2.5 measured at the ground. The only layer here that measures something happening to people rather than to the ground — and the one most likely to matter to somebody watching from the place being looked at.',
-    url: 'https://openaq.org/developers/',
+    url: 'https://explore.openaq.org/register?redirect=/',
     fields: ['openaq'],
     steps: [
-      'Register at openaq.org/developers and create an API key. Free.',
+      'Register at <b>explore.openaq.org/register</b> and create an API key. Free. The old openaq.org/developers address this used to point at is a 404 now.',
       'Paste it below, reload, and switch on <b>Air quality (PM2.5)</b> under People.',
       'The API answers 401 without a key, so the layer says it is missing one rather than drawing nothing.',
       'Colour follows the WHO 24-hour guideline of 15 micrograms per cubic metre. Reference monitors and low-cost sensors are reported together and are not equally accurate — the card says so on every reading.',

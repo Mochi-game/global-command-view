@@ -231,6 +231,46 @@ def check_badges(app_js, report):
         report.note("source badges: all %d licence values have one" % len(used))
 
 
+def check_setup_links(app_js, report):
+    """A GET THE KEY button that leads to a 404.
+
+    Two of the ten did. Both had been right when they were written and quietly
+    stopped being: openaq.org/developers went away, and the Trafikverket API
+    root stopped answering at all. Nothing in the app could tell, because a dead
+    link looks exactly like a live one until somebody clicks it - and the person
+    who clicks it is somebody deciding whether this app is worth the trouble.
+
+    Networked, so it is skipped by --quick along with the slow feeds.
+    """
+    start = app_js.find("const SERVICES")
+    if start == -1:
+        report.fail("setup", "SERVICES not found")
+        return
+    block = app_js[start:app_js.index("\n];", start)]
+    pairs = re.findall(r"name: '([^']+)',(?:.|\n)*?url: '([^']+)'", block)
+    if not pairs:
+        report.fail("setup", "no service links found to check")
+        return
+
+    dead = []
+    for name, url in pairs:
+        req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
+        try:
+            with urllib.request.urlopen(req, timeout=25) as resp:
+                if resp.status >= 400:
+                    dead.append("%s %s (%s)" % (name, url, resp.status))
+        except urllib.error.HTTPError as exc:
+            dead.append("%s %s (%s)" % (name, url, exc.code))
+        except Exception as exc:  # noqa: BLE001 - a link check, not a feed
+            dead.append("%s %s (%s)" % (name, url, str(exc)[:30]))
+
+    if dead:
+        report.fail("setup", "GET THE KEY links that do not answer: %s"
+                    % "; ".join(dead))
+    else:
+        report.note("setup links: all %d answer" % len(pairs))
+
+
 def check_cache(report):
     """The disk cache inside the ceilings it claims to keep.
 
@@ -537,6 +577,8 @@ def main():
     check_grouped(app_js, report)
     check_keys_documented(app_js, report)
     check_badges(app_js, report)
+    if not args.quick:
+        check_setup_links(app_js, report)
     check_commas(app_js, report)
     check_cache(report)
     check_ids(app_js, index_html, report)

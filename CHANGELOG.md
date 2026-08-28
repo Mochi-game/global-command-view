@@ -6,6 +6,31 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 0.94.1 — two GET THE KEY buttons that led to a 404
+
+Handed the working OpenAQ registration link, because the one in the app was
+dead. Checking the other nine found a second: the Trafikverket API root, which
+had been the right address when it was written and stopped answering at some
+point since.
+
+Both had been correct once. That is the whole problem with a link in an app —
+it looks exactly as alive as a working one until somebody clicks it, and the
+person clicking it is somebody deciding whether this is worth the trouble of an
+account. The same thing cost real time here once already with a TomTom address.
+
+- OpenAQ: `openaq.org/developers` → `explore.openaq.org/register`
+- Trafikverket: `api.trafikinfo.trafikverket.se` → `data.trafikverket.se`
+- Windy, which was not broken, now points at the key page rather than at the
+  pricing page it was redirecting to.
+
+Both cards say in their steps that the old address is dead, so anyone following
+an older screenshot is not left wondering.
+
+And this is now tested rather than trusted. The smoke test fetches every GET THE
+KEY link and names the ones that do not answer. It is a network check, so it is
+skipped by `--quick` along with the slow feeds. Verified by planting a dead link
+and watching it fail, then restoring it.
+
 ## 0.94.0 — a setup page that says what to do first, and a badge that stops lying
 
 Shown another app's onboarding as the standard to meet, and it was. Two things
