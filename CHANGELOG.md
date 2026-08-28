@@ -6,6 +6,39 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.2.0 — layers remembered, a box that fits an airport, and errors that stop deleting themselves
+
+Reported that the taxiways had gone. Three separate faults came out of chasing
+it, and the third is the one worth reading.
+
+**Layer choices are remembered now.** They never were: every reload put every
+layer back to off, and this app asks to be reloaded often. Switching taxiways on,
+reloading to pick up a fix, and finding them gone is indistinguishable from a
+broken layer. The first visit still opens empty — that is about not deciding for
+somebody who has not chosen yet — and every visit after that comes back as you
+left it, which is about not overruling somebody who has.
+
+**The taxiway request measured the wrong thing.** It used the view rectangle,
+and a view rectangle is a poor description of a tilted camera: at fifteen
+degrees of pitch a kilometre up — standing on the apron, which is exactly where
+you want taxiways — it stretches to the horizon. Measured here as 0.98 by 4.13
+degrees, which the layer refused as too wide while telling somebody parked on
+the ramp to zoom in. It now takes a five-kilometre box around the point the
+camera is actually looking at, so the answer no longer depends on how far the
+camera happens to be leaning.
+
+**And the feed log was eating its own errors.** It wrote messages with
+`innerHTML`. Python hands back failures like `<urlopen error timed out>`, the
+browser parsed that as a tag, and the line arrived reading `taxiways:` with the
+failure silently removed. The messages most worth reading are exactly the ones
+most likely to contain angle brackets, so the log deleted information precisely
+when something had gone wrong. Messages are appended as text now.
+
+Found along the way, and not our bug: all four Overpass mirrors were down at
+once — connection refused, 502, read timeout, connection refused. The circuit
+breaker did its job, dropping a 75-second walk through dead mirrors to a
+0.1-second refusal with a plain reason. The layer works; the source was out.
+
 ## 1.1.1 — the airport dot, lost in its own colour
 
 Reported straight after the taxiways landed: the airport marker had gone again.

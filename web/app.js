@@ -21,7 +21,17 @@ function log(message, level) {
   // reading 17:26 and concludes the app has been frozen for two hours - which
   // is exactly what happened. The HUD clock has always said Z; this did not.
   const t = new Date().toISOString().slice(11, 19);
-  li.innerHTML = `<span class="t">${t}Z</span>${message}`;
+  const stamp = document.createElement('span');
+  stamp.className = 't';
+  stamp.textContent = `${t}Z`;
+  li.append(stamp);
+  // As text, not as markup. This was innerHTML, and the very messages worth
+  // reading are the ones most likely to contain angle brackets: Python hands
+  // back "<urlopen error timed out>", the browser parsed it as a tag, and the
+  // line arrived reading "taxiways:" with the failure eaten. An error that
+  // deletes itself is worse than no error, and it deleted itself precisely when
+  // something had gone wrong.
+  li.append(document.createTextNode(message));
   list.prepend(li);
   while (list.children.length > 60) list.lastChild.remove();
 }
@@ -543,6 +553,41 @@ function hintFor(id) {
   if (text) log(text);
 }
 
+/*
+ * Which layers were on, kept between visits.
+ *
+ * The globe opens empty on purpose, and it still does the first time. But
+ * nothing was remembered after that, so every reload threw away whatever
+ * somebody had switched on - and this app asks to be reloaded often. Reported
+ * as taxiways having disappeared: they had not, the reload had simply put every
+ * layer back to off, which looks exactly like a broken layer.
+ *
+ * First run empty, every run after that as you left it. The two are not in
+ * conflict: opening empty is about not deciding for somebody who has not chosen
+ * yet, and this is about not overruling somebody who has.
+ */
+const LAYERS_KEY = 'gcv-layers-on';
+
+function rememberLayers() {
+  try {
+    localStorage.setItem(LAYERS_KEY,
+      JSON.stringify(LAYERS.filter((l) => l.on).map((l) => l.id)));
+  } catch (_) { /* private window, or storage full: not worth failing over */ }
+}
+
+function restoreLayers() {
+  let saved;
+  try {
+    saved = JSON.parse(localStorage.getItem(LAYERS_KEY) || 'null');
+  } catch (_) { saved = null; }
+  // null means never saved - a first visit, which opens empty as designed. An
+  // empty array means somebody switched everything off, and that is a choice.
+  if (!Array.isArray(saved)) return;
+  const wanted = new Set(saved);
+  for (const layer of LAYERS) layer.on = wanted.has(layer.id);
+  for (const id of saved) if (LAYER_ON_DEMAND[id]) LAYER_ON_DEMAND[id]();
+}
+
 function renderLayerList() {
   const ul = $('#layers');
   ul.innerHTML = '';
@@ -599,6 +644,7 @@ function renderLayerList() {
       // those sections starts folded. Saying so once, at the moment somebody
       // switches the layer on, beats explaining it twice afterwards.
       if (layer.on) hintFor(layer.id);
+      rememberLayers();
     };
       ul.append(li);
     }
@@ -9222,6 +9268,36 @@ async function loadNavaids(force) {
  * different convention for a map of the same ground.
  */
 
+/*
+ * A box around what the camera is looking at, rather than around everything it
+ * can see.
+ *
+ * The view rectangle is the wrong measure for anything at airport scale. Tilt
+ * the camera fifteen degrees at a kilometre up - standing on the apron, which
+ * is exactly where you want taxiways - and the rectangle stretches to the
+ * horizon: measured here as 0.98 by 4.13 degrees. The layer refused it as too
+ * wide and said "zoom in", to somebody already parked on the ramp.
+ *
+ * So this asks where the middle of the screen lands and takes a fixed box
+ * around that point. An airport fits in about five kilometres either way, and
+ * the answer no longer depends on how far the camera happens to be leaning.
+ */
+function boxAroundTarget(halfDegrees) {
+  const target = cameraTarget();
+  if (!target) return null;
+  const at = Cesium.Cartographic.fromCartesian(target);
+  const lat = Cesium.Math.toDegrees(at.latitude);
+  const lon = Cesium.Math.toDegrees(at.longitude);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  // Longitude degrees shrink towards the poles, so the box is widened to stay
+  // the same distance across on the ground.
+  const wide = halfDegrees / Math.max(0.2, Math.cos(Cesium.Math.toRadians(lat)));
+  return {
+    south: lat - halfDegrees, north: lat + halfDegrees,
+    west: lon - wide, east: lon + wide,
+  };
+}
+
 let aerowayPrimitive = null;
 let aerowayAt = '';
 
@@ -9230,14 +9306,9 @@ const APRON_COLOUR = '#8a94a6';
 
 async function loadAeroway(force) {
   if (!layerOn('aeroway')) return;
-  const view = viewer.camera.computeViewRectangle();
-  if (!view) return;
-  const box = {
-    south: Cesium.Math.toDegrees(view.south),
-    west: Cesium.Math.toDegrees(view.west),
-    north: Cesium.Math.toDegrees(view.north),
-    east: Cesium.Math.toDegrees(view.east),
-  };
+  // About five kilometres either way, which is an airport.
+  const box = boxAroundTarget(0.045);
+  if (!box) return;
   const key = [box.south, box.west, box.north, box.east].map((n) => n.toFixed(2)).join(',');
   if (key === aerowayAt && !force) return;
   aerowayAt = key;
@@ -9640,6 +9711,7 @@ async function loadCopernicus() {
 
 /* ------------------------------------------------------------------ boot */
 
+restoreLayers();
 renderLayerList();
 renderStyles();
 loadCopernicus();
