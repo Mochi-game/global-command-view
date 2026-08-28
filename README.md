@@ -242,7 +242,10 @@ All three are Sweden only, and say so on every card.
 
 ## Licence
 
-The code is **MIT** — see `LICENSE`. Do what you like with it.
+The code is **MIT** — see [`LICENSE`](LICENSE). Do what you like with it.
+The licence file is kept as plain MIT with nothing appended, so it is
+recognised as MIT; the note that used to sit at the bottom of it now lives
+in [`DATA-LICENCES.md`](DATA-LICENCES.md).
 
 **The data is not.** Everything this app draws is fetched at runtime from other
 people's services under their terms, and the MIT grant does not extend to any of

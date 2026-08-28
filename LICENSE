@@ -19,16 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-This licence covers the code in this folder and nothing else.
-
-The app displays data from a number of outside services, and those come with
-their own terms — several of them permit non-commercial use only. The MIT
-licence above does not grant any right to their data. See the
-SOURCES & LICENCES tab in the app, or the table in README.md, for what each
-feed allows.
-
-In short: this software may be given away freely, but the live picture it draws
-may not be sold without licences from the providers behind it.
