@@ -36,8 +36,23 @@ ready to paint its live frame onto the map. In the panel, the meters: 27 of
 
 **Windows, and you have never installed anything like this:** download the ZIP,
 right-click it, choose **Extract All**, then double-click
-**`Start Global Command View.cmd`** inside. If Python is missing it will tell you
-so and wait, rather than flashing a window at you.
+**`Install Global Command View.cmd`** inside. It checks for Python, offers to
+install it if it is missing, and then starts the app. If Python is already there
+it says so and goes straight to starting.
+
+**No administrator rights are needed.** Everything it installs goes to your own
+user account — winget with `--scope user`, or the python.org installer with
+`InstallAllUsers=0`. Nothing outside your user folder is touched and nobody else
+on the computer is affected. **If Windows asks you to elevate while running it,
+something is wrong: say no.**
+
+It asks before downloading anything and says what it will fetch and from where
+(python.org, about 26 MB). An installer that pulls an executable without telling
+you is indistinguishable from something you would not want, so this one tells
+you, and answering anything but `y` installs nothing.
+
+Once Python is on the machine, **`Start Global Command View.cmd`** is the one to
+use from then on.
 
 > **Windows will probably stop you the first time.** A `.cmd` file that came from
 > the internet triggers SmartScreen: a blue box saying *Windows protected your
