@@ -36,14 +36,41 @@ function log(message, level) {
   while (list.children.length > 60) list.lastChild.remove();
 }
 
+/*
+ * Said once, however many layers hit it.
+ *
+ * A machine that cannot verify HTTPS certificates fails every feed the same
+ * way, and the raw message - "certificate verify failed: unable to get local
+ * issuer certificate" - reads like a broken app or a missing key to anyone who
+ * has not seen it before. The server attaches a plain explanation to any answer
+ * carrying that failure; this puts it in the feed log the first time, and then
+ * stays quiet rather than repeating it for all forty layers.
+ */
+let certAdviceSaid = false;
+
+function noteCertAdvice(body) {
+  if (!body || !body.cert_advice || certAdviceSaid) return;
+  certAdviceSaid = true;
+  log(`certificates: ${body.cert_advice}`, 'warn');
+  for (const host of body.cert_hosts || []) {
+    log(`  open once in Edge: ${host}`, 'warn');
+  }
+}
+
 async function getJSON(url) {
   const res = await fetch(url);
   if (!res.ok) {
     let detail = res.statusText;
-    try { detail = (await res.json()).error || detail; } catch (_) { /* keep status */ }
+    try {
+      const body = await res.json();
+      noteCertAdvice(body);
+      detail = body.error || detail;
+    } catch (_) { /* keep status */ }
     throw new Error(`${res.status} ${detail}`);
   }
-  return res.json();
+  const body = await res.json();
+  noteCertAdvice(body);
+  return body;
 }
 
 /** Small canvas glyphs — cheaper and sharper than shipping image files. */

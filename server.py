@@ -38,7 +38,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -219,6 +219,81 @@ _locks_guard = threading.Lock()
 
 def log(*parts):
     print(time.strftime("[%H:%M:%S]"), *parts, flush=True)
+
+
+# A certificate failure is the machine's, and it does not explain itself.
+#
+# Reported from a fresh Windows install: every layer that fetches over HTTPS came
+# back empty and the app said "certificate verify failed: unable to get local
+# issuer certificate". That is accurate and useless. It reads like the app is
+# broken, or like a key is missing, and it is neither - the app never calls a
+# keyed service without a key, and a keyless install draws ninety-one radio
+# stations on a healthy machine.
+#
+# What it means on Windows: Python verifies against the Windows certificate
+# store, and Windows only fetches a root certificate the first time something
+# asks for it. On a new machine, or one that cannot reach Windows Update, the
+# root is simply not there yet - and unlike a browser, Python does not trigger
+# the fetch itself. Opening the address in Edge or Chrome does, because they use
+# that same store, and Python finds it on the next start.
+#
+# Checked before writing this: setting SSL_CERT_FILE, which most of the internet
+# recommends, changes nothing here. Pointing it at a file that does not exist
+# left verification working perfectly, so it is not what Python reads on Windows
+# and following that advice only wastes an evening.
+#
+# What this deliberately does not do is offer to turn verification off. That
+# would fix the symptom by making every connection this app makes unverified,
+# on a machine whose trust store is already known to be wrong.
+CERT_MARKERS = (b"CERTIFICATE_VERIFY_FAILED",
+                b"unable to get local issuer",
+                b"certificate verify failed")
+
+CERT_ADVICE = (
+    "this machine cannot verify HTTPS certificates, which is why the feed is "
+    "empty - it is not a missing key and not this feed being down. Python on "
+    "Windows verifies against the Windows certificate store, and Windows only "
+    "fetches a root the first time something needs it, so on a new machine it "
+    "is not there yet. Open the failing address in Edge or Chrome once - they "
+    "use the same store and will make Windows fetch it - then stop and start "
+    "this app. If the browser also complains, something is inspecting HTTPS: "
+    "antivirus with 'scan encrypted connections' switched on, or a company "
+    "proxy whose certificate Windows does not trust."
+)
+
+# Which addresses to open, because "the failing address" is not something the
+# feed log can tell you and the list is short.
+#
+# It is per certificate authority, not all-or-nothing: a machine reported
+# shortwave, APRS and aircraft working while radio, airports, runways, weather
+# and beacons were all empty. Those four sit behind three hosts, so three visits
+# in a browser fix eight layers.
+CERT_HOSTS = (
+    "https://de1.api.radio-browser.info/json/stations/search?limit=1",
+    "https://davidmegginson.github.io/ourairports-data/airports.csv",
+    "https://aviationweather.gov/api/data/metar?ids=ESSA",
+    "https://api.openmhz.com/systems",
+)
+
+
+def _with_cert_advice(data):
+    """Add a plain explanation to any answer carrying a certificate failure.
+
+    Done here, once, rather than in each feed's own error path: this failure is
+    never about one feed. When it happens, everything fetched over HTTPS fails
+    the same way, and every one of them should say the same useful thing.
+    """
+    if not data or not any(m in data for m in CERT_MARKERS):
+        return data
+    try:
+        body = json.loads(data)
+        if isinstance(body, dict) and "cert_advice" not in body:
+            body["cert_advice"] = CERT_ADVICE
+            body["cert_hosts"] = list(CERT_HOSTS)
+            return json.dumps(body).encode()
+    except Exception:  # noqa: BLE001 - not JSON, or not ours to rewrite
+        pass
+    return data
 
 
 def _mem_get(key):
@@ -7008,9 +7083,12 @@ class Handler(SimpleHTTPRequestHandler):
             body = json.dumps({"error": str(exc), "feed": name}).encode()
             return self._send(400, body)
         except Exception as exc:  # noqa: BLE001 - report upstream trouble as JSON
-            body = json.dumps({"error": str(exc), "feed": name}).encode()
+            body = _with_cert_advice(
+                json.dumps({"error": str(exc), "feed": name}).encode())
             return self._send(502, body)
         ctype = "text/plain; charset=utf-8" if name in TEXT_FEEDS else "application/json"
+        if ctype.startswith("application/json"):
+            data = _with_cert_advice(data)
         return self._send(200, data, ctype=ctype, source=source)
 
     @staticmethod

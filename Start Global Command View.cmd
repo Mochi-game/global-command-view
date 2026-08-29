@@ -12,5 +12,5 @@ rem
 rem The window you are looking at closes on its own once the server answers.
 rem The server itself runs with no window; use the stop icon to shut it down.
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0start.ps1"
+powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0start.ps1"
 exit /b %errorlevel%

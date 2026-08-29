@@ -440,7 +440,7 @@ def check_trust_script(report):
     # anything containing the name - it was written that way first and a test
     # that renamed the script to .DISABLED still came back all clear, which is
     # a check that cannot fail and therefore is not one.
-    wanted = 'powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Trust these files.ps1"'
+    wanted = 'powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0Trust these files.ps1"'
     if wanted not in text:
         report.fail("trust", "the installer no longer runs the unblock step")
 
@@ -469,7 +469,7 @@ def check_start_hidden(report):
         return
 
     with open(launcher, encoding="utf-8", errors="replace") as fh:
-        wanted = 'powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0start.ps1"'
+        wanted = 'powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0start.ps1"'
         if wanted not in fh.read():
             report.fail("start", "the launcher no longer runs start.ps1")
 

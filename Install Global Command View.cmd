@@ -27,7 +27,7 @@ rem than last so a folder is left trusted even if the install below fails.
 rem Bypass is needed for this one call because the script it runs is itself
 rem still marked at this point - that is the thing being fixed.
 if exist "%~dp0Trust these files.ps1" (
-  powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Trust these files.ps1"
+  powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0Trust these files.ps1"
 )
 
 rem ---------------------------------------------------------------- python?
@@ -91,7 +91,7 @@ set "PYEXE=%TEMP%\python-3.12.10-amd64.exe"
 echo   Downloading from python.org. This is about 26 MB.
 echo   %PYURL%
 echo.
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -Command ^
   "try { $ProgressPreference='SilentlyContinue'; Invoke-WebRequest -Uri '%PYURL%' -OutFile '%PYEXE%' -UseBasicParsing; exit 0 } catch { exit 1 }"
 if not exist "%PYEXE%" (
   echo.

@@ -6,6 +6,44 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.3.1 - a certificate failure that explains itself
+
+Reported from a fresh Windows install: FM radio, airports, runways, weather and
+beacons all empty, while shortwave, APRS and aircraft worked fine. The app said
+"certificate verify failed: unable to get local issuer certificate", which is
+accurate and useless - it reads like a broken app or a missing key, and it is
+neither. A keyless install draws ninety-one radio stations on a healthy machine.
+
+The mixed result is the clue. It is per certificate authority, not
+all-or-nothing: Python on Windows verifies against the Windows certificate
+store, Windows only fetches a root the first time something asks for it, and
+unlike a browser Python does not trigger that fetch. Whichever roots happen to
+be cached already work; the rest fail.
+
+Any answer carrying that failure now arrives with a plain explanation and the
+addresses to open. Attached in one place rather than in each feed's error path,
+because this is never about one feed - when it happens, everything fetched over
+HTTPS fails the same way. The app prints it once and then stays quiet rather
+than repeating it for all forty layers.
+
+The addresses are named rather than described, because "open the failing
+address" is not something a feed log can tell you. Eight layers sit behind three
+hosts, so three visits in a browser fix all of them.
+
+Checked before writing any of it: setting `SSL_CERT_FILE`, which most of the
+internet recommends for this, changes nothing on Windows. Pointed at a file that
+does not exist, verification carried on working perfectly - so it is not what
+Python reads there, and following that advice only costs an evening.
+
+What this deliberately does not do is offer to turn verification off. That fixes
+the symptom by making every connection unverified, on a machine whose trust
+store is already known to be wrong.
+
+Also: `-NoLogo` on the four PowerShell calls in the launchers. Windows
+PowerShell prints an "install the latest PowerShell" banner on some machines,
+and a stop icon should not lecture you on the way out. Not reproducible here,
+so it is a defensive fix rather than a confirmed one.
+
 ## 1.3.0 — ships from an open network, and no account for them
 
 Two AIS feeds were here and both had a hole. Digitraffic is Finnish and covers
