@@ -95,6 +95,21 @@ the taskbar for as long as the app is up, and no window to close. Use
 printed goes to `server.log` beside it, and if it fails to come up the launcher
 stays open and puts the reason on screen instead of vanishing.
 
+## Upgrading without losing your keys
+
+**Unpack the new version straight over the old folder.** Nothing you made is in
+the download, so there is nothing for it to overwrite: `keys.json`, your saved
+views in `data/marks.json`, the Google spend tally and the disk cache are all
+kept out of the archive on purpose. Verified by doing it &mdash; keys, marks and
+cache came through untouched while `server.py` was replaced.
+
+The risk runs the other way. **Unpacking somewhere new leaves your keys behind**
+in the old folder, and the fresh copy starts with none. If you do that, copy
+`keys.json` and the `data` folder across afterwards.
+
+Nothing needs uninstalling first, and the installer can be run again safely: it
+finds Python already there and simply starts.
+
 There is **no configuration step, no account, and nothing to install beyond
 Python.** No `pip install`, no npm, no build. The globe engine loads from a CDN,
 so the first run needs internet.
