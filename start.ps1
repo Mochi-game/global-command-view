@@ -72,6 +72,20 @@ if (-not $py) {
     exit 1
 }
 
+# Certificates, once, and never in the way.
+#
+# The installer does this properly and waits for it. This is for somebody who
+# unpacked the ZIP and went straight to the launcher, so it runs in the
+# background and the app does not wait five seconds to find out it had nothing
+# to fix. The marker beside it means this happens on a first run and not again.
+$warm = Join-Path $here 'warm-certificates.ps1'
+if ((Test-Path $warm) -and -not (Test-Path (Join-Path $here '.certificates-warmed'))) {
+    try {
+        Start-Process -FilePath 'powershell' -WindowStyle Hidden -ArgumentList @(
+            '-NoLogo', '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', "`"$warm`"")
+    } catch { }
+}
+
 Write-Host '  Starting. This window closes by itself.'
 Write-Host ''
 

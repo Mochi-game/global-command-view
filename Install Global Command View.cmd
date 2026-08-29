@@ -124,6 +124,19 @@ echo.
 echo   Python is in. Starting.
 echo.
 
+rem ------------------------------------------------- certificates
+rem Windows fetches a root certificate the first time something asks for it,
+rem through CryptoAPI. PowerShell asks; Python does not. On a fresh machine
+rem that leaves Python unable to verify hosts the rest of the computer reaches
+rem fine - reported as radio, airports and weather all empty while shortwave
+rem and aircraft worked. This asks on Python's behalf, once, and takes about
+rem five seconds.
+if exist "%~dp0warm-certificates.ps1" (
+  echo   Checking certificates. About five seconds.
+  powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0warm-certificates.ps1"
+  echo.
+)
+
 rem ------------------------------------------------------------------ go
 :ready
 echo   The browser opens by itself in a moment.

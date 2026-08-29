@@ -6,6 +6,48 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.4.0 - certificates fixed at install, not explained afterwards
+
+1.3.1 made the certificate failure explain itself, which was the wrong ambition.
+An app that tells you to paste a command is not solved for the person who
+downloaded it, and that was said plainly: it has to work when you install it.
+
+It does now. `warm-certificates.ps1` runs during installation and asks Windows
+for the certificate authorities this app needs, before Python ever looks for
+them.
+
+Why that works. Windows does not ship every root; it fetches one the first time
+something asks, through CryptoAPI. A browser asks. PowerShell asks, because .NET
+validates through CryptoAPI too. Python does not - it copies what is already in
+the store and validates with OpenSSL - so on a fresh machine Python fails at
+hosts the rest of the computer reaches without trouble. The installer is already
+PowerShell, so it asks on Python's behalf.
+
+A TLS handshake per host, not an HTTP request: validating the chain is the whole
+mechanism, and the response underneath would only cost time. Nothing is
+downloaded into the app and nothing is trusted that Windows would not have
+trusted anyway. No administrator rights - this is the same fetch that opening
+the site in Edge would trigger.
+
+Twenty hosts, chosen to cover the authorities behind the layers that need no
+key, because certificates are issued per authority and shared across hosts.
+
+Sequentially that took 27 seconds, which is too much to add to an install and
+far too much to add to a launch. Run through a runspace pool it takes 5.5, and
+the launcher fires it in the background anyway - for somebody who unpacked the
+ZIP and never ran the installer - so it is never in the way. A marker file means
+it happens once.
+
+It reports honestly. The first version called every host that did not answer a
+certificate failure, and on a healthy machine announced that two layers would be
+empty when the hosts were merely slow. A rejected chain and an unreachable host
+are different things and are now said differently.
+
+What it cannot do is help a machine blocked from Windows Update's certificate
+list, or one where antivirus and company proxies re-sign HTTPS with something
+Windows does not trust. Those need a person, and the app says so when it hits
+them - the explanation from 1.3.1 stays, as the fallback it should have been.
+
 ## 1.3.1 - a certificate failure that explains itself
 
 Reported from a fresh Windows install: FM radio, airports, runways, weather and

@@ -483,6 +483,43 @@ def check_start_hidden(report):
         report.fail("start", "the launcher no longer waits for the server to answer")
 
 
+
+def check_cert_warmup(report):
+    """The certificate warm-up, still reachable from both places that call it.
+
+    This is the fix for a fresh Windows machine where Python cannot verify hosts
+    the rest of the computer reaches fine, and it works by being run - so the two
+    call sites matter as much as the script. The installer waits for it; the
+    launcher fires it in the background for somebody who never ran the installer.
+    Lose either line and the app still works perfectly on every machine that did
+    not need it, which is exactly why nobody would notice.
+    """
+    warm = os.path.join(ROOT, "warm-certificates.ps1")
+    if not os.path.exists(warm):
+        report.fail("certificates", "warm-certificates.ps1 is missing")
+        return
+    with open(warm, encoding="utf-8", errors="replace") as fh:
+        body = fh.read()
+    if "AuthenticateAsClient" not in body:
+        report.fail("certificates", "the handshake is gone, so no root is ever fetched")
+    if "RunspaceFactory" not in body:
+        report.fail("certificates",
+                    "the parallel pool is gone - sequentially this took 27s, not 5s")
+
+    for name, want in (
+        ("Install Global Command View.cmd",
+         'powershell -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0warm-certificates.ps1"'),
+        ("start.ps1", "warm-certificates.ps1"),
+    ):
+        path = os.path.join(ROOT, name)
+        if not os.path.exists(path):
+            report.fail("certificates", "%s is missing" % name)
+            continue
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            if want not in fh.read():
+                report.fail("certificates", "%s no longer runs the warm-up" % name)
+
+
 def check_placeholders(app_js, report):
     """A template hole naming something JavaScript has never heard of.
 
@@ -797,6 +834,7 @@ def main():
     check_badges(app_js, report)
     check_trust_script(report)
     check_start_hidden(report)
+    check_cert_warmup(report)
     if not args.quick:
         check_setup_links(app_js, report)
     check_commas(app_js, report)
