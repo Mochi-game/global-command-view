@@ -6,6 +6,61 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.3.0 — ships from an open network, and no account for them
+
+Two AIS feeds were here and both had a hole. Digitraffic is Finnish and covers
+the Baltic properly and nothing else. aisstream covers the world, needs a key,
+and its own aggregator describes it as "frequently down" — which matches the
+long silent stretches this app has logged.
+
+**Vessels (open network)** draws from openwaters.io, which re-serves several AIS
+networks deduplicated against each other and asks for nothing at all. Measured
+rather than estimated: over the Stockholm archipelago, 612 vessels against the
+66 Digitraffic alone gives. Along the Norwegian coast, 760 from Kystverket,
+which nothing else here reached.
+
+The part that matters most is what it does for somebody with no keys. Worldwide
+shipping sat behind the aisstream key, so a first run showed the Baltic and
+stopped. It does not any more.
+
+A layer of its own rather than more ships poured into Vessels, because the two
+answer different questions. Vessels is two feeds this app calls directly and can
+account for exactly. This is an aggregate whose licence is per source and is not
+pooled, and keeping them apart is the only way each layer can say what it is.
+
+### The licence filter, which is the real work
+
+Kystverket is NLOD 2.0, Fintraffic is CC BY 4.0, AISHub grants use only, and
+volunteer receivers have not settled theirs. Commercial-safe mode keeps the
+first two and withdraws the rest: over the Baltic that is 805 vessels down to
+170.
+
+It is an **allowlist**, and that is deliberate. Volunteer receivers arrive under
+their own station hash — `source: v1:ed25519:GzNIQN-_HKsHnxYNmWn…` — so a list
+of names to exclude would silently admit every new one that appeared. Anything
+unrecognised counts as not clear.
+
+This is the one filter in the app where a mistake is not a broken feature but a
+quiet wrong answer, in the mode whose whole job is keeping somebody with a
+monetised channel out of trouble. So it was built and tested before the layer
+drew a single point, and the self-check now guards it against the live feed:
+every vessel marked open must come from a named clean source, and every one from
+those sources must be marked open. Verified to fail when AISHub is added to the
+list and when the list is emptied.
+
+### Found by running it
+
+The bounding box is latitude first. Written longitude-first the first time,
+which returned an empty collection over the Stockholm archipelago rather than an
+error — a wrong answer that looks exactly like an empty sea.
+
+`nav_status` and `type` arrive as the numbers the AIS message carries, not as
+words. Written as strings, which failed on the first real response with *int
+object has no attribute strip*. The type codes go through the ship-kind table
+this app already had; the status codes get a table of their own, because
+"engaged in fishing" and "at anchor" are the difference between a working boat
+and a parked one.
+
 ## 1.2.7 - the self-check stops blaming the wrong party
 
 A first install on a second computer reported three GET THE KEY links as not

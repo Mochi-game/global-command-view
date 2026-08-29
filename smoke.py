@@ -40,6 +40,7 @@ WEB = os.path.join(ROOT, "web")
 ENDPOINT_ARGS = {
     "fires": "bbox=10,55,25,62",
     "vessels": "bbox=17,58,21,61",
+    "openwaters": "south=58&west=16&north=61&east=21",
     "cameras-nearby": "lat=59.33&lon=18.06",
     "streetview": "lat=59.33&lon=18.06",
     "imagery-date": "lat=59.33&lon=18.06",
@@ -651,6 +652,70 @@ def call(port, path, timeout=90):
         return 0, str(exc).encode(), time.time() - started
 
 
+
+def check_openwaters_licence(port, report):
+    """The one filter in this app where a silent mistake has consequences.
+
+    openwaters.io re-serves several AIS networks and their licences are not
+    pooled: Kystverket is NLOD, Fintraffic is CC BY, AISHub grants use only, and
+    volunteer receivers are still settling theirs. Commercial-safe mode exists to
+    keep somebody with a monetised channel out of trouble, so a vessel wrongly
+    marked open is not a broken feature - it is a quiet wrong answer in the one
+    place that must not give one.
+
+    Two things are checked. That the rule is an allowlist, because volunteers
+    arrive under their own station hash - source "v1:ed25519:GzNIQN..." - and a
+    list of names to exclude would admit every new one that appeared. And that
+    the flag actually follows it, against the live feed rather than a fixture:
+    every vessel marked open must come from a named clean source, and every one
+    from those sources must be marked open.
+
+    Networked, so --quick skips it with the other live checks.
+    """
+    src = read(os.path.join(ROOT, "server.py"))
+    if "OPENWATERS_OPEN = {" not in src:
+        report.fail("openwaters", "the licence allowlist is gone")
+        return
+    block = src[src.index("OPENWATERS_OPEN = {"):]
+    block = block[:block.index("}")]
+    named = set(re.findall(r'"([a-z]+)":', block))
+    if not named:
+        report.fail("openwaters", "the allowlist names no sources, so nothing is clean")
+        return
+    if "aishub" in named or "aisstream" in named:
+        report.fail("openwaters",
+                    "a use-only source is on the clean list: %s" % sorted(named))
+
+    status, body, _ = call(port, "/api/openwaters"
+                           "?south=58&west=4&north=64&east=12")
+    if status != 200:
+        report.note("openwaters: no live answer to check the flag against (HTTP %s)" % status)
+        return
+    try:
+        data = json.loads(body)
+    except Exception as exc:  # noqa: BLE001
+        report.fail("openwaters", "answered but not JSON: %s" % exc)
+        return
+    ships = data.get("vessels") or []
+    if not ships:
+        report.note("openwaters: answered with no vessels, flag not exercised")
+        return
+
+    wrong_open = sorted({v.get("source") for v in ships
+                         if v.get("open") and v.get("source") not in named})
+    wrong_shut = sorted({v.get("source") for v in ships
+                         if not v.get("open") and v.get("source") in named})
+    if wrong_open:
+        report.fail("openwaters",
+                    "marked open but not on the allowlist: %s" % wrong_open)
+    if wrong_shut:
+        report.fail("openwaters",
+                    "on the allowlist but marked not open: %s" % wrong_shut)
+    if not wrong_open and not wrong_shut:
+        report.note("openwaters: %d vessels, %d open, allowlist holds"
+                    % (len(ships), data.get("open_count", 0)))
+
+
 def check_server(port, quick, report):
     server_py = read(os.path.join(ROOT, "server.py"))
     endpoints = find_endpoints(server_py)
@@ -764,6 +829,8 @@ def main():
         print("\nendpoints")
         try:
             check_server(port, args.quick, report)
+            if not args.quick:
+                check_openwaters_licence(port, report)
         finally:
             if started:
                 started.terminate()

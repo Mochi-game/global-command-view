@@ -391,6 +391,7 @@ const collections = {
   landings: scene.primitives.add(new Cesium.PointPrimitiveCollection()),
   satellites: scene.primitives.add(new Cesium.PointPrimitiveCollection()),
 };
+const openShips = scene.primitives.add(new Cesium.PointPrimitiveCollection());
 const orbitTrack = scene.primitives.add(new Cesium.PolylineCollection());
 const quakes = scene.primitives.add(new Cesium.PointPrimitiveCollection());
 const fires = scene.primitives.add(new Cesium.PointPrimitiveCollection());
@@ -437,7 +438,7 @@ const SCALE = {
 const LAYER_GROUPS = [
   { name: 'Radio', ids: ['broadcast', 'radio', 'scanners', 'airports', 'aprs'] },
   { name: 'Aviation', ids: ['runways', 'aeroway', 'metar', 'navaids'] },
-  { name: 'Moving', ids: ['flights', 'services', 'vessels', 'trains', 'capital', 'fishing'] },
+  { name: 'Moving', ids: ['flights', 'services', 'vessels', 'openships', 'trains', 'capital', 'fishing'] },
   { name: 'Earth', ids: ['fires', 'quakes', 'volcanoes', 'weather'] },
   { name: 'People', ids: ['outbreaks', 'news', 'air', 'own'] },
   { name: 'Infrastructure',
@@ -452,6 +453,7 @@ const LAYERS = [
   { id: 'flights', name: 'Air traffic', color: '#ffb347', on: false, count: 0, note: 'OpenSky worldwide, topped up by community feeders — transponders, so an aircraft that is not broadcasting is not here' },
   { id: 'services', name: 'Police & state air', color: '#4fa3ff', on: false, count: 0, note: 'picked out of the same ADS-B feed by registry — police, medical, coastguard and military airframes' },
   { id: 'vessels', name: 'Vessels (AIS)', color: '#4fd6ff', on: false, count: 0, note: 'Digitraffic covers the Baltic; an aisstream key opens the rest — ships report their own position' },
+  { id: 'openships', name: 'Vessels (open network)', color: '#5ee0c0', on: false, count: 0, note: 'openwaters.io — Kystverket, AISHub, volunteer receivers and more, deduplicated, no account needed; licence is per source and commercial-safe keeps only the clean ones' },
   { id: 'cables', name: 'Submarine cables', color: '#b58cff', on: false, count: 0, note: 'TeleGeography — fine to watch; ask them before monetising' },
   { id: 'cameras', name: 'Public cameras', color: '#7dffab', on: false, count: 0, note: 'Digitraffic, TfL, Trafikverket and Windy merged — a still from the camera, not a live stream' },
   { id: 'names', name: 'Names & borders', color: '#cbd5e1', on: false, count: 0, note: 'Natural Earth lines, Esri dark-canvas labels \u2014 works over satellite too' },
@@ -710,6 +712,7 @@ function applyVisibility() {
   collections.flights.show = on('flights');
   collections.services.show = on('services');
   collections.vessels.show = on('vessels');
+  openShips.show = on('openships');
   courseVectors.show = on('vessels');
   wakes.show = on('vessels');
   collections.cameras.show = on('cameras');
@@ -2171,6 +2174,34 @@ function describePicked(type, ref) {
     ]);
   } else if (type === 'metar') {
     showMetar(ref);
+  } else if (type === 'openship') {
+    const age = ref.seen
+      ? Math.round((Date.now() - new Date(ref.seen).getTime()) / 60000) : null;
+    showDetail(ref.name || `MMSI ${ref.mmsi}`,
+      `${ref.kind || 'vessel'} · open AIS network`, [
+        ['MMSI', String(ref.mmsi || '')],
+        ['Doing', ref.status || 'not stated in the message'],
+        ['Speed', ref.sog === null || ref.sog === undefined
+          ? 'not reported' : `${ref.sog} kn`],
+        ['Course', ref.cog === null || ref.cog === undefined
+          ? 'not reported' : `${Math.round(ref.cog)}°`],
+        ['Heading', ref.heading === null || ref.heading === undefined
+          ? 'not reported' : `${ref.heading}°`],
+        ['Position', `${ref.lat.toFixed(4)}, ${ref.lon.toFixed(4)}`],
+        ['Heard', age === null ? 'unknown'
+          : age < 1 ? 'less than a minute ago' : `${age} min ago`],
+        // The source is on every vessel because the licence is per source, and
+        // this is where that has to be visible rather than buried in a tab.
+        ['Heard by', ref.source && ref.source.startsWith('v1:')
+          ? 'a volunteer receiver' : (ref.source || 'not stated')],
+        ['Licence', ref.open
+          ? 'this one is open data — it stays in commercial-safe mode'
+          : 'not clear for commercial use — withheld in commercial-safe mode'],
+        ['Note', 'the ship reported this about itself. AIS is a collision '
+          + 'avoidance system, not a register: a name and a type are whatever '
+          + 'was typed into the set, and a vessel that is not transmitting is '
+          + 'not here.'],
+      ]);
   } else if (type === 'runway') {
     showRunway(ref);
   } else if (type === 'swroad') {
@@ -8420,6 +8451,9 @@ const SOURCE_LICENCES = [
   ['adsb.fi', 'air traffic fallback', 'community feed, attribution', 'free'],
   ['adsbdb', 'aircraft registry, operators', 'free API', 'free'],
   ['planespotters', 'aircraft photographs', 'no paywalled features, credit + link required', 'non-commercial'],
+  ['openwaters.io', 'open AIS network, no account',
+    'per source, not pooled — Kystverket NLOD 2.0, Fintraffic CC BY 4.0, AISHub use-only, volunteers still settling theirs', 'free',
+    'https://openwaters.io/ais/'],
   ['Digitraffic', 'Baltic AIS, Finnish cameras', 'CC BY 4.0', 'free'],
   ['Trafikverket', 'Swedish road cameras, road disruption and train positions', 'open API, attribution', 'free'],
   ['SMHI', 'Swedish weather, water and fire warnings', 'CC BY 4.0, attribution required, no account', 'free'],
@@ -9392,6 +9426,101 @@ async function loadNavaids(force) {
   log(`navaids: ${(data.navaids || []).length} beacons in view · OurAirports`);
   applyVisibility();
 }
+
+/* -------------------------------------------------------------- open waters */
+
+/*
+ * Ships from an open AIS network that asks for nothing.
+ *
+ * A layer of its own rather than more ships poured into Vessels, because the
+ * two answer different questions. Vessels is Digitraffic and aisstream, which
+ * this app calls directly and can say exactly where each contact came from.
+ * This is several networks re-served together, and its licence is per source
+ * and not pooled - so the honest thing is to keep them apart and let each
+ * layer say what it is.
+ *
+ * Measured over the Stockholm archipelago: 612 here against the 66 Digitraffic
+ * alone would give. Over the Norwegian coast, 760 from Kystverket, which
+ * nothing in this app reached before.
+ */
+
+let openWatersAt = '';
+
+const OPEN_WATERS_COLOUR = '#5ee0c0';
+const OPEN_WATERS_DIM = '#4a7a70';
+
+async function loadOpenWaters(force) {
+  if (!layerOn('openships')) return;
+  const box = viewBoxFor(2.0);
+  if (!box) return;
+  const key = [box.south, box.west, box.north, box.east].map((n) => n.toFixed(1)).join(',');
+  if (key === openWatersAt && !force) return;
+  openWatersAt = key;
+
+  let data;
+  try {
+    data = await getJSON('/api/openwaters?'
+      + `south=${box.south.toFixed(3)}&west=${box.west.toFixed(3)}`
+      + `&north=${box.north.toFixed(3)}&east=${box.east.toFixed(3)}`);
+  } catch (err) {
+    log(`open waters unavailable (${err.message})`, 'warn');
+    return;
+  }
+  if (openWatersAt !== key) return;
+
+  openShips.removeAll();
+
+  if (data.too_wide) {
+    setCount('openships', 0);
+    log(`open waters: ${data.note}`, 'warn');
+    return;
+  }
+  if (data.error) {
+    setCount('openships', 0);
+    log(`open waters: ${data.error}`, 'warn');
+    return;
+  }
+
+  const lit = Cesium.Color.fromCssColorString(OPEN_WATERS_COLOUR);
+  const dim = Cesium.Color.fromCssColorString(OPEN_WATERS_DIM);
+
+  let drawn = 0;
+  let withheld = 0;
+  for (const v of data.vessels || []) {
+    // The licence decides this, not the look of it. A source that grants use
+    // only is fine to watch and not fine to build on, so commercial-safe mode
+    // leaves it out entirely rather than dimming it and hoping.
+    if (safeMode && !v.open) { withheld++; continue; }
+    openShips.add({
+      position: Cesium.Cartesian3.fromDegrees(v.lon, v.lat, 0),
+      // Moving ships read brighter than parked ones, which is most of what you
+      // want to see at a glance in a harbour full of moored hulls.
+      pixelSize: (v.sog || 0) > 0.5 ? 7 : 5,
+      color: ((v.sog || 0) > 0.5 ? lit : dim).withAlpha(0.9),
+      outlineColor: Cesium.Color.fromCssColorString('#0b0e14').withAlpha(0.7),
+      outlineWidth: 1,
+      disableDepthTestDistance: MARK_THROUGH_M,
+      id: { type: 'openship', ref: v },
+    });
+    drawn++;
+  }
+
+  openShips.show = layerOn('openships');
+  setCount('openships', drawn);
+
+  const parts = Object.entries(data.by_source || {})
+    .sort((a, b) => b[1] - a[1])
+    .map(([s, n]) => `${s.startsWith('v1:') ? 'volunteer' : s} ${n}`);
+  log(`open waters: ${drawn} vessels · ${parts.join(', ')}`
+    + (withheld ? ` · ${withheld} withheld in commercial-safe mode` : '')
+    + (data.not_drawn ? ` · ${data.not_drawn} beyond the cap` : ''));
+}
+
+LAYER_ON_DEMAND.openships = () => loadOpenWaters(true);
+viewer.camera.moveEnd.addEventListener(() => loadOpenWaters(false));
+// AIS positions age quickly; this is the same cadence the other moving layers
+// use and well inside what the network asks of an anonymous caller.
+setInterval(whileOn('openships', () => loadOpenWaters(true)), 30_000);
 
 /* ------------------------------------------------------------------ aeroway */
 

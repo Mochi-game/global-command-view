@@ -38,7 +38,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.2.7"
+VERSION = "1.3.0"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -6021,6 +6021,174 @@ def overpass(query):
     raise last
 
 
+# --------------------------------------------------------------- open waters
+
+# Ships from an open AIS network that asks for no account at all.
+#
+# This app already had two AIS feeds and both had a hole in them. Digitraffic is
+# Finnish and covers the Baltic properly and nothing else. aisstream covers the
+# world and needs a key, and its own aggregator describes it as "frequently
+# down", which matches the long silent stretches this app has logged.
+#
+# openwaters.io re-serves several networks deduplicated against each other, over
+# plain HTTP, anonymously. Measured over the Stockholm archipelago: 467 vessels,
+# of which 374 came from AISHub - a source neither of the existing feeds carries.
+# Over the Norwegian coast, 741 more from Kystverket, which nothing here reached
+# before.
+#
+# The important part is what it does for somebody with no keys. Worldwide
+# shipping used to be behind the aisstream key; without one you saw the Baltic.
+# This asks for nothing.
+
+OPENWATERS_URL = "https://ais.openwaters.io/v1/vessels?bbox=%.4f,%.4f,%.4f,%.4f"
+OPENWATERS_TTL = 25
+# Their box is latitude first. Written lon-first the first time, which returned
+# an empty collection over the Stockholm archipelago rather than an error - the
+# kind of wrong answer that looks like an empty sea.
+OPENWATERS_MAX_SPAN = (14.0, 28.0)
+OPENWATERS_MAX_SHIPS = 3000
+
+# Which sources behind that network carry a licence this app can point at.
+#
+# An allowlist, and that is the whole design. Volunteer receivers arrive under
+# their own station hash - source "v1:ed25519:GzNIQN-_HKsHnxYNmWn..." - so a list
+# of names to exclude would silently admit every new one that appears. Anything
+# not named here is treated as not clear for commercial use, which is the safe
+# way round for a mode whose only job is keeping somebody out of trouble.
+#
+# AISHub is the awkward one, and it is also most of the data. Their terms grant
+# "use" and nothing further, so the events are fine to look at and not fine to
+# build on. They stay in the layer and leave it in commercial-safe mode.
+OPENWATERS_OPEN = {
+    "kystverket": "Contains data under the Norwegian licence for Open Government "
+                  "data (NLOD) distributed by the Norwegian Coastal Administration.",
+    "digitraffic": "Source: Fintraffic / digitraffic.fi, license CC 4.0 BY.",
+}
+
+# What a ship says it is doing, by the number it sends. Worth translating
+# rather than dropping: "engaged in fishing" and "at anchor" are the difference
+# between a working boat and a parked one.
+NAV_STATUS = {
+    0: "under way using engine",
+    1: "at anchor",
+    2: "not under command",
+    3: "restricted manoeuvrability",
+    4: "constrained by draught",
+    5: "moored",
+    6: "aground",
+    7: "engaged in fishing",
+    8: "under way sailing",
+    14: "AIS-SART, MOB or EPIRB",
+    15: "undefined",
+}
+
+OPENWATERS_TERMS = {
+    "aishub": "AISHub membership terms grant use only - fine to display, not to "
+              "build a product on. Withdrawn in commercial-safe mode.",
+    "aisstream": "no published terms. Best effort, and it may disappear.",
+}
+
+
+def openwaters(south, west, north, east):
+    """Vessels in a box from the openwaters.io network, tagged by source."""
+    if not all(math.isfinite(v) for v in (south, west, north, east)):
+        return json.dumps({"vessels": [], "error": "the view did not resolve to a box"}).encode(), "refused"
+    if south > north:
+        south, north = north, south
+    if west > east:
+        west, east = east, west
+    if north - south > OPENWATERS_MAX_SPAN[0] or east - west > OPENWATERS_MAX_SPAN[1]:
+        return json.dumps({
+            "vessels": [], "too_wide": True,
+            "note": "zoom in - asking this for the whole planet returns every "
+                    "vessel it knows, which was 17 MB when measured",
+        }).encode(), "refused"
+
+    cache = "openwaters_%.2f_%.2f_%.2f_%.2f" % (south, west, north, east)
+    hit = _mem_get(cache)
+    if hit and time.time() - hit[0] < OPENWATERS_TTL:
+        return hit[1], "memory"
+
+    # Latitude first: their bbox is south,west,north,east.
+    url = OPENWATERS_URL % (south, west, north, east)
+    req = urllib.request.Request(url, headers={
+        "User-Agent": USER_AGENT, "Accept": "application/json",
+        "Accept-Encoding": "gzip",
+    })
+    try:
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+            raw = resp.read()
+            if resp.headers.get("Content-Encoding") == "gzip":
+                raw = gzip.GzipFile(fileobj=io.BytesIO(raw)).read()
+        body = json.loads(raw)
+    except Exception as exc:  # noqa: BLE001
+        log("openwaters: %s" % exc)
+        return json.dumps({"vessels": [], "error": str(exc)[:120]}).encode(), "error"
+
+    out = []
+    by_source = {}
+    for feature in body.get("features") or []:
+        where = (feature.get("geometry") or {}).get("coordinates") or []
+        if len(where) < 2:
+            continue
+        p = feature.get("properties") or {}
+        src = (p.get("source") or "").strip()
+        by_source[src] = by_source.get(src, 0) + 1
+        out.append({
+            "mmsi": p.get("mmsi"),
+            "name": (p.get("name") or "").strip()[:40],
+            "lon": where[0], "lat": where[1],
+            "sog": p.get("sog"),
+            "cog": p.get("cog"),
+            "heading": p.get("heading"),
+            # Both of these arrive as the numbers the AIS message carries, not
+            # as words. Written as strings the first time, which failed on the
+            # first real answer with "int object has no attribute strip" - the
+            # kind of thing only a live response tells you.
+            "type": p.get("type"),
+            "kind": ship_kind(p.get("type")),
+            "status": NAV_STATUS.get(p.get("nav_status"), ""),
+            "seen": p.get("seen") or "",
+            "source": src,
+            # Whether this one vessel may be shown when the app is in
+            # commercial-safe mode. Decided here, where the licences are known,
+            # and acted on in the client, where the switch lives.
+            "open": src in OPENWATERS_OPEN,
+        })
+
+    cut = 0
+    if len(out) > OPENWATERS_MAX_SHIPS:
+        # Thirty thousand contacts at once is what made this app stutter before.
+        # Nearest to the middle of the box survives, so the cut is the edges
+        # rather than whatever the feed happened to list last.
+        mid_lat = (south + north) / 2.0
+        mid_lon = (west + east) / 2.0
+        out.sort(key=lambda v: (v["lat"] - mid_lat) ** 2 + (v["lon"] - mid_lon) ** 2)
+        cut = len(out) - OPENWATERS_MAX_SHIPS
+        out = out[:OPENWATERS_MAX_SHIPS]
+
+    credits = sorted({OPENWATERS_OPEN[s] for s in by_source if s in OPENWATERS_OPEN})
+    data = json.dumps({
+        "vessels": out,
+        "by_source": by_source,
+        "not_drawn": cut,
+        "open_count": sum(1 for v in out if v["open"]),
+        "credits": credits,
+        "terms": {s: OPENWATERS_TERMS[s] for s in by_source if s in OPENWATERS_TERMS},
+        "source": "openwaters.io, an open AIS network",
+        "note": "several networks re-served together and deduplicated, with the "
+                "source named on every vessel. The licence is per source and is "
+                "not pooled: Kystverket is NLOD, Fintraffic is CC BY, AISHub "
+                "grants use only, and volunteer receivers are still settling "
+                "theirs. Commercial-safe mode keeps only the first two.",
+    }).encode()
+    _mem_put(cache, data)
+    log("openwaters: %d vessels%s · %s"
+        % (len(out), (", %d not drawn" % cut) if cut else "",
+           ", ".join("%s %d" % (k or "?", v) for k, v in sorted(by_source.items()))))
+    return data, "network"
+
+
 # ------------------------------------------------------------------ aeroway
 
 # The ground chart: taxiways, taxilanes and aprons, with the letters painted on
@@ -6725,6 +6893,12 @@ class Handler(SimpleHTTPRequestHandler):
                     float(query.get("east", ["0"])[0]))
             elif name == "taf":
                 data, source = taf(query.get("icao", [""])[0])
+            elif name == "openwaters":
+                data, source = openwaters(
+                    float(query.get("south", ["0"])[0]),
+                    float(query.get("west", ["0"])[0]),
+                    float(query.get("north", ["0"])[0]),
+                    float(query.get("east", ["0"])[0]))
             elif name == "aeroway":
                 data, source = aeroway(
                     float(query.get("south", ["0"])[0]),
