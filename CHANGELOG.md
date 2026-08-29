@@ -6,6 +6,80 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.2.4 — a refresh that keeps the airport
+
+Reported as taxiways appearing at Arlanda and then vanishing on refresh. That
+turned out to be four separate faults stacked on top of each other, and finding
+the first one only made the next one visible.
+
+**The cache had never worked.** It keyed on the exact bounding box, and the box
+comes from wherever the camera is pointing, so nudging the view a hundred metres
+produced a different key. Eight files were sitting in the cache for one airport,
+four of them byte-identical at 101 270 bytes. Every camera move was a fresh
+Overpass request, and Overpass takes most of a minute when it answers at all —
+so the layer emptied whenever it did not. Snapping the edges to a grid was the
+obvious fix and the wrong one: the box straddles several grid lines, and
+crossing any of them still changes the key. It now snaps the *middle* and asks
+whether any cached box already covers the ground being asked about. Six views
+spread over two kilometres of Arlanda: one fetch, one file, and zooming in
+re-uses what zooming out paid for.
+
+**The place was not remembered, only the layers.** The layers came back on after
+a reload and the camera did not come back to the airport, and a layer that draws
+one airfield has nothing to draw from orbit. It reads exactly like a broken
+layer. The view is saved now, so a reload returns to it.
+
+**The view rectangle lied.** Cesium's `computeViewRectangle` reported the entire
+planet for a camera four thousand metres over Arlanda, so the airport layer drew
+nine hundred airfields on top of the one underneath the camera and the runway
+layer refused its own box for being too wide. Geometry settles it: from four
+kilometres up the horizon is two degrees away, and a rectangle claiming far more
+than that is not a view but a failure to compute one. Airports, runways, METAR
+and beacons now fall back to a fixed box around what the camera is pointing at —
+the same measure the taxiway layer already used, which is why that one layer had
+been working. Seven other layers share the same call and the same exposure; they
+are not changed here.
+
+**Late answers overwrote current ones.** Two requests can be in the air at once
+and come back in either order. The small answer usually won and the large stale
+one landed afterwards and redrew over it. Five loaders now discard an answer
+nobody is waiting for any more.
+
+### Clicking a runway now answers what the dot answered
+
+The airport marker is fifteen pixels and had been reported missing twice, most
+recently because the taxiway layer arrived painted in the marker's own amber.
+A runway is the largest object on the airfield. Clicking one now gives the
+field's tower, ground, approach, ATIS and clearance frequencies, its beacons
+with their DME channels, and the link to that country's AIP — the same card the
+dot gives. The dot is solid white inside a dark ring now, which survives both
+pale concrete and yellow paint.
+
+This is as close to a chart as public data gets: the ground layout, the
+frequencies, the beacons and the runway geometry together. What separates it
+from a real one is on the card rather than glossed over. There are no
+procedures in it — no SID, no STAR, no approach, no minima — because those
+belong to Jeppesen and to each country's AIP.
+
+Taxiway designators are bold, and clamped to the ground rather than floating at
+ellipsoid height. They had been drawn at height zero while the yellow lines are
+draped on the terrain, so every letter hung below the surface it was labelling
+and slid across it as the camera panned.
+
+### Air quality and fishing, first run with real keys
+
+Both were written against documentation and neither had been run. The keys
+arrived and OpenAQ turned out to be badly wrong: `/v3/parameters/2/latest`
+accepts `coordinates` and `radius` and ignores both, so twenty kilometres around
+Stockholm answered with South Korea, Lithuania, China and California. It goes
+through `/v3/locations` now, which does filter. Two more faults only a real
+answer could show — stations stop reporting without saying so, and a broken
+sensor reports −1 — so readings older than a day and negative concentrations are
+dropped rather than drawn.
+
+Global Fishing Watch worked first time, but every event came back with no
+duration: `durationHours` does not exist. It is computed from the two ends now.
+
 ## 1.2.3 — the warning Windows shows before anything else
 
 Asked what somebody does after unpacking the ZIP. The instructions were there

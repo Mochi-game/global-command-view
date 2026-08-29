@@ -566,6 +566,56 @@ function hintFor(id) {
  * conflict: opening empty is about not deciding for somebody who has not chosen
  * yet, and this is about not overruling somebody who has.
  */
+/*
+ * Where you were looking, kept between visits.
+ *
+ * The layers above were already remembered, and that turned out to be half an
+ * answer. Reported as taxiways vanishing on refresh: the layer came back on,
+ * the camera did not come back to the airport, and a layer that draws one
+ * airfield has nothing to draw from orbit. It reads exactly like a broken
+ * layer, and the fix for the other half - a cache that finally holds - is
+ * invisible if a reload throws away the place it was holding.
+ *
+ * Remembering both is what makes a reload cheap. Come back to the same view
+ * with the same layers on, and the taxiways are already on disk.
+ */
+const VIEW_KEY = 'gcv-camera';
+
+function rememberCamera() {
+  try {
+    const p = viewer.camera.positionCartographic;
+    localStorage.setItem(VIEW_KEY, JSON.stringify({
+      lon: Cesium.Math.toDegrees(p.longitude),
+      lat: Cesium.Math.toDegrees(p.latitude),
+      height: p.height,
+      heading: viewer.camera.heading,
+      pitch: viewer.camera.pitch,
+      roll: viewer.camera.roll,
+    }));
+  } catch (_) { /* private window, or storage full: not worth failing over */ }
+}
+
+function restoreCamera() {
+  let saved;
+  try {
+    saved = JSON.parse(localStorage.getItem(VIEW_KEY) || 'null');
+  } catch (_) { saved = null; }
+  if (!saved || ![saved.lon, saved.lat, saved.height].every(Number.isFinite)) return;
+  // Below the ground, or so far out the globe is a dot, means something went
+  // wrong last time rather than somewhere worth returning to.
+  if (saved.height < 50 || saved.height > 5e7) return;
+  try {
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(saved.lon, saved.lat, saved.height),
+      orientation: {
+        heading: saved.heading || 0,
+        pitch: Number.isFinite(saved.pitch) ? saved.pitch : Cesium.Math.toRadians(-90),
+        roll: saved.roll || 0,
+      },
+    });
+  } catch (_) { /* a bad stored view is not worth refusing to start over */ }
+}
+
 const LAYERS_KEY = 'gcv-layers-on';
 
 function rememberLayers() {
@@ -2118,30 +2168,7 @@ function describePicked(type, ref) {
   } else if (type === 'metar') {
     showMetar(ref);
   } else if (type === 'runway') {
-    const r = ref;
-    const landing = ref.end === 'he' ? r.he : r.le;
-    const heading = ref.end === 'he' ? r.he_heading : r.le_heading;
-    showDetail(`${r.airport} runway ${r.le}/${r.he}`,
-      ref.end ? `approach line to ${landing} \u00b7 OurAirports`
-                 : 'runway \u00b7 OurAirports', [
-        ['Length', r.length_ft
-          ? `${r.length_ft.toLocaleString('en-US')} ft (${Math.round(r.length_ft * 0.3048).toLocaleString('en-US')} m)`
-          : 'not published'],
-        ['Width', r.width_ft ? `${r.width_ft} ft` : 'not published'],
-        ['Surface', r.surface || 'not published'],
-        ['Lit', r.lit ? 'yes' : 'not according to the record'],
-        ['Headings', `${r.le} at ${r.le_heading}\u00b0 true, `
-          + `${r.he} at ${r.he_heading}\u00b0 true`],
-        ref.end ? ['Landing on', `${landing}, heading ${heading}\u00b0 true`] : null,
-        r.closed ? ['Closed', 'this runway is marked closed in the record'] : null,
-        ['The green line', 'ten nautical miles along the runway bearing, '
-          + 'computed here. It is where a straight-in approach would be, and it '
-          + 'is not a procedure: real approaches have step-downs, offsets and '
-          + 'turns that only a published chart carries, and those charts are '
-          + 'licensed. Do not fly this.'],
-        ['Note', 'geometry from OurAirports, which is community-maintained and '
-          + 'public domain. It can lag a resurfacing or a renumbering.'],
-      ].filter(Boolean));
+    showRunway(ref);
   } else if (type === 'swroad') {
     const kind = ROAD_KIND_SHORT[ref.kind] || ref.kind || 'disruption';
     showDetail(ref.road || ref.where.slice(0, 40) || 'Road disruption',
@@ -3062,16 +3089,24 @@ let airportsAsked = '';
 
 async function loadAirports() {
   if (!LAYERS.find((l) => l.id === 'airports').on) return;
-  const rect = scene.camera.computeViewRectangle(scene.globe.ellipsoid);
-  const bbox = rect
-    ? [rect.west, rect.south, rect.east, rect.north].map((r) => Cesium.Math.toDegrees(r))
-    : [-180, -90, 180, 90];
+  const box = viewBoxFor(0.6);
+  if (!box) return;
+  const bbox = [box.west, box.south, box.east, box.north];
   const key = bbox.map((v) => v.toFixed(1)).join(',');
   if (key === airportsAsked) return;
   airportsAsked = key;
 
   try {
     const data = await getJSON(`/api/airports?bbox=${bbox.map((v) => v.toFixed(3)).join(',')}`);
+    // An answer nobody is waiting for any more is thrown away here.
+    //
+    // Two of these can be in the air at once - the boot asks about one view and a
+    // pan asks about the next - and they come back in whatever order the network
+    // decides. The small answer usually wins the race and the large one lands
+    // afterwards and overwrites it, which is how nine hundred airports ended up
+    // drawn over the one airfield the camera was parked on. Whoever is still the
+    // current question draws; everyone else is late and says nothing.
+    if (airportsAsked !== key) return;
     airports.removeAll();
     for (const a of data.airports) {
       // Reported as invisible at an airport with three aviation layers on:
@@ -3087,7 +3122,7 @@ async function loadAirports() {
       // to, so it is now the largest and reads as the ring they sit inside.
       airports.add({
         position: Cesium.Cartesian3.fromDegrees(a.lon, a.lat, 0),
-        pixelSize: a.big ? 16 : 9,
+        pixelSize: a.big ? 15 : 9,
         // White, not amber. It was amber, and then the taxiway layer arrived
         // painted in the same #fcd34d - which is the right colour for taxiway
         // paint and the wrong one for the marker sitting in the middle of four
@@ -3097,8 +3132,16 @@ async function loadAirports() {
         // Nothing else at an airfield is white: runways are grey, approach
         // lines green, weather green through red, beacons blue. So the anchor
         // gets the one colour with no competition.
-        color: Cesium.Color.WHITE.withAlpha(a.big ? 0.18 : 0.12),
-        outlineColor: Cesium.Color.WHITE.withAlpha(0.95),
+        // Solid, with a dark ring around it. It was a hollow white ring - a
+        // 0.18 alpha fill inside a white outline - which reads well against
+        // dark ground and vanishes against an airport, where the ground is pale
+        // concrete covered in yellow paint and, since the taxiway layer landed,
+        // four hundred yellow lines and letters. Reported missing a second time.
+        //
+        // White on a dark ring is the one combination that survives both: the
+        // ring separates it from concrete, the white from the paint.
+        color: Cesium.Color.WHITE.withAlpha(0.95),
+        outlineColor: Cesium.Color.fromCssColorString('#0b0e14').withAlpha(0.9),
         outlineWidth: 2,
         disableDepthTestDistance: MARK_THROUGH_M,
         scaleByDistance: new Cesium.NearFarScalar(1e5, 1.3, 2e7, 0.5),
@@ -8855,14 +8898,8 @@ const CENTRELINE_COLOUR = '#7dffab';
 
 async function loadRunways(force) {
   if (!layerOn('runways')) return;
-  const view = viewer.camera.computeViewRectangle();
-  if (!view) return;
-  const box = {
-    south: Cesium.Math.toDegrees(view.south),
-    west: Cesium.Math.toDegrees(view.west),
-    north: Cesium.Math.toDegrees(view.north),
-    east: Cesium.Math.toDegrees(view.east),
-  };
+  const box = viewBoxFor(0.25);
+  if (!box) return;
   const key = [box.south, box.west, box.north, box.east].map((n) => n.toFixed(1)).join(',');
   if (key === runwaysAt && !force) return;
   runwaysAt = key;
@@ -8876,6 +8913,16 @@ async function loadRunways(force) {
     log(`runways unavailable (${err.message})`, 'warn');
     return;
   }
+
+  // An answer nobody is waiting for any more is thrown away here.
+  //
+  // Two of these can be in the air at once - the boot asks about one view and a
+  // pan asks about the next - and they come back in whatever order the network
+  // decides. The small answer usually wins the race and the large one lands
+  // afterwards and overwrites it, which is how nine hundred airports ended up
+  // drawn over the one airfield the camera was parked on. Whoever is still the
+  // current question draws; everyone else is late and says nothing.
+  if (runwaysAt !== key) return;
 
   if (runwayPrimitive) {
     scene.primitives.remove(runwayPrimitive);
@@ -8969,14 +9016,8 @@ let metarAt = '';
 
 async function loadMetar(force) {
   if (!layerOn('metar')) return;
-  const view = viewer.camera.computeViewRectangle();
-  if (!view) return;
-  const box = {
-    south: Cesium.Math.toDegrees(view.south),
-    west: Cesium.Math.toDegrees(view.west),
-    north: Cesium.Math.toDegrees(view.north),
-    east: Cesium.Math.toDegrees(view.east),
-  };
+  const box = viewBoxFor(1.2);
+  if (!box) return;
   const key = [box.south, box.west, box.north, box.east].map((n) => n.toFixed(1)).join(',');
   if (key === metarAt && !force) return;
   metarAt = key;
@@ -8990,6 +9031,16 @@ async function loadMetar(force) {
     log(`metar unavailable (${err.message})`, 'warn');
     return;
   }
+
+  // An answer nobody is waiting for any more is thrown away here.
+  //
+  // Two of these can be in the air at once - the boot asks about one view and a
+  // pan asks about the next - and they come back in whatever order the network
+  // decides. The small answer usually wins the race and the large one lands
+  // afterwards and overwrites it, which is how nine hundred airports ended up
+  // drawn over the one airfield the camera was parked on. Whoever is still the
+  // current question draws; everyone else is late and says nothing.
+  if (metarAt !== key) return;
 
   metarPoints.removeAll();
   if (data.too_wide) {
@@ -9144,6 +9195,34 @@ function navaidLines(list) {
   }).join('\n');
 }
 
+/*
+ * The field block: what is on the strip of paper, wherever you asked from.
+ *
+ * Written once because two things ask for it. Clicking the airport dot asks,
+ * and so does clicking a runway - and the runway is the better target. The dot
+ * is fifteen pixels; a runway is three kilometres of tarmac you cannot miss,
+ * and it was reported twice as impossible to find before this existed.
+ */
+function fieldRows(field, country) {
+  if (field.error) {
+    return [['Frequencies', `could not fetch them (${field.error})`]];
+  }
+  const rows = [
+    ['Frequencies', field.frequencies && field.frequencies.length
+      ? frequencyLines(field.frequencies)
+      : 'none published for this field'],
+    ['Beacons', field.navaids && field.navaids.length
+      ? navaidLines(field.navaids)
+      : 'none listed as belonging to this field'],
+    ['No ILS here', 'this data carries NDB, VOR, VOR-DME, VORTAC, TACAN and DME '
+      + 'and nothing else — no localiser, no glideslope, no minima. Those are in '
+      + 'the national AIP, and an invented approach would be worse than none.'],
+  ];
+  const aip = AIP_LINKS[country || field.country];
+  if (aip) rows.push([aip[0], aip[1]]);
+  return rows;
+}
+
 async function showAirport(ref) {
   const title = ref.name;
   const base = () => [
@@ -9174,28 +9253,75 @@ async function showAirport(ref) {
   }
   if ($('#detail-title').textContent !== title) return;
 
-  const aip = AIP_LINKS[ref.country];
-  const rows = [...base()];
-  if (field.error) {
-    rows.push(['Frequencies', `could not fetch them (${field.error})`]);
-  } else {
-    rows.push(['Frequencies', field.frequencies && field.frequencies.length
-      ? frequencyLines(field.frequencies)
-      : 'none published for this field']);
-    rows.push(['Beacons', field.navaids && field.navaids.length
-      ? navaidLines(field.navaids)
-      : 'none listed as belonging to this field']);
-    rows.push(['No ILS here', 'this data carries NDB, VOR, VOR-DME, VORTAC, '
-      + 'TACAN and DME and nothing else — no localiser, no glideslope, no '
-      + 'minima. Those are in the national AIP, and an invented approach would '
-      + 'be worse than none.']);
-    if (aip) rows.push([aip[0], aip[1]]);
-  }
+  const rows = [...base(), ...fieldRows(field, ref.country)];
   rows.push(...tail());
   rows.push(['Note', 'frequencies and beacons from OurAirports, which is '
     + 'community-maintained and public domain. It can lag a reallocation, and '
     + 'the AIP above is the authority for the country it belongs to.']);
   showDetail(title, `${ref.big ? 'large' : 'medium'} airport · ${ref.icao || '?'}`, rows);
+}
+
+/*
+ * A runway, and the field it belongs to, on one card.
+ *
+ * Asked for after the airport dot went missing a third time. The dot is the
+ * anchor and it is fifteen pixels wide; the runway is the largest object on the
+ * airfield and the thing you were already looking at. So clicking one now
+ * answers the question the dot answered, and the dot stops being the only way.
+ *
+ * This is the closest an app built on public data gets to a chart: the ground
+ * layout, the frequencies, the beacons and the runway geometry, together. What
+ * separates it from a real one is stated on the card rather than glossed over.
+ * There are no procedures in here - no SID, no STAR, no approach, no minima -
+ * because those are Jeppesen's and each country's AIP, published under their
+ * terms. The link to the country's own AIP is the honest substitute.
+ */
+async function showRunway(ref) {
+  const r = ref;
+  const landing = ref.end === 'he' ? r.he : r.le;
+  const heading = ref.end === 'he' ? r.he_heading : r.le_heading;
+  const title = `${r.airport} runway ${r.le}/${r.he}`;
+
+  // The runway's own geometry, which arrived with the layer and needs no
+  // fetching, so it is on screen before the field block is asked for.
+  const strip = () => [
+    ['Length', r.length_ft
+      ? `${r.length_ft.toLocaleString('en-US')} ft (${Math.round(r.length_ft * 0.3048).toLocaleString('en-US')} m)`
+      : 'not published'],
+    ['Width', r.width_ft ? `${r.width_ft} ft` : 'not published'],
+    ['Surface', r.surface || 'not published'],
+    ['Lit', r.lit ? 'yes' : 'not according to the record'],
+    ['Headings', `${r.le} at ${r.le_heading}° true, `
+      + `${r.he} at ${r.he_heading}° true`],
+    ref.end ? ['Landing on', `${landing}, heading ${heading}° true`] : null,
+    r.closed ? ['Closed', 'this runway is marked closed in the record'] : null,
+  ].filter(Boolean);
+
+  const tail = () => [
+    ['The green line', 'ten nautical miles along the runway bearing, computed '
+      + 'here. It is where a straight-in approach would be, and it is not a '
+      + 'procedure: real approaches have step-downs, offsets and turns that only '
+      + 'a published chart carries, and those charts are licensed. Do not fly this.'],
+    ['Note', 'geometry from OurAirports, which is community-maintained and '
+      + 'public domain. It can lag a resurfacing or a renumbering.'],
+  ];
+
+  const kind = ref.end ? `approach line to ${landing} · OurAirports`
+    : 'runway · OurAirports';
+  showDetail(title, kind, [...strip(), ['Frequencies', 'looking…'], ...tail()]);
+  if (!r.airport) return;
+
+  let field = null;
+  try {
+    field = await getJSON('/api/airfield?icao=' + encodeURIComponent(r.airport));
+  } catch (err) {
+    field = { error: err.message };
+  }
+  if ($('#detail-title').textContent !== title) return;
+
+  showDetail(title,
+    field.name ? `${ref.end ? `approach to ${landing}` : 'runway'} · ${field.name}` : kind,
+    [...strip(), ...fieldRows(field), ...tail()]);
 }
 
 /* ------------------------------------------------------------------ navaids */
@@ -9209,14 +9335,8 @@ const NAVAID_COLOUR = {
 
 async function loadNavaids(force) {
   if (!layerOn('navaids')) return;
-  const view = viewer.camera.computeViewRectangle();
-  if (!view) return;
-  const box = {
-    south: Cesium.Math.toDegrees(view.south),
-    west: Cesium.Math.toDegrees(view.west),
-    north: Cesium.Math.toDegrees(view.north),
-    east: Cesium.Math.toDegrees(view.east),
-  };
+  const box = viewBoxFor(1.2);
+  if (!box) return;
   const key = [box.south, box.west, box.north, box.east].map((n) => n.toFixed(1)).join(',');
   if (key === navaidAt && !force) return;
   navaidAt = key;
@@ -9230,6 +9350,16 @@ async function loadNavaids(force) {
     log(`navaids unavailable (${err.message})`, 'warn');
     return;
   }
+
+  // An answer nobody is waiting for any more is thrown away here.
+  //
+  // Two of these can be in the air at once - the boot asks about one view and a
+  // pan asks about the next - and they come back in whatever order the network
+  // decides. The small answer usually wins the race and the large one lands
+  // afterwards and overwrites it, which is how nine hundred airports ended up
+  // drawn over the one airfield the camera was parked on. Whoever is still the
+  // current question draws; everyone else is late and says nothing.
+  if (navaidAt !== key) return;
 
   navaidPoints.removeAll();
   if (data.too_wide) {
@@ -9301,6 +9431,44 @@ function boxAroundTarget(halfDegrees) {
   };
 }
 
+/*
+ * The view rectangle, when it can be believed, and a box around the middle of
+ * the screen when it cannot.
+ *
+ * computeViewRectangle is the obvious way to ask what is on screen and it is
+ * wrong often enough to have broken three layers. Tilted fifteen degrees at a
+ * kilometre up it stretched to the horizon and reported 0.98 by 4.13 degrees.
+ * Straight down at four thousand metres over Arlanda, before the globe had
+ * finished loading, it reported the entire planet - so the airport layer drew
+ * nine hundred airfields on top of the one underneath the camera, and the
+ * runway layer refused its own box for being too wide.
+ *
+ * Geometry settles it. From height h the horizon is acos(R/(R+h)) away, which
+ * at four kilometres is about two degrees. A rectangle claiming to span far
+ * more than that from a low camera is not a view, it is a failure to compute
+ * one, and the fixed box around what the camera is actually pointing at is the
+ * better answer. Generous by half, because a rectangle that is merely large is
+ * usually honest and only a wild one is not.
+ */
+function viewBoxFor(halfDegrees) {
+  const view = viewer.camera.computeViewRectangle();
+  if (view) {
+    const box = {
+      south: Cesium.Math.toDegrees(view.south),
+      west: Cesium.Math.toDegrees(view.west),
+      north: Cesium.Math.toDegrees(view.north),
+      east: Cesium.Math.toDegrees(view.east),
+    };
+    const r = Cesium.Ellipsoid.WGS84.maximumRadius;
+    const h = Math.max(1, viewer.camera.positionCartographic.height);
+    const horizon = Cesium.Math.toDegrees(Math.acos(r / (r + h)));
+    if (box.north > box.south && (box.north - box.south) / 2 <= horizon * 1.5) {
+      return box;
+    }
+  }
+  return boxAroundTarget(halfDegrees);
+}
+
 let aerowayPrimitive = null;
 let aerowayAt = '';
 
@@ -9329,6 +9497,16 @@ async function loadAeroway(force) {
     log(`taxiways unavailable (${err.message})`, 'warn');
     return;
   }
+
+  // An answer nobody is waiting for any more is thrown away here.
+  //
+  // Two of these can be in the air at once - the boot asks about one view and a
+  // pan asks about the next - and they come back in whatever order the network
+  // decides. The small answer usually wins the race and the large one lands
+  // afterwards and overwrites it, which is how nine hundred airports ended up
+  // drawn over the one airfield the camera was parked on. Whoever is still the
+  // current question draws; everyone else is late and says nothing.
+  if (aerowayAt !== key) return;
 
   if (aerowayPrimitive) {
     scene.primitives.remove(aerowayPrimitive);
@@ -9375,8 +9553,17 @@ async function loadAeroway(force) {
       const mid = way.points[Math.floor(way.points.length / 2)];
       aerowayLabels.add({
         position: Cesium.Cartesian3.fromDegrees(mid[0], mid[1], 0),
+        // Clamped to the ground, which is the whole reason these stay put.
+        //
+        // The height above was zero, meaning the ellipsoid, while the yellow
+        // lines are draped on the terrain by GroundPolylinePrimitive. Arlanda
+        // sits above that zero, so every letter hung below the surface it was
+        // labelling and slid across it in parallax as the camera panned.
+        // Reported as the names drifting off their taxiways.
+        heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
         text: way.ref,
-        font: '600 11px "JetBrains Mono", monospace',
+        // Bold, because this is read at a glance against yellow paint.
+        font: '700 12px "JetBrains Mono", monospace',
         fillColor: Cesium.Color.fromCssColorString(
           isApron ? APRON_COLOUR : TAXIWAY_COLOUR),
         outlineColor: Cesium.Color.fromCssColorString('#0b0e14'),
@@ -9720,7 +9907,32 @@ async function loadCopernicus() {
 
 /* ------------------------------------------------------------------ boot */
 
+// The view first, then the layers. The other order restores a layer that
+// draws one airfield while the camera is still in orbit, which asks for a
+// box the size of a continent and is refused - and the layer then reads as
+// empty until you happen to move.
+restoreCamera();
 restoreLayers();
+viewer.camera.moveEnd.addEventListener(rememberCamera);
+
+// And then asked again, one frame later.
+//
+// The view-dependent layers - airports, runways, taxiways, weather, beacons -
+// answer "what is in view" by asking the camera, and at boot they ask before
+// the first frame has been drawn. The camera has been restored by then but the
+// scene has not caught up, so they get a box the size of the globe: nine
+// hundred airports drawn over an airfield you are parked on, and no taxiways
+// at all because that box is refused for being too wide.
+//
+// Nothing corrected it, because setView is not a pan and raises no event, so
+// the wrong answer stood until you happened to move. One frame is enough for
+// the camera to be real, and this asks them again through the very event a pan
+// would have used.
+const settleView = () => {
+  viewer.scene.postRender.removeEventListener(settleView);
+  viewer.camera.moveEnd.raiseEvent();
+};
+viewer.scene.postRender.addEventListener(settleView);
 renderLayerList();
 renderStyles();
 loadCopernicus();

@@ -38,7 +38,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.2.3"
+VERSION = "1.2.4"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -3500,8 +3500,21 @@ def airfield(icao):
         row["means"] = FREQUENCY_KINDS.get(row["kind"], "")
 
     mine = [n for n in _navaids if n["airport"] == icao]
+
+    # Who the field is, not just what it transmits on. A runway knows the ICAO
+    # code of the field it belongs to and nothing else, so when a runway is
+    # clicked this is where the name, the town and the country have to come
+    # from - and the country is what picks the right national AIP link.
+    _load_airports()
+    field = next((a for a in _airports if a["icao"] == icao), {})
+
     return json.dumps({
         "icao": icao,
+        "name": field.get("name", ""),
+        "town": field.get("town", ""),
+        "country": field.get("country", ""),
+        "elev_ft": field.get("elev_ft", ""),
+        "big": field.get("big", False),
         "frequencies": rows,
         "navaids": mine,
         "source": "OurAirports, public domain",
@@ -4528,73 +4541,161 @@ def search(q):
 # station id rather than a station name, which the card says plainly.
 OPENAQ_PM25 = 2  # OpenAQ's parameter id for PM2.5
 AQ_TTL = 900
+# A station that has not reported for a day is not reporting. Twelve is enough
+# to fill a city and few enough that the follow-up requests stay polite.
+AQ_MAX_AGE_H = 24
+AQ_MAX_STATIONS = 12
 
 
 def air_quality(lat, lon, radius_km):
+    """PM2.5 measured at the ground, near a point.
+
+    Rewritten the first time it ran with a key, which is when three faults
+    showed up at once - none of them visible without one.
+
+    The old code asked /v3/parameters/2/latest with coordinates and radius. That
+    endpoint accepts both parameters and ignores them: a query for twenty
+    kilometres around Stockholm answered `found: 20771` and returned South
+    Korea, Lithuania, China and California. The path existed, which is all that
+    could be checked without a key, and the filter did nothing.
+
+    So it goes through /v3/locations now, which does filter, and then asks each
+    nearby station's sensor for its latest value.
+
+    Two more things that only a real answer could show. Stations stop reporting
+    without saying so - Hornsgatan's "latest" was three months old - so the age
+    of every reading is carried and anything past a day is dropped. And a sensor
+    that is broken reports -1, which is not a concentration; negatives go.
+    """
     key = KEYS.get("openaq", "")
     if not key:
         return json.dumps({
             "readings": [],
             "needs_key": "openaq",
-            "how": "free from openaq.org/developers - put it in keys.json as openaq",
+            "how": "free at explore.openaq.org/register - put it in keys.json as openaq",
         }).encode(), "no key"
 
-    # OpenAQ caps the radius at 25 km, and asking for more is an error rather
-    # than a truncation, so it is clamped here where the reason can be written down.
     metres = int(max(1000, min(radius_km * 1000, 25000)))
     cache = "openaq_%.2f_%.2f_%d" % (lat, lon, metres)
     hit = _mem_get(cache)
     if hit and time.time() - hit[0] < AQ_TTL:
         return hit[1], "memory"
 
-    url = ("https://api.openaq.org/v3/parameters/%d/latest?coordinates=%.4f,%.4f"
-           "&radius=%d&limit=200" % (OPENAQ_PM25, lat, lon, metres))
-    req = urllib.request.Request(url, headers={
-        "User-Agent": USER_AGENT, "X-API-Key": key, "Accept": "application/json",
-    })
-    try:
+    def ask(url):
+        req = urllib.request.Request(url, headers={
+            "User-Agent": USER_AGENT, "X-API-Key": key, "Accept": "application/json",
+        })
         with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
-            body = json.loads(resp.read())
+            return json.loads(resp.read())
+
+    stations_url = ("https://api.openaq.org/v3/locations"
+                    "?coordinates=%.4f,%.4f&radius=%d&parameters_id=%d&limit=100"
+                    % (lat, lon, metres, OPENAQ_PM25))
+    try:
+        found = ask(stations_url)
     except urllib.error.HTTPError as exc:
         detail = "the key was refused" if exc.code == 401 else "HTTP %d" % exc.code
         log("openaq: %s" % detail)
         return json.dumps({"readings": [], "error": detail}).encode(), "error"
-    except Exception as exc:  # noqa: BLE001 - one layer, not the whole globe
+    except Exception as exc:  # noqa: BLE001
         log("openaq: %s" % exc)
-        return json.dumps({"readings": [], "error": str(exc)}).encode(), "error"
+        return json.dumps({"readings": [], "error": str(exc)[:120]}).encode(), "error"
 
-    readings = []
-    rows = body.get("results")
+    rows = found.get("results")
     if not isinstance(rows, list):
-        held = ", ".join(sorted(body)[:8]) or "nothing"
-        log("openaq: answered, but with no results list - top level held: %s" % held)
+        held = ", ".join(sorted(found)[:6]) if isinstance(found, dict) else type(found).__name__
+        log("openaq: answered, but with no locations list - held: %s" % held)
         return json.dumps({
             "readings": [],
             "error": "the feed answered in a shape this does not recognise (%s)" % held,
         }).encode(), "error"
 
-    for row in rows:
-        where = row.get("coordinates") or {}
+    now = time.time()
+
+    def age_hours(stamp):
+        if not stamp:
+            return None
+        try:
+            return (now - datetime.datetime.fromisoformat(
+                stamp.replace("Z", "+00:00")).timestamp()) / 3600.0
+        except Exception:  # noqa: BLE001
+            return None
+
+    # Nearest first, and only stations that have reported inside a day. Asking a
+    # station that went quiet in May costs a request and answers with May.
+    live = []
+    for station in rows:
+        age = age_hours((station.get("datetimeLast") or {}).get("utc"))
+        if age is None or age > AQ_MAX_AGE_H:
+            continue
+        sensor = next((s.get("id") for s in station.get("sensors") or []
+                       if (s.get("parameter") or {}).get("id") == OPENAQ_PM25), None)
+        if sensor:
+            live.append((station.get("distance") or 1e9, sensor, station))
+    live.sort(key=lambda row: row[0])
+
+    silent = len(rows) - len(live)
+    readings = []
+    for _, sensor, station in live[:AQ_MAX_STATIONS]:
+        try:
+            latest = ((ask("https://api.openaq.org/v3/sensors/%d" % sensor)
+                       .get("results") or [{}])[0].get("latest") or {})
+        except Exception:  # noqa: BLE001 - one dead sensor is not the whole layer
+            continue
+        value = latest.get("value")
+        # A sensor reporting -1 is a sensor saying it does not know, and drawing
+        # a negative concentration would be inventing a measurement.
+        if value is None or value < 0:
+            continue
+        where = latest.get("coordinates") or station.get("coordinates") or {}
         if where.get("latitude") is None or where.get("longitude") is None:
+            continue
+        stamp = (latest.get("datetime") or {}).get("utc", "")
+        # The station's last report and this sensor's last report are not the
+        # same thing: a site can be posting NO2 hourly while its PM2.5 sensor
+        # has been quiet since May. Filtering on the station and printing the
+        # sensor let 33-hour-old readings through a 24-hour rule.
+        own_age = age_hours(stamp)
+        if own_age is None or own_age > AQ_MAX_AGE_H:
             continue
         readings.append({
             "lat": where["latitude"],
             "lon": where["longitude"],
-            "pm25": row.get("value"),
-            "when": (row.get("datetime") or {}).get("utc", ""),
-            "sensor": row.get("sensorsId"),
-            "station": row.get("locationsId"),
+            "pm25": value,
+            "when": stamp,
+            "age_h": round(age_hours(stamp) or 0, 1),
+            "station": (station.get("name") or "")[:50],
+            "where": (station.get("locality") or "")[:40],
+            "provider": ((station.get("provider") or {}).get("name") or "")[:40],
+            "sensor": sensor,
         })
+
     data = json.dumps({
         "readings": readings,
-        "parameter": "PM2.5, micrograms per cubic metre",
-        "source": "OpenAQ, CC BY 4.0",
-        "radius_km": round(metres / 1000, 1),
+        "stations_in_range": len(rows),
+        "silent": silent,
+        "source": "OpenAQ",
+        "note": "measured at the ground by whoever runs that station. Reference "
+                "monitors and low-cost sensors are reported together and are not "
+                "equally accurate. Stations go quiet without saying so, and any "
+                "that have not reported for a day are left out rather than shown "
+                "as current.",
     }).encode()
-    key_worked("openaq")
     _mem_put(cache, data)
-    log("openaq: %d PM2.5 readings within %d km" % (len(readings), metres / 1000))
+    log("openaq: %d PM2.5 readings within %d km, %d stations silent"
+        % (len(readings), radius_km, silent))
     return data, "network"
+
+def _circle(lat, lon, radius_km, points=24):
+    """A circle as a GeoJSON polygon, because the API takes geometry not radii."""
+    ring = []
+    for n in range(points + 1):
+        angle = 2 * math.pi * n / points
+        dy = radius_km / 110.574
+        dx = radius_km / (111.320 * max(0.05, math.cos(math.radians(lat))))
+        ring.append([round(lon + dx * math.sin(angle), 4),
+                     round(lat + dy * math.cos(angle), 4)])
+    return {"type": "Polygon", "coordinates": [ring]}
 
 
 # ------------------------------------------------------------------- fishing
@@ -4621,16 +4722,16 @@ GFW_DATASETS = (
 GFW_TTL = 3600
 
 
-def _circle(lat, lon, radius_km, points=24):
-    """A circle as a GeoJSON polygon, because the API takes geometry not radii."""
-    ring = []
-    for n in range(points + 1):
-        angle = 2 * math.pi * n / points
-        dy = radius_km / 110.574
-        dx = radius_km / (111.320 * max(0.05, math.cos(math.radians(lat))))
-        ring.append([round(lon + dx * math.sin(angle), 4),
-                     round(lat + dy * math.cos(angle), 4)])
-    return {"type": "Polygon", "coordinates": [ring]}
+def _event_hours(start, end):
+    """How long an event lasted, from its two ends."""
+    if not start or not end:
+        return None
+    try:
+        a = datetime.datetime.fromisoformat(start.replace("Z", "+00:00"))
+        b = datetime.datetime.fromisoformat(end.replace("Z", "+00:00"))
+    except Exception:  # noqa: BLE001
+        return None
+    return round((b - a).total_seconds() / 3600.0, 1)
 
 
 def fishing(lat, lon, radius_km, days=14):
@@ -4698,7 +4799,12 @@ def fishing(lat, lon, radius_km, days=14):
             "kind": row.get("type", ""),
             "start": row.get("start", ""),
             "end": row.get("end", ""),
-            "hours": row.get("durationHours"),
+            # Computed from the two timestamps rather than read from a field.
+            # durationHours was a guess made without a key and it does not
+            # exist: every one of two hundred events came back null. start and
+            # end are both there, so the answer is arithmetic on data we have
+            # rather than a name we hoped for.
+            "hours": _event_hours(row.get("start"), row.get("end")),
             "vessel": vessel.get("name") or vessel.get("ssvid") or "",
             "flag": vessel.get("flag", ""),
         })
@@ -5937,6 +6043,71 @@ AEROWAY_QUERY = (
 # the card prints it. A year-old map is fine; a year-old map that looks like
 # today is not.
 AEROWAY_TTL = 365 * 86400
+# A twentieth of a degree: about five kilometres, which is an airport, and
+# coarse enough that panning around one does not ask again.
+AEROWAY_GRID = 0.05
+
+
+def _aeroway_box_of(name):
+    """Read the box back out of a cache filename, or None if it is not one."""
+    try:
+        parts = name[len("aeroway_"):-len(".json")].split("_")
+        if len(parts) != 4:
+            return None
+        return [float(v.replace("p", ".").replace("m", "-")) for v in parts]
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _aeroway_covering(south, west, north, east):
+    """Any cached answer whose box already contains this one.
+
+    Snapping to a grid stopped most of the misses but not all of them, because a
+    grid has boundaries and two views a hundred metres apart can still land on
+    opposite sides of one. Six views of Arlanda spread over two kilometres gave
+    four instant hits and two thirty-second fetches for the same 248 taxiways.
+
+    So the question asked here is not "is there an entry under this exact key"
+    but "has anything already been fetched that covers this ground". A box
+    inside a box needs no request, which also means zooming in re-uses what
+    zooming out already paid for.
+    """
+    try:
+        names = os.listdir(CACHE_DIR)
+    except OSError:
+        return None
+    best = None
+    for name in names:
+        if not name.startswith("aeroway_") or not name.endswith(".json"):
+            continue
+        box = _aeroway_box_of(name)
+        if not box:
+            continue
+        if not (box[0] <= south and box[1] <= west
+                and box[2] >= north and box[3] >= east):
+            continue
+        path = os.path.join(CACHE_DIR, name)
+        try:
+            age = time.time() - os.path.getmtime(path)
+        except OSError:
+            continue
+        if age > AEROWAY_TTL:
+            continue
+        # The tightest box that still covers it, so the answer is about this
+        # airport rather than half the county.
+        span = (box[2] - box[0]) * (box[3] - box[1])
+        if best is None or span < best[0]:
+            best = (span, path, age)
+    if best is None:
+        return None
+    try:
+        with open(best[1], "rb") as fh:
+            kept = json.loads(fh.read())
+    except Exception:  # noqa: BLE001
+        return None
+    kept["fetched"] = time.strftime("%Y-%m-%d", time.gmtime(time.time() - best[2]))
+    kept["age_days"] = int(best[2] / 86400)
+    return json.dumps(kept).encode()
 
 
 def aeroway(south, west, north, east):
@@ -5955,11 +6126,49 @@ def aeroway(south, west, north, east):
                     "and this asks OpenStreetMap for every one in the box",
         }).encode(), "refused"
 
+    # Snapped to a grid before anything else, and this is the whole reason the
+    # cache works at all.
+    #
+    # It used to key on the box as given. The box comes from wherever the camera
+    # is pointing, so nudging the view by a hundred metres produced a different
+    # key - and eight files were found in the cache for one airport, four of them
+    # byte-identical at 101 270 bytes each. Every camera move was a fresh
+    # request, and when Overpass was down the layer emptied. Reported as
+    # taxiways appearing and then vanishing on refresh.
+    #
+    # The middle is what gets snapped, not the edges. Snapping the edges looks
+    # like it should work and does not: the box is about a tenth of a degree
+    # across, so it straddles two or three grid lines, and crossing any one of
+    # them still changes the key. Snapping the middle and then rounding the box
+    # out to whole grid steps means every view of the same airport asks one
+    # identical question - so the second one is free, and it survives an
+    # Overpass outage.
+    # What was actually asked for, kept aside. The containment test below has to
+    # be against this and not against the snapped box: snapping makes the box
+    # bigger, and a bigger box pokes outside the cached one and misses a perfectly
+    # good answer.
+    want = (south, west, north, east)
+
+    grid = AEROWAY_GRID
+    mid_lat = round((south + north) / 2 / grid) * grid
+    mid_lon = round((west + east) / 2 / grid) * grid
+    # Half a step of slack, because snapping moved the middle by up to that much
+    # and the box still has to cover what was actually asked for.
+    reach_lat = math.ceil(((north - south) / 2 + grid / 2) / grid) * grid
+    reach_lon = math.ceil(((east - west) / 2 + grid / 2) / grid) * grid
+    south, north = mid_lat - reach_lat, mid_lat + reach_lat
+    west, east = mid_lon - reach_lon, mid_lon + reach_lon
+
     box = "%.3f,%.3f,%.3f,%.3f" % (south, west, north, east)
     cache = "aeroway_" + box.replace(",", "_").replace(".", "p").replace("-", "m")
     hit = _mem_get(cache)
     if hit and time.time() - hit[0] < AEROWAY_TTL:
         return hit[1], "memory"
+
+    covered = _aeroway_covering(*want)
+    if covered is not None:
+        _mem_put(cache, covered)
+        return covered, "disk"
 
     # Disk, before the network. Overpass has four mirrors in the list and three
     # of them belong to one operator, so when that operator is down the layer
