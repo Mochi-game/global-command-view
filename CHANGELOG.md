@@ -6,6 +6,57 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.2.5 — attribution that is visible, and a folder Windows will trust
+
+Two things found by asking whether this was fit to publish.
+
+### The credits were built and then hidden
+
+`style.css` carried `display: none` on both `.cesium-viewer-bottom` and
+`.cesium-widget-credits`, filed under "Cesium chrome we do not want". The credit
+strings were being constructed correctly all along — *Imagery © Esri and its
+licensors*, the ODbL notice for OpenStreetMap, Cesium ion's own — handed to
+Cesium, and never drawn anywhere.
+
+Attribution is a licence condition, not chrome. Esri's imagery terms, ODbL and
+the ion Community tier all want the notice on the map, and the SOURCES &
+LICENCES tab, good as it is, is a credits page rather than a basemap's own line.
+
+Un-hiding them was not enough on its own. Cesium folds credits behind a "Data
+attribution" link unless the `Credit` is constructed with `showOnScreen`, so
+that argument is passed now; and Cesium's stylesheet loads from the CDN *after*
+this one and pins the container to the left, where the layer panel sits on top
+of it — attribution behind a panel is not attribution. It sits at the bottom
+right now, small and dim.
+
+Wikipedia joined the source list at the same time. The submarine base
+coordinates come from it, which the data file said and the table did not.
+
+### Everything out of a ZIP arrives untrusted
+
+Windows tags every file unpacked from a downloaded archive with the Mark of the
+Web. That tag is what raises the SmartScreen box on the launchers, and it is
+why `stop.ps1` would not run at all — PowerShell refuses an unsigned script that
+came from outside.
+
+**`Trust these files.ps1`** takes the tag off, using Windows' own
+`Unblock-File`. It is what the *Unblock* tick box in a file's Properties dialog
+does, it changes no security setting and nothing outside its own folder, and it
+needs no administrator rights. The installer runs it before anything else, so a
+folder ends up trusted even if the Python step below it fails.
+
+A script that asks you to trust a folder is exactly the shape of the thing you
+should refuse, so this one is built to be refusable. It works only on the
+directory it is sitting in, and it stops with `Nothing was changed` unless
+`server.py` is beside it — pointed at a downloads folder it does nothing.
+Tested both ways: five marked files cleared in the app folder, and a foreign
+executable left marked when the script was moved somewhere it did not belong.
+
+The self-check now verifies the installer still makes that call. The first
+version of that check looked for the filename as a substring and passed when
+the script was renamed to `.DISABLED` — a check that cannot fail is not one, so
+it matches the whole invocation.
+
 ## 1.2.4 — a refresh that keeps the airport
 
 Reported as taxiways appearing at Arlanda and then vanishing on refresh. That

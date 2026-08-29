@@ -342,6 +342,48 @@ def check_commas(app_js, report):
         report.note("object literals: no field left without its comma")
 
 
+
+def check_trust_script(report):
+    """The unblock step, still wired into the installer.
+
+    Everything unpacked from a downloaded ZIP carries Windows' Mark of the Web,
+    which raises SmartScreen on the launchers and stops stop.ps1 running at all.
+    The installer clears it before doing anything else, and that is one line in
+    a batch file - exactly the kind of thing that gets lost in an edit and is
+    never noticed, because the person it breaks is a stranger on their first run
+    and the machine it was tested on was trusted already.
+
+    The guard is checked too. The script refuses to run unless server.py is
+    beside it, which is what stops it being copied into a download folder and
+    used to wave through a pile of things nobody looked at.
+    """
+    script = os.path.join(ROOT, "Trust these files.ps1")
+    if not os.path.exists(script):
+        report.fail("trust", "Trust these files.ps1 is missing")
+        return
+
+    with open(script, encoding="utf-8", errors="replace") as fh:
+        body = fh.read()
+    if "Unblock-File" not in body:
+        report.fail("trust", "the script no longer calls Unblock-File")
+    if "server.py" not in body:
+        report.fail("trust", "the guard on server.py is gone - it would run anywhere")
+
+    installer = os.path.join(ROOT, "Install Global Command View.cmd")
+    if not os.path.exists(installer):
+        report.fail("trust", "Install Global Command View.cmd is missing")
+        return
+    with open(installer, encoding="utf-8", errors="replace") as fh:
+        text = fh.read()
+    # The whole invocation, not the filename. A bare substring check passes on
+    # anything containing the name - it was written that way first and a test
+    # that renamed the script to .DISABLED still came back all clear, which is
+    # a check that cannot fail and therefore is not one.
+    wanted = 'powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Trust these files.ps1"'
+    if wanted not in text:
+        report.fail("trust", "the installer no longer runs the unblock step")
+
+
 def check_placeholders(app_js, report):
     """A template hole naming something JavaScript has never heard of.
 
@@ -577,6 +619,7 @@ def main():
     check_grouped(app_js, report)
     check_keys_documented(app_js, report)
     check_badges(app_js, report)
+    check_trust_script(report)
     if not args.quick:
         check_setup_links(app_js, report)
     check_commas(app_js, report)

@@ -66,6 +66,15 @@ use from then on.
 >
 > Alternatively, skip the launcher entirely and run `python server.py` in that
 > folder. It does the same job with nothing to click past.
+>
+> **It only happens once.** Everything unpacked from a downloaded ZIP carries a
+> hidden tag called the Mark of the Web, which is what raises that box — and
+> what stops `stop.ps1` running at all. The installer takes the tag off the
+> whole folder before it does anything else, using Windows' own `Unblock-File`.
+> After that the launchers open without a word. **`Trust these files.ps1`** does
+> the same on its own if you already installed and want the warnings gone; it
+> works only on the folder it sits in and refuses to run unless `server.py` is
+> beside it, so it cannot be pointed at a directory of things nobody looked at.
 
 **macOS:** download the ZIP, unpack it, then double-click
 **`Start Global Command View.command`** inside. If double-clicking does nothing,

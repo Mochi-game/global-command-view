@@ -19,6 +19,17 @@ echo   GLOBAL COMMAND VIEW
 echo   ---------------------------------------------------------------
 echo.
 
+rem ------------------------------------------------- trust these files
+rem Everything out of a downloaded ZIP carries Windows' Mark of the Web,
+rem which is what makes the launchers raise SmartScreen and what stops
+rem stop.ps1 running at all. This takes it off, and it runs first rather
+rem than last so a folder is left trusted even if the install below fails.
+rem Bypass is needed for this one call because the script it runs is itself
+rem still marked at this point - that is the thing being fixed.
+if exist "%~dp0Trust these files.ps1" (
+  powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Trust these files.ps1"
+)
+
 rem ---------------------------------------------------------------- python?
 set "PY="
 for %%C in (py python python3) do (
