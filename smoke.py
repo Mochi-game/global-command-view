@@ -384,6 +384,44 @@ def check_trust_script(report):
         report.fail("trust", "the installer no longer runs the unblock step")
 
 
+
+def check_start_hidden(report):
+    """The launcher still starts the server without a window.
+
+    Three pieces have to stay joined: the .cmd somebody double-clicks, the
+    PowerShell beside it, and the -WindowStyle Hidden that is the whole point.
+    Lose the last one and everything still works - which is why it needs a test.
+    A console window that came back would be a regression nobody notices until
+    somebody complains about a black box on their taskbar again.
+
+    The whole invocation is matched rather than the filename, because a check
+    that looks for a substring passes on a file renamed to .DISABLED.
+    """
+    launcher = os.path.join(ROOT, "Start Global Command View.cmd")
+    script = os.path.join(ROOT, "start.ps1")
+
+    if not os.path.exists(script):
+        report.fail("start", "start.ps1 is missing")
+        return
+    if not os.path.exists(launcher):
+        report.fail("start", "Start Global Command View.cmd is missing")
+        return
+
+    with open(launcher, encoding="utf-8", errors="replace") as fh:
+        wanted = 'powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0start.ps1"'
+        if wanted not in fh.read():
+            report.fail("start", "the launcher no longer runs start.ps1")
+
+    with open(script, encoding="utf-8", errors="replace") as fh:
+        body = fh.read()
+    if "-WindowStyle Hidden" not in body:
+        report.fail("start", "the server would start with a visible window again")
+    # The health check is what stops the launcher walking away from a server
+    # that died on startup, leaving no window, no browser and nothing to read.
+    if "api/version" not in body:
+        report.fail("start", "the launcher no longer waits for the server to answer")
+
+
 def check_placeholders(app_js, report):
     """A template hole naming something JavaScript has never heard of.
 
@@ -620,6 +658,7 @@ def main():
     check_keys_documented(app_js, report)
     check_badges(app_js, report)
     check_trust_script(report)
+    check_start_hidden(report)
     if not args.quick:
         check_setup_links(app_js, report)
     check_commas(app_js, report)

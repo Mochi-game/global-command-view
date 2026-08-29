@@ -86,8 +86,14 @@ then on. The same file runs on Linux.
 open <http://localhost:8820>. Ctrl+C stops it.
 
 `--port 8821` moves it if something already holds the port; `--no-open` skips the
-browser. **`Stop Global Command View.cmd`** shuts the server down, and closing the
-window does too.
+browser.
+
+**The server runs with no window.** The launcher shows one only while it starts,
+says so, and closes itself once the server answers — so there is no black box on
+the taskbar for as long as the app is up, and no window to close. Use
+**`Stop Global Command View.cmd`** to shut it down. What the server would have
+printed goes to `server.log` beside it, and if it fails to come up the launcher
+stays open and puts the reason on screen instead of vanishing.
 
 There is **no configuration step, no account, and nothing to install beyond
 Python.** No `pip install`, no npm, no build. The globe engine loads from a CDN,

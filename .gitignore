@@ -9,6 +9,12 @@ data/marks.json
 data/usage.json
 data/manual_events.json
 
+# What the hidden server said. It runs with no window now, so its output goes
+# here instead of to a console nobody is watching - and the launcher reads these
+# back to you if it fails to come up.
+server.log
+server-error.log
+
 # A Windows shortcut stores an absolute path, so the one that works here is
 # broken everywhere else. The .cmd files beside it work from any folder.
 *.lnk

@@ -6,6 +6,41 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.2.6 — the server stops leaving a window on your taskbar
+
+Reported after a first install: the app works, and there is a console window
+sitting there for as long as it is up. No other program on the machine does
+that, and closing it was the documented way to shut the app down — which makes
+a black box on the taskbar into load-bearing UI.
+
+The server runs hidden now. The launcher shows a window only while it starts,
+says that it will close itself, and does, usually inside four seconds. There is
+nothing left to close afterwards; the stop icon is the way out, as it already
+was.
+
+What it does not do is start the server and walk away. A server that dies on
+startup would leave you with no window, no browser and nothing to read, so the
+launcher waits until the server actually answers before it goes. If nothing
+comes up it stays open and prints the reason instead of vanishing. The output
+that used to scroll past in the console goes to `server.log` beside the app, so
+it is still there to read after the fact.
+
+Written as `start.ps1` with a one-line `.cmd` beside it, matching the
+`stop.ps1` pair that was already there.
+
+Two things this shook out. The health check was written as
+``"$url`api/version"`` — and `` `a `` is PowerShell's escape for the bell
+character, so it asked for `/<BEL>pi/version`, got a 404, and reported a
+perfectly healthy server as failed to start, printing the server's own log
+underneath showing it running fine. And `stop.ps1` finds the server by whoever
+holds port 8820, which still works with no window; that was worth confirming
+rather than assuming.
+
+The self-check now guards the launcher: that the `.cmd` still calls the script,
+that `-WindowStyle Hidden` is still there, and that the wait for the server is
+still there. All three verified to fail when removed, because a check that
+cannot fail is not one.
+
 ## 1.2.5 — attribution that is visible, and a folder Windows will trust
 
 Two things found by asking whether this was fit to publish.
