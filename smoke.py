@@ -231,6 +231,56 @@ def check_badges(app_js, report):
         report.note("source badges: all %d licence values have one" % len(used))
 
 
+
+# Failures that are this machine's, not the service's.
+#
+# A fresh install on a second computer reported three registration links as not
+# answering and one feed as HTTP 502, and every one of them carried
+# CERTIFICATE_VERIFY_FAILED. Nothing was wrong with Trafikverket, OpenSky,
+# TomTom or Wikipedia. Python could not verify a certificate, and the report
+# named the services instead of saying so - which sent the reader looking for a
+# key they had not set, in an app that never calls a keyed service without one.
+#
+# Blaming the wrong party is worse than saying nothing, so these are recognised
+# and reported once, as what they are.
+TLS_MARKERS = (
+    "CERTIFICATE_VERIFY_FAILED",
+    "SSL: CERTIFICA",
+    "certificate verify failed",
+    "SSLCertVerificationError",
+    "unable to get local issuer",
+)
+
+LOCAL_MARKERS = TLS_MARKERS + (
+    "getaddrinfo failed",
+    "Name or service not known",
+    "Temporary failure in name resolution",
+)
+
+
+def local_fault(text):
+    """Is this failure the machine's own, rather than the other end's?"""
+    return any(m.lower() in str(text).lower() for m in LOCAL_MARKERS)
+
+
+def tls_advice(count, where):
+    """One explanation, in place of a list of accusations."""
+    return (
+        "%d %s failed because this machine cannot verify HTTPS certificates, "
+        "not because anything is down. Python on Windows uses the Windows "
+        "certificate store, and Windows fetches root certificates the first "
+        "time something needs them - on a new machine, or one that cannot "
+        "reach Windows Update, they are simply not there yet. Opening one of "
+        "the failing addresses in Edge once is usually enough: the browser "
+        "makes Windows fetch the root, and Python then finds it. If the "
+        "machine is behind antivirus or a company proxy that inspects HTTPS, "
+        "that product's own certificate has to be trusted by Windows instead. "
+        "No key is involved - this app never calls a service that needs a key "
+        "until you have entered one."
+        % (count, where)
+    )
+
+
 def check_setup_links(app_js, report):
     """A GET THE KEY button that leads to a 404.
 
@@ -253,6 +303,7 @@ def check_setup_links(app_js, report):
         return
 
     dead = []
+    local = []
     for name, url in pairs:
         req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
         try:
@@ -262,12 +313,21 @@ def check_setup_links(app_js, report):
         except urllib.error.HTTPError as exc:
             dead.append("%s %s (%s)" % (name, url, exc.code))
         except Exception as exc:  # noqa: BLE001 - a link check, not a feed
-            dead.append("%s %s (%s)" % (name, url, str(exc)[:30]))
+            # A certificate this machine cannot verify says nothing about the
+            # link. Reported separately, or the reader goes looking for a fault
+            # at Trafikverket that is sitting on their own computer.
+            if local_fault(exc):
+                local.append(name)
+            else:
+                dead.append("%s %s (%s)" % (name, url, str(exc)[:30]))
 
+    if local:
+        report.fail("setup", tls_advice(len(local), "registration links (%s)"
+                                        % ", ".join(local)))
     if dead:
         report.fail("setup", "GET THE KEY links that do not answer: %s"
                     % "; ".join(dead))
-    else:
+    if not dead and not local:
         report.note("setup links: all %d answer" % len(pairs))
 
 
@@ -596,6 +656,8 @@ def check_server(port, quick, report):
     endpoints = find_endpoints(server_py)
     report.note("%d endpoints found in server.py" % len(endpoints))
 
+    tls_hits = []
+
     for name in endpoints:
         if quick and name in SLOW:
             print("  %-16s skipped (--quick)" % name)
@@ -612,7 +674,14 @@ def check_server(port, quick, report):
             print("  %-16s 400 ok   refuses without usable arguments" % name)
             continue
         if status != 200:
-            report.fail("api/" + name, "HTTP %d: %s" % (status, body[:90].decode("utf-8", "replace")))
+            detail = body[:200].decode("utf-8", "replace")
+            if local_fault(detail):
+                # The feed is fine; this machine could not complete the
+                # handshake. Counted, and explained once at the end.
+                tls_hits.append(name)
+                print("  %-16s HTTP %d   certificate not verified here" % (name, status))
+                continue
+            report.fail("api/" + name, "HTTP %d: %s" % (status, detail[:90]))
             print("  %-16s HTTP %d" % (name, status))
             continue
         try:
@@ -625,6 +694,10 @@ def check_server(port, quick, report):
         shape = ("%d keys" % len(parsed)) if isinstance(parsed, dict) else \
                 ("%d items" % len(parsed)) if isinstance(parsed, list) else "scalar"
         print("  %-16s 200      %6.2fs  %7d B  %s" % (name, took, size, shape))
+
+    if tls_hits:
+        report.fail("certificates", tls_advice(len(tls_hits), "feeds (%s)"
+                                               % ", ".join(sorted(tls_hits))))
 
     # The version endpoint is the app's own statement that it started.
     status, body, _ = call(port, "/api/version")

@@ -6,6 +6,29 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.2.7 - the self-check stops blaming the wrong party
+
+A first install on a second computer reported three GET THE KEY links as not
+answering and one feed as HTTP 502. Every one of them carried
+CERTIFICATE_VERIFY_FAILED, and nothing was wrong with Trafikverket, OpenSky,
+TomTom or Wikipedia. Python on that machine could not verify a certificate.
+
+The report named the services, which sent the reader looking for a missing key
+- and no key was involved. Every keyed feed in this app returns empty without
+one and makes no call at all: TomTom, Copernicus, Global Fishing Watch, Windy,
+Trafikverket, OpenAQ. The failures were the machine's own.
+
+Those are now told apart from real faults and explained once, with what
+actually fixes them: Python on Windows reads the Windows certificate store, and
+Windows fetches root certificates the first time something needs them, so on a
+new machine they are simply not there yet. Opening one of the failing addresses
+in a browser once is usually enough. Antivirus or a company proxy that inspects
+HTTPS is the other cause, and there its own certificate has to be trusted.
+
+Checked against the exact strings from that screen: three certificate spellings
+and a DNS failure recognised as local, and a 404, a 500 and a timeout still
+reported as the other end's problem, which they are.
+
 ## 1.2.6 — the server stops leaving a window on your taskbar
 
 Reported after a first install: the app works, and there is a console window
