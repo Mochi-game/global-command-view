@@ -14,3 +14,18 @@ feed allows.
 
 In short: this software may be given away freely, but the live picture it draws
 may not be sold without licences from the providers behind it.
+
+## The certificate bundle in `certs/`
+
+`certs/cacert.pem` is Mozilla's list of trusted certificate authorities, as
+packaged by [certifi](https://github.com/certifi/python-certifi) and
+redistributed here under the **Mozilla Public License 2.0**. It is not this
+project's work and the MIT licence above does not cover it.
+
+It is there because Windows fetches a root certificate only when something asks,
+and Python never asks. On a machine that cannot reach Windows Update's
+certificate list, every HTTPS feed fails with *unable to get local issuer
+certificate* while the same computer's browser works fine. The app tries the
+operating system's own store first and only falls back to this file when that
+comes back with a certificate error - so a healthy machine never touches it.
+See `certs/README.md`.

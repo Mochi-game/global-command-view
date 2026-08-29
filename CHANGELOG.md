@@ -6,6 +6,57 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.4.1 - a second attempt at the certificate, and a stop button that works anywhere
+
+### The certificate, finally
+
+1.4.0 asked Windows to fetch the roots during installation, which works when
+Windows can reach its certificate list. On the machine this was written for it
+still failed - and no amount of asking produces a root that cannot be downloaded.
+
+So there is a bundle now: `certs/cacert.pem`, Mozilla's list as packaged by
+certifi, 143 roots, MPL 2.0 and not covered by this project's licence.
+
+The order is the whole design. Every request goes to the operating system's own
+trust store first, exactly as before, and **only one that comes back with a
+certificate error** is tried again against the file. The system store is current
+and a bundle ages, so a healthy machine never touches it, and a machine that
+would otherwise show nothing at all gets a second attempt that is still properly
+verified.
+
+There is deliberately no way to switch verification off. That turns an empty
+layer into every connection being unchecked, on a machine already known to have
+something wrong with its trust store.
+
+Patched over `urllib.request.urlopen` rather than threaded through fifty-six
+call sites, each of which would have had to remember, and one of which would
+have forgotten.
+
+Tested against the real condition: a context with no trusted authorities is
+rejected exactly as that machine rejects, the bundle then verifies the same host,
+and the wrapper recovers when handed that error verbatim.
+
+### The stop button
+
+Reported: copying the stop icon to the Desktop broke it. It looked for
+`stop.ps1` beside itself, did not find it there, and printed PowerShell's own
+complaint about a `-File` argument that does not exist. Copying a button to
+where you want the button is not a mistake, so this was.
+
+Stopping needs no files - whoever is listening on port 8820 is the server - so
+the .cmd carries the whole thing inline when the script is not beside it, and
+works from anywhere.
+
+Written with pipe characters first, escaped as `^|` inside the quotes, which is
+not an escape there at all: PowerShell received a literal `^|`, matched nothing,
+and the button said "Nothing was running" while the server carried on. A foreach
+loop needs no pipes and cannot be mangled on the way through cmd.
+
+And it repeats until the port is free. One pass takes whatever the port lookup
+returns at that instant, and two servers can end up bound to the same port - it
+happened here, and the button reported success while one kept serving. A stop
+button that leaves something running is worse than none, because you believe it.
+
 ## 1.4.0 - certificates fixed at install, not explained afterwards
 
 1.3.1 made the certificate failure explain itself, which was the wrong ambition.

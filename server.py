@@ -27,6 +27,7 @@ import email.utils
 import json
 import math
 import os
+import ssl
 import re
 import stat as stat_module
 import threading
@@ -38,7 +39,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.4.0"
+VERSION = "1.4.1"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -294,6 +295,71 @@ def _with_cert_advice(data):
     except Exception:  # noqa: BLE001 - not JSON, or not ours to rewrite
         pass
     return data
+
+
+# A second attempt for machines whose trust store cannot be fixed.
+#
+# Windows fetches a root certificate the first time something asks, through
+# CryptoAPI, and Python never asks - it copies what is already in the store and
+# verifies with OpenSSL. warm-certificates.ps1 asks on its behalf during
+# installation and that is enough on most machines. It is not enough on one that
+# cannot reach Windows Update's certificate list at all, because then the root
+# does not exist locally and no amount of asking produces it.
+#
+# So: every request goes to the operating system's trust store first, exactly as
+# before. Only one that comes back with a certificate error is tried again
+# against the bundle in certs/, which is Mozilla's list as packaged by certifi.
+#
+# The order is the whole design. The system store is current and the bundle is a
+# snapshot that ages, so a healthy machine never touches the file, and a machine
+# that would otherwise show nothing at all gets a second attempt that is still
+# properly verified.
+#
+# There is deliberately no way to switch verification off. That would turn an
+# empty layer into every connection being unchecked, on a machine already known
+# to have something wrong with its trust store.
+CA_BUNDLE = os.path.join(ROOT, "certs", "cacert.pem")
+_ca_context = None
+_ca_used = [False]
+
+
+def _is_cert_error(exc):
+    text = str(exc)
+    return ("CERTIFICATE_VERIFY_FAILED" in text
+            or "certificate verify failed" in text
+            or "unable to get local issuer" in text)
+
+
+def _bundle_context():
+    global _ca_context
+    if _ca_context is None:
+        _ca_context = ssl.create_default_context(cafile=CA_BUNDLE)
+    return _ca_context
+
+
+_system_urlopen = urllib.request.urlopen
+
+
+def _urlopen_with_fallback(url, *args, **kwargs):
+    try:
+        return _system_urlopen(url, *args, **kwargs)
+    except Exception as exc:  # noqa: BLE001 - only certificate errors are ours
+        if not _is_cert_error(exc) or not os.path.exists(CA_BUNDLE):
+            raise
+        retry = dict(kwargs)
+        retry["context"] = _bundle_context()
+        opened = _system_urlopen(url, *args, **retry)
+        if not _ca_used[0]:
+            _ca_used[0] = True
+            log("certificates: this machine could not verify a host from its own "
+                "store, so the bundle in certs/ is being used instead. Still "
+                "verified, just against Mozilla's list rather than Windows'.")
+        return opened
+
+
+# Patched rather than threaded through fifty-six call sites, each of which would
+# have had to remember to do this and one of which would have forgotten.
+urllib.request.urlopen = _urlopen_with_fallback
 
 
 def _mem_get(key):

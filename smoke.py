@@ -520,6 +520,42 @@ def check_cert_warmup(report):
                 report.fail("certificates", "%s no longer runs the warm-up" % name)
 
 
+
+def check_ca_fallback(report):
+    """The certificate bundle, and the fact that it is only a fallback.
+
+    Two things can go wrong here and only one of them is visible. The bundle can
+    go missing, which breaks machines that need it - noticeable. Or the order can
+    invert so every request verifies against a file that ages instead of the
+    operating system's current store, which breaks nothing today and quietly
+    stops trusting a new authority in a year.
+
+    So both are checked: that the file is there with a plausible number of roots,
+    and that the system path is still tried first.
+    """
+    bundle = os.path.join(ROOT, "certs", "cacert.pem")
+    if not os.path.exists(bundle):
+        report.fail("certificates", "certs/cacert.pem is missing")
+        return
+    with open(bundle, encoding="utf-8", errors="replace") as fh:
+        roots = fh.read().count("BEGIN CERTIFICATE")
+    if roots < 50:
+        report.fail("certificates", "the bundle holds only %d roots" % roots)
+
+    src = read(os.path.join(ROOT, "server.py"))
+    if "_urlopen_with_fallback" not in src:
+        report.fail("certificates", "the fallback is no longer installed")
+        return
+    body = src[src.index("def _urlopen_with_fallback"):]
+    body = body[:body.index(chr(10) + "urllib.request.urlopen =")]
+    if "_system_urlopen" not in body.split("except")[0]:
+        report.fail("certificates",
+                    "the bundle is tried before the system store, not after")
+    if "_is_cert_error" not in body:
+        report.fail("certificates",
+                    "every failure now retries against the bundle, not just certificate ones")
+
+
 def check_placeholders(app_js, report):
     """A template hole naming something JavaScript has never heard of.
 
@@ -835,6 +871,7 @@ def main():
     check_trust_script(report)
     check_start_hidden(report)
     check_cert_warmup(report)
+    check_ca_fallback(report)
     if not args.quick:
         check_setup_links(app_js, report)
     check_commas(app_js, report)
