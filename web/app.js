@@ -335,9 +335,13 @@ function makeImageryLayer(key) {
       url,
       maximumLevel: (spec.gibs || spec.openLicence) ? spec.max
         : safeMode ? (key === 'ops' ? 8 : 9) : spec.max,
+      // The second argument is showOnScreen, and without it Cesium folds every
+      // credit behind a "Data attribution" link nobody clicks. Esri's terms and
+      // ODbL both want the notice on the map, not one interaction away.
       credit: new Cesium.Credit(
         (spec.gibs || spec.openLicence || !safeMode) ? spec.credit
-          : 'NASA GIBS / EOSDIS - public domain'
+          : 'NASA GIBS / EOSDIS - public domain',
+        true
       ),
     })
   );
@@ -8423,6 +8427,9 @@ const SOURCE_LICENCES = [
   ['Windy', 'webcams worldwide', 'free tier is link/embed only', 'non-commercial'],
   ['aisstream.io', 'worldwide AIS', 'free tier', 'free'],
   ['KartaView', 'street-level photographs', 'CC BY-SA', 'free'],
+  ['Wikipedia', 'submarine base positions, background on places',
+    'CC BY-SA 4.0 — attribution and share-alike', 'free',
+    'https://en.wikipedia.org/'],
   ['Wikimedia Commons', 'ship and type photographs', 'per file, mostly CC BY-SA', 'free'],
   ['Wikidata', 'entity graph, heads of state', 'CC0', 'free'],
   ['CelesTrak', 'orbital elements, satellite catalogue', 'free with attribution', 'free'],

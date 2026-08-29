@@ -45,7 +45,11 @@ ROOT = os.path.dirname(os.path.abspath(__file__))
 WEB = os.path.join(ROOT, "web")
 CACHE_DIR = os.path.join(ROOT, ".cache")
 
-USER_AGENT = "global-command-view/0.1 (local research client)"
+# Nominatim and Overpass both ask that a client identify itself and say where
+# to complain. A project URL is the contact route for something with no
+# operator - anyone whose service this is rude to can find the issue tracker.
+USER_AGENT = ("global-command-view/%s "
+              "(+https://github.com/Mochi-game/global-command-view)" % VERSION)
 TIMEOUT = 30
 
 # Optional API keys, kept out of git. See keys.example.json. Everything works

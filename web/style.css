@@ -29,8 +29,43 @@ html, body {
 }
 
 /* Cesium chrome we do not want */
-.cesium-viewer-bottom { display: none; }
-.cesium-widget-credits { display: none; }
+
+/*
+ * Except the attribution, which is a licence condition rather than chrome.
+ *
+ * Both of these rules said display:none, which meant the credit strings were
+ * being built correctly - "Imagery (c) Esri and its licensors", the ODbL notice
+ * for OpenStreetMap, Cesium ion's own - and then hidden from the one place a
+ * map is supposed to carry them. Esri's terms, ODbL and the ion Community tier
+ * all require it visible on the map itself, and a credits tab elsewhere in the
+ * app does not substitute for a basemap's own line.
+ *
+ * So it stays, small and dim in the corner, out of the way of everything else.
+ */
+.cesium-viewer .cesium-viewer-bottom {
+  /* Cesium's own stylesheet comes from the CDN after this one and pins these to
+     the left, where the layer panel sits on top of them - attribution behind a
+     panel is not attribution. Hence the overrides. */
+  left: auto !important;
+  right: 10px !important;
+  bottom: 2px !important;
+  z-index: 4;
+  pointer-events: auto;
+}
+
+.cesium-viewer .cesium-widget-credits {
+  display: block;
+  color: var(--dim);
+  font: 9px/1.5 var(--mono);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
+  opacity: 0.75;
+  max-width: 46vw;
+  text-align: right;
+}
+
+.cesium-widget-credits a,
+.cesium-widget-credits a:visited { color: var(--dim); }
+.cesium-widget-credits a:hover { color: var(--cyan); }
 .cesium-performanceDisplay-defaultContainer { top: 56px; right: 12px; left: auto; }
 
 #scanlines {
