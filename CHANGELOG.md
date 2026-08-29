@@ -6,6 +6,30 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.2.3 — the warning Windows shows before anything else
+
+Asked what somebody does after unpacking the ZIP. The instructions were there
+and were fine, and they left out the one thing that actually stops people: a
+`.cmd` file that came from the internet triggers SmartScreen. A blue box saying
+*Windows protected your PC*, with only a **Don't run** button visible and the
+way through hidden behind **More info**.
+
+That is where a first-time Windows user gives up, and nothing anywhere mentioned
+it. The README does now, including what the warning actually means — Windows has
+never seen this file before, which is true and will be true of anything from a
+small project — and the two ways past it: More info then Run anyway, or skip the
+launcher and run `python server.py` in that folder, which does the same job with
+nothing to click past.
+
+It also says to open the file in Notepad and read it first, because that is the
+honest answer to a security prompt. Fifty lines, forty of which are the message
+it prints when Python is missing.
+
+Checked while writing it, rather than assumed: a clean checkout with no
+`keys.json` starts and answers, reporting `"keys": []` and naming the feeds that
+work without any account. The install path is sound; only the doorway was
+undocumented.
+
 ## 1.2.2 — taxiways kept a year, and told how old they are
 
 Asked to keep them a year rather than a week. Fair: a taxiway does not move, and

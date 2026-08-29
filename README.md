@@ -39,6 +39,19 @@ right-click it, choose **Extract All**, then double-click
 **`Start Global Command View.cmd`** inside. If Python is missing it will tell you
 so and wait, rather than flashing a window at you.
 
+> **Windows will probably stop you the first time.** A `.cmd` file that came from
+> the internet triggers SmartScreen: a blue box saying *Windows protected your
+> PC*, with only a **Don't run** button visible. The way through is **More
+> info** → **Run anyway**. That warning is Windows telling you it has never seen
+> this file before, which is true and will be true of anything you download from
+> a small project. If you would rather not take my word for it, the file is
+> fifty lines of batch script and forty of them are the message it prints when
+> Python is missing — open it in Notepad first and read it. That is the honest
+> answer to a security prompt: look at the thing.
+>
+> Alternatively, skip the launcher entirely and run `python server.py` in that
+> folder. It does the same job with nothing to click past.
+
 **macOS:** download the ZIP, unpack it, then double-click
 **`Start Global Command View.command`** inside. If double-clicking does nothing,
 the executable bit did not survive the download — open Terminal in that folder
