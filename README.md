@@ -76,11 +76,31 @@ use from then on.
 > works only on the folder it sits in and refuses to run unless `server.py` is
 > beside it, so it cannot be pointed at a directory of things nobody looked at.
 
-**macOS:** download the ZIP, unpack it, then double-click
-**`Start Global Command View.command`** inside. If double-clicking does nothing,
-the executable bit did not survive the download — open Terminal in that folder
-and run `chmod +x "Start Global Command View.command"` once, then it works from
-then on. The same file runs on Linux.
+**macOS:** download the ZIP, unpack it, then **right-click**
+**`Start Global Command View.command`** and choose **Open** &mdash; then **Open**
+again in the box that appears. Not double-click, the first time.
+
+> **You are not doing anything wrong when macOS refuses.** It will say the file
+> *cannot be opened because it is from an unidentified developer*, or *Apple
+> could not verify it is free of malware*. That is Gatekeeper, and it says the
+> same about everything downloaded from outside the App Store that has not been
+> signed with a $99-a-year Apple Developer certificate. Right-click &rarr; Open is
+> the deliberate gesture that says you meant it, and you only do it once.
+>
+> On macOS 15 Sequoia and later, right-click &rarr; Open may not offer a way
+> through. Then: **System Settings &rarr; Privacy &amp; Security**, scroll down, and
+> press **Open Anyway** next to the file's name. Same thing, moved.
+>
+> **You do not need Wine, Whisky, CrossOver or any of that.** Those exist to run
+> Windows `.exe` files on a Mac. There is no `.exe` here &mdash; this is Python and
+> a browser, and both run on macOS natively. The `.cmd` files in the folder are
+> the Windows launchers and can be ignored.
+>
+> If double-clicking does nothing at all and no message appears, that is the
+> other thing: the executable bit. `chmod +x "Start Global Command View.command"`
+> in Terminal, once. The ZIP does carry the bit, so this is rare.
+
+The same file runs on Linux, where none of the above applies.
 
 **Anything else, or if you would rather type it:** `python3 server.py`, then
 open <http://localhost:8820>. Ctrl+C stops it.
