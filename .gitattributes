@@ -22,4 +22,4 @@
 
 # Read on a Mac, so LF. TextEdit copes with either, but a file addressed to
 # macOS users should not arrive full of carriage returns.
-Mac users - read this first.txt text eol=lf
+"Mac users - read this first.txt" text eol=lf
