@@ -13,6 +13,25 @@ that rather than drawing an empty map.
 you turn on is the first thing you see. A welcome page says what to try first;
 tick the box and it stays gone, and **WELCOME** in the top bar brings it back.
 
+## Watch it first
+
+<table>
+<tr>
+<td width="50%" valign="top">
+<a href="https://youtu.be/DI1-QUQtPtI"><img src="https://img.youtube.com/vi/DI1-QUQtPtI/maxresdefault.jpg" alt="Modern Onboarding Global Command View"></a>
+<p><b><a href="https://youtu.be/DI1-QUQtPtI">Modern Onboarding</a></b> &middot; 18 min<br>
+Downloading it, installing it, and what the layers actually show. Start here if
+you have never run it.</p>
+</td>
+<td width="50%" valign="top">
+<a href="https://youtu.be/YqUMbXMA2MI"><img src="https://img.youtube.com/vi/YqUMbXMA2MI/maxresdefault.jpg" alt="Orlando long ATC and approach"></a>
+<p><b><a href="https://youtu.be/YqUMbXMA2MI">Orlando: ATC and approach</a></b> &middot; 7 min<br>
+Following live traffic into an airfield with the frequencies, the runway
+geometry and the approach lines on screen.</p>
+</td>
+</tr>
+</table>
+
 ![Everything on at once: the night side of Earth with satellite designators,
 fire clusters, submarine cables, and the layer panel counting each
 feed](docs/globe.jpg)
@@ -50,6 +69,22 @@ It asks before downloading anything and says what it will fetch and from where
 (python.org, about 26 MB). An installer that pulls an executable without telling
 you is indistinguishable from something you would not want, so this one tells
 you, and answering anything but `y` installs nothing.
+
+### First, before you unpack it
+
+![Unblock the ZIP: right-click it, choose Properties, tick Unblock](docs/unblock-the-zip.svg)
+
+Right-click the downloaded ZIP, choose **Properties**, tick **Unblock** at the
+bottom, and press OK. *Then* extract it.
+
+Windows marks everything that arrives from the internet, and that mark is what
+raises the *Windows protected your PC* box on the launchers and stops
+`stop.ps1` running at all. Clear it on the archive and every file unpacked from
+it comes out clean, so you never meet the warning at all.
+
+Skip this and nothing is lost &mdash; the installer clears the whole folder for you.
+But you have to get past the warning on the installer itself first, and doing it
+at the ZIP is one tick instead.
 
 Once Python is on the machine, **`Start Global Command View.cmd`** is the one to
 use from then on.

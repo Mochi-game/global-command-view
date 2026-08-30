@@ -1,0 +1,79 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 470" width="880" height="470" font-family="Segoe UI, system-ui, sans-serif">
+  <title>Unblock the ZIP before you unpack it</title>
+  <desc>Right-click the downloaded ZIP, choose Properties, and tick Unblock at the bottom of the General tab. Every file unpacked from it is then trusted.</desc>
+
+  <rect width="880" height="470" fill="#f4f4f4"/>
+
+  <!-- step one -->
+  <text x="28" y="36" font-size="15.5" font-weight="600" fill="#1a1a1a">1. Right-click the ZIP you downloaded</text>
+  <text x="28" y="58" font-size="13" fill="#5a5a5a">Before unpacking it. Afterwards is too late to do it in one go.</text>
+
+  <g transform="translate(28,78)">
+    <rect width="264" height="50" rx="4" fill="#fff" stroke="#c9c9c9"/>
+    <rect x="16" y="13" width="20" height="24" rx="2" fill="#ffd166" stroke="#d9a520"/>
+    <line x1="16" y1="21" x2="36" y2="21" stroke="#d9a520"/>
+    <text x="48" y="30" font-size="13" fill="#1a1a1a">GlobalCommandView-1.4.2.zip</text>
+  </g>
+
+  <g transform="translate(96,136)">
+    <rect width="204" height="126" rx="6" fill="#fbfbfb" stroke="#c9c9c9"/>
+    <text x="18" y="26" font-size="13" fill="#5a5a5a">Open</text>
+    <text x="18" y="50" font-size="13" fill="#5a5a5a">Extract All…</text>
+    <line x1="8" y1="62" x2="196" y2="62" stroke="#e4e4e4"/>
+    <text x="18" y="82" font-size="13" fill="#5a5a5a">Show more options</text>
+    <line x1="8" y1="93" x2="196" y2="93" stroke="#e4e4e4"/>
+    <rect x="6" y="99" width="192" height="22" rx="3" fill="#e8f0fe"/>
+    <text x="18" y="115" font-size="13" font-weight="600" fill="#1a1a1a">Properties</text>
+  </g>
+
+  <text x="28" y="290" font-size="12.5" fill="#7a7a7a">On Windows 11 the short menu may not list</text>
+  <text x="28" y="308" font-size="12.5" fill="#7a7a7a">Properties. Choose Show more options first.</text>
+
+  <!-- step two -->
+  <text x="452" y="36" font-size="15.5" font-weight="600" fill="#1a1a1a">2. Tick Unblock, then OK</text>
+  <text x="452" y="58" font-size="13" fill="#5a5a5a">At the very bottom of the General tab.</text>
+
+  <g transform="translate(452,78)">
+    <rect width="400" height="212" rx="6" fill="#fff" stroke="#b6b6b6"/>
+    <path d="M0 84 v-78 a6 6 0 0 1 6 -6 h388 a6 6 0 0 1 6 6 v78 z" fill="#fff"/>
+    <path d="M0 30 v-24 a6 6 0 0 1 6 -6 h388 a6 6 0 0 1 6 6 v24 z" fill="#efefef"/>
+    <text x="16" y="20" font-size="12" fill="#333">GlobalCommandView-1.4.2.zip Properties</text>
+
+    <text x="20" y="58" font-size="12" fill="#7a7a7a">Created:</text>
+    <text x="118" y="58" font-size="12" fill="#333">30 August 2026, 08:50</text>
+    <text x="20" y="80" font-size="12" fill="#7a7a7a">Size:</text>
+    <text x="118" y="80" font-size="12" fill="#333">1.38 MB</text>
+
+    <line x1="20" y1="98" x2="380" y2="98" stroke="#e6e6e6"/>
+
+    <text x="20" y="124" font-size="12" fill="#7a7a7a">Security:</text>
+    <text x="118" y="124" font-size="11.5" fill="#333">This file came from another computer and</text>
+    <text x="118" y="141" font-size="11.5" fill="#333">might be blocked to help protect this computer.</text>
+
+    <!-- the one control that matters, on its own line so nothing collides -->
+    <rect x="114" y="154" width="118" height="26" rx="4" fill="#fff5ef" stroke="#f0b48a"/>
+    <rect x="123" y="160" width="14" height="14" rx="2" fill="#0067c0" stroke="#0067c0"/>
+    <path d="M126.5 167 l2.8 3.2 l5.2 -6" fill="none" stroke="#fff" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round"/>
+    <text x="145" y="172" font-size="12.5" font-weight="600" fill="#1a1a1a">Unblock</text>
+
+    <rect x="212" y="176" width="76" height="26" rx="4" fill="#e9e9e9" stroke="#bfbfbf"/>
+    <text x="250" y="193" font-size="12" fill="#333" text-anchor="middle">OK</text>
+    <rect x="298" y="176" width="82" height="26" rx="4" fill="#e9e9e9" stroke="#bfbfbf"/>
+    <text x="339" y="193" font-size="12" fill="#333" text-anchor="middle">Cancel</text>
+  </g>
+
+  <!-- arrow, coming from the left into the checkbox, clear of every button -->
+  <path d="M392 262 C 440 262, 500 258, 540 250" fill="none" stroke="#e8590c" stroke-width="2.6"
+        stroke-linecap="round"/>
+  <path d="M552 247 l-16 -7 l3 13 z" fill="#e8590c"/>
+  <text x="404" y="250" font-size="12.5" font-weight="600" fill="#e8590c" text-anchor="end">this box</text>
+
+  <!-- why -->
+  <line x1="28" y1="338" x2="852" y2="338" stroke="#dcdcdc"/>
+  <text x="28" y="368" font-size="14.5" font-weight="600" fill="#1a1a1a">Why at the ZIP, and not afterwards</text>
+  <text x="28" y="393" font-size="13" fill="#444">Windows marks everything that arrives from the internet. Unblock the archive first and every file unpacked</text>
+  <text x="28" y="414" font-size="13" fill="#444">from it comes out clean: no SmartScreen box on the installer, and the stop button works straight away.</text>
+  <text x="28" y="440" font-size="13" fill="#444">Do it afterwards and the mark is already on each file separately. The installer clears the whole folder for you</text>
+  <text x="28" y="461" font-size="13" fill="#444">either way — but only once you have got past the warning on the installer itself.</text>
+</svg>
