@@ -34,3 +34,11 @@
 "Global Command View.html" linguist-generated=true
 docs/* linguist-documentation=true
 certs/* linguist-vendored=true
+
+# Kept in the repository, left out of the download.
+#
+# The social preview card is uploaded by hand in GitHub's settings and is
+# referenced by nothing else. It was 963 kB of a 2.4 MB archive that every user
+# downloads and no user needs. The screenshots stay, because README.md points at
+# them and somebody reading it in the folder should see them.
+docs/social-preview.png export-ignore
