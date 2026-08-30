@@ -1513,3 +1513,24 @@ audio.stream-player {
   text-transform: uppercase;
   color: var(--amber);
 }
+
+/* The films on the welcome page.
+ *
+ * Set apart from the numbered cards rather than made a fourth one: watching is
+ * an alternative to reading the three, not a step after them. Dimmer than the
+ * cards so it offers itself without competing with the thing it is offering. */
+.welcome-films {
+  margin: 18px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: rgba(79, 214, 255, 0.04);
+  color: var(--dim);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.welcome-films b { color: var(--ink); }
+
+.welcome-films a { color: var(--cyan); text-decoration: none; }
+.welcome-films a:hover { text-decoration: underline; }
