@@ -23,3 +23,14 @@
 # Read on a Mac, so LF. TextEdit copes with either, but a file addressed to
 # macOS users should not arrive full of carriage returns.
 "Mac users - read this first.txt" text eol=lf
+
+# What GitHub counts as this project's language.
+#
+# It said HTML, because "Global Command View.html" is a 664 kB single-file build
+# and outweighed everything written by hand. A tool listed as HTML on a topic
+# page reads as a web page rather than something you run, which is the opposite
+# of true here: it is a Python server and a JavaScript client, and the .html is
+# output rather than source.
+"Global Command View.html" linguist-generated=true
+docs/* linguist-documentation=true
+certs/* linguist-vendored=true
