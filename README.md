@@ -32,6 +32,8 @@ geometry and the approach lines on screen.</p>
 </tr>
 </table>
 
+More on the channel: **[youtube.com/@Global-command](https://www.youtube.com/@Global-command)**
+
 ![Everything on at once: the night side of Earth with satellite designators,
 fire clusters, submarine cables, and the layer panel counting each
 feed](docs/globe.jpg)
