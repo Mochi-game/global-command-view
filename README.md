@@ -102,6 +102,10 @@ again in the box that appears. Not double-click, the first time.
 
 The same file runs on Linux, where none of the above applies.
 
+All of that is also in **`Mac users - read this first.txt`** inside the
+folder, because somebody meeting *unidentified developer* for the first time
+is looking at the folder, not at this page.
+
 **Anything else, or if you would rather type it:** `python3 server.py`, then
 open <http://localhost:8820>. Ctrl+C stops it.
 

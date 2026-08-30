@@ -1,0 +1,120 @@
+GLOBAL COMMAND VIEW ON A MAC
+================================================================
+
+You do not need Wine, Whisky or CrossOver.
+
+Those exist to run Windows .exe files on a Mac, and there is no .exe
+here. This app is Python and a web browser, and both run on macOS
+natively. Most of the files in this folder end in .cmd - those are the
+Windows launchers. Ignore them. The one that matters to you is:
+
+    Start Global Command View.command
+
+This note exists because the first thing macOS does is refuse to open
+it, in words that sound like the file is broken. It is not.
+
+
+1. THE FIRST TIME: RIGHT-CLICK, DO NOT DOUBLE-CLICK
+----------------------------------------------------------------
+
+    Right-click (or Control-click) "Start Global Command View.command"
+    Choose "Open"
+    In the box that appears, press "Open" again
+
+That is the whole trick, and you only do it once.
+
+Double-clicking shows the same message with only "Move to Trash" and
+"Cancel" - no way through. Right-click then Open shows the same words
+with an "Open" button added. The message is identical; the buttons are
+not. That is what makes it confusing.
+
+  Why it happens: macOS refuses to open anything downloaded from
+  outside the App Store that has not been signed with an Apple
+  Developer certificate, which costs $99 a year. It says "unidentified
+  developer" when it means "unsigned". Right-click then Open is the
+  deliberate gesture that says you meant to run it.
+
+  On macOS 15 Sequoia and later there may be no "Open" button. Then:
+  double-click once and let it be refused, open System Settings ->
+  Privacy & Security, scroll down, and press "Open Anyway" next to the
+  file's name. Same permission, moved.
+
+
+2. PYTHON
+----------------------------------------------------------------
+
+The app needs Python 3.9 or newer. Most Macs have it; if yours does
+not, macOS will offer to install its Command Line Tools the moment
+the launcher asks for python3. Say yes. It is a few hundred megabytes
+and takes a few minutes.
+
+If it does not offer, run this in Terminal:
+
+    xcode-select --install
+
+  IT WILL SAY SOMETHING ABSURD LIKE "ABOUT 20 HOURS". Ignore it and
+  do not cancel. macOS estimates that from the first few seconds,
+  before the download has got going, and it is wrong every time. It
+  settles to about ten minutes once it has a real speed to measure.
+  Cancelling a working install because of that number is the most
+  likely way to get stuck here.
+
+Nothing from this project is downloaded in the process. That is
+Apple's own toolchain, from Apple.
+
+
+3. IF YOU WOULD RATHER SKIP ALL OF THAT
+----------------------------------------------------------------
+
+Gatekeeper cares about *opening* a file. Running one through Python
+does not involve it at all:
+
+    Open Terminal
+    Type:  cd     (with a space after it)
+    Drag this folder from Finder into the Terminal window
+    Press return
+    Then type:  python3 server.py
+
+The browser opens by itself. Control-C stops it.
+
+This is not a way around security. You are running a Python file you
+can read in any text editor, instead of asking macOS to launch a shell
+script on your behalf. It is the same app either way.
+
+
+4. STOPPING IT
+----------------------------------------------------------------
+
+The Terminal window that opened is the server. Press Control-C in it,
+or close the window. There is no stop icon on macOS - the .cmd files
+that do that are for Windows.
+
+
+5. KEYS, IF YOU WANT THEM LATER
+----------------------------------------------------------------
+
+Most layers need no account at all: radio, ships, aircraft, cameras,
+earthquakes, fires. Nothing has to be set up to start looking.
+
+The ones that do are added in the app itself, under SETUP. They are
+written to a file called keys.json in this folder, which stays on your
+machine and is never sent anywhere except to the service it belongs
+to.
+
+
+6. WHEN YOU UPDATE LATER
+----------------------------------------------------------------
+
+Unpack the new version straight over this folder. Nothing you made is
+in the download, so there is nothing for it to overwrite - keys.json,
+your saved views and the cache are all kept out of the archive on
+purpose.
+
+Unpacking somewhere new is the one that loses things: your keys stay
+behind in the old folder. If you do that, copy keys.json and the data
+folder across afterwards.
+
+
+----------------------------------------------------------------
+Full documentation is in README.md, and the app has a HELP tab that
+explains every layer and where its data comes from.
