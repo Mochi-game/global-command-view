@@ -6,6 +6,54 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.4.3 - the launcher notices it is inside the ZIP
+
+Reported from a user's machine: Python complaining about a file it could not
+open, at a path ending `.zip.5d8\global-command-view-main\server.py`.
+
+That is Windows showing an archive as though it were a folder. Double-clicking
+the launcher in there looks exactly like double-clicking it in a real one, but
+Windows copies out that single file to a temporary directory and runs it alone.
+Nothing else came with it, so the first thing to fail is server.py not existing
+— and Python reports that as a path error nobody outside this project could
+read.
+
+Both Windows launchers check for server.py beside them now and say what
+happened: this came from inside the ZIP, here is where Windows put it, extract
+it properly and run it from there. And, while the ZIP is already right-clicked,
+tick Unblock at the bottom of Properties — the same gesture, and it saves the
+SmartScreen warning later.
+
+Tested by rebuilding the situation exactly: one launcher alone in a directory
+named the way Windows names them, with no server.py beside it.
+
+## 1.4.2 - an install note for Mac users, in the folder where they are looking
+
+A Mac user met *cannot be opened because it is from an unidentified developer*,
+found nothing about it in the README, and went off reading about Wine and
+Whisky. Reasonable: a folder full of `.cmd` files, and the one file meant for
+them refuses to open. Concluding this is a Windows program is the obvious
+inference.
+
+The README was actively wrong. It blamed the executable bit and told people to
+run `chmod`, which does nothing here — the bit survives the download fine, and
+the archive carries it at 0755. What stops them is Gatekeeper, which was not
+mentioned anywhere.
+
+`Mac users - read this first.txt` now ships in the folder, and it opens by
+saying Wine is not needed and that the `.cmd` files are for Windows. Then:
+right-click and Open rather than double-click, and why the box says the same
+words either way while only one of them has an Open button; where Sequoia moved
+that permission; the Command Line Tools; running it through `python3` instead if
+they would rather not argue with Gatekeeper at all; how to stop it; and that
+keys survive an update.
+
+It also says the Command Line Tools download will claim to need about twenty
+hours and to ignore that. macOS estimates from the first few seconds and is
+wrong every time; it settles to roughly ten minutes. Cancelling a working
+install over that number is the likeliest way to get stuck, and nobody had
+written it down.
+
 ## 1.4.1 - a second attempt at the certificate, and a stop button that works anywhere
 
 ### The certificate, finally
