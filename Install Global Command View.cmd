@@ -19,6 +19,29 @@ echo   GLOBAL COMMAND VIEW
 echo   ---------------------------------------------------------------
 echo.
 
+rem --------------------------------------------- unpacked, or still in the zip?
+rem Windows shows an archive as a folder, so double-clicking this inside one
+rem looks the same as doing it in a real folder. It is not: Windows copies out
+rem this single file to a temp directory and runs it alone, and everything after
+rem here fails on files that were never extracted.
+if not exist "%~dp0server.py" (
+  echo.
+  echo   This is running from inside the ZIP file.
+  echo.
+  echo   Windows shows a ZIP as if it were a folder, but it is not one. It
+  echo   copied this one file out to a temporary place and ran it there,
+  echo   without the rest of the app.
+  echo.
+  echo   Close this window, right-click the ZIP you downloaded, choose
+  echo   Extract All, and run the installer from the folder that appears.
+  echo.
+  echo   While you have it right-clicked: Properties, and tick Unblock at
+  echo   the bottom. That saves you a warning later.
+  echo.
+  pause
+  exit /b 1
+)
+
 rem ------------------------------------------------- trust these files
 rem Everything out of a downloaded ZIP carries Windows' Mark of the Web,
 rem which is what makes the launchers raise SmartScreen and what stops

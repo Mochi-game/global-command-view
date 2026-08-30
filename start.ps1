@@ -17,6 +17,41 @@ $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
 if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Path }
 
+# Run from inside the ZIP, which is the commonest way to get nowhere.
+#
+# Windows shows an archive as though it were a folder, so double-clicking the
+# launcher in there looks exactly like double-clicking it in a real one. What
+# happens instead is that Windows copies out that single file to somewhere like
+#   C:\Users\you\AppData\Local\Temp\<guid>_something.zip.abc\
+# and runs it there, alone. Nothing else came with it, so the first thing to
+# fail is server.py not existing - and Python reports that as a path error with
+# a temp directory in it that means nothing to the person reading it.
+#
+# Reported by a user who saw exactly that, with no way to tell what it meant.
+if (-not (Test-Path (Join-Path $here 'server.py'))) {
+    Write-Host ''
+    Write-Host '  This is running from inside the ZIP file.' -ForegroundColor Yellow
+    Write-Host ''
+    Write-Host '  Windows shows a ZIP as if it were a folder, but it is not one. It'
+    Write-Host '  copied this one file out to a temporary place and ran it there,'
+    Write-Host '  without the rest of the app:'
+    Write-Host ''
+    Write-Host "    $here" -ForegroundColor DarkGray
+    Write-Host ''
+    Write-Host '  What to do instead:' -ForegroundColor Cyan
+    Write-Host ''
+    Write-Host '    1. Close this window.'
+    Write-Host '    2. Right-click the ZIP file you downloaded.'
+    Write-Host '    3. Choose Extract All, and pick somewhere to put it.'
+    Write-Host '    4. Open the folder that appears, and run it from in there.'
+    Write-Host ''
+    Write-Host '  While you have it right-clicked: Properties, and tick Unblock at'
+    Write-Host '  the bottom. That saves you a warning later.'
+    Write-Host ''
+    Read-Host '  Press Enter to close'
+    exit 1
+}
+
 $port = 8820
 $url = "http://127.0.0.1:$port/"
 $outLog = Join-Path $here 'server.log'
