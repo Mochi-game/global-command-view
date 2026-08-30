@@ -404,6 +404,16 @@ mistakes are mine.
 
 ---
 
+## If it is useful to you
+
+[**buymeacoffee.com/myriskdashk**](https://buymeacoffee.com/myriskdashk)
+
+Entirely optional, and nothing is behind it. Every layer stays free for
+everyone, because several of the feeds this draws on permit non-commercial use
+only &mdash; a payment anyone *had* to make would break their terms. A voluntary
+tip is not a sale, which is the whole difference.
+
+
 ## Licence
 
 The code is **MIT** — see [`LICENSE`](LICENSE). Do what you like with it.

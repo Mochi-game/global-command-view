@@ -1,0 +1,11 @@
+# Puts a Sponsor button at the top of the repository page, beside Watch and
+# Fork, which is where somebody who has just decided they like this is looking.
+# A line at the bottom of the README is read by people who already scrolled that
+# far, and they are not the ones who need asking.
+#
+# The app carries the same link on its own toolbar. Worth keeping both honest
+# about what it is: every layer stays free for everyone, and a voluntary tip is
+# not a sale. Several of the feeds behind this permit non-commercial use only,
+# so a payment somebody has to make to get the app or unlock a feature would
+# break their terms. This cannot become that.
+buy_me_a_coffee: myriskdashk
