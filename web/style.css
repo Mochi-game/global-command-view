@@ -1534,3 +1534,67 @@ audio.stream-player {
 
 .welcome-films a { color: var(--cyan); text-decoration: none; }
 .welcome-films a:hover { text-decoration: underline; }
+
+/* Performance mode, on its own above the layer list.
+ *
+ * It used to sit inside the Broadcast section, which it has nothing to do with,
+ * and which is folded by default. The person who needs this switch is the one
+ * whose globe is already stuttering, and asking them to hunt for it through the
+ * panel that is causing the stutter is the wrong way round.
+ *
+ * Amber rather than the panel's usual dim, because it is the one control here
+ * that changes how the app behaves rather than what it shows. */
+#perf-block {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 8px;
+  margin-bottom: 2px;
+}
+
+.perf-row {
+  font-weight: 600;
+  color: var(--amber);
+}
+
+.perf-row input { accent-color: var(--amber); }
+
+/* Radar time strip.
+ *
+ * Beside the radio player and built like it: a fixture rather than something
+ * inside a card, because the card empties when you click anything else and the
+ * animation would lose its controls halfway through a loop. */
+#radarbar {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 46;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  background: rgba(4, 7, 12, 0.9);
+  border: 1px solid rgba(94, 234, 212, 0.4);
+  font: 11px/1 var(--mono);
+  color: var(--ink);
+}
+
+#radarbar[hidden] { display: none; }
+
+.rb-tag {
+  color: #5eead4;
+  letter-spacing: 0.12em;
+  font-weight: 600;
+}
+
+#radarbar button {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font: 11px/1 var(--mono);
+  padding: 3px 7px;
+  cursor: pointer;
+}
+
+#radarbar button:hover { border-color: #5eead4; color: #5eead4; }
+
+#radar-time { font-weight: 600; }
+#radar-age { color: var(--dim); }

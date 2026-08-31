@@ -39,7 +39,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.4.3"
+VERSION = "1.5.0"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -6162,6 +6162,87 @@ def overpass(query):
     raise last
 
 
+# ---------------------------------------------------------------- rain radar
+
+# Precipitation radar, the last two hours of it, as tiles you can run.
+#
+# The one thing this globe had nothing to say about was the weather happening
+# right now. SMHI warns about tomorrow and METAR reports one airfield; neither
+# shows you the front crossing the country.
+#
+# RainViewer stitches national radar networks into one global mosaic and serves
+# it as plain tiles, no account. Thirteen frames covering roughly the last two
+# hours at ten-minute steps, and each one has a timestamp, so the layer can say
+# which minute you are looking at rather than implying it is now.
+#
+# What it is not: a forecast. Radar is the past, and the newest frame is still
+# several minutes old by the time it reaches you. The card says so.
+
+RAINVIEWER_INDEX = "https://api.rainviewer.com/public/weather-maps.json"
+# Frames arrive every ten minutes and the index is small, so this is short.
+RADAR_TTL = 240
+
+
+def radar():
+    """Where the radar frames are, and what time each one is."""
+    hit = _mem_get("radar")
+    if hit and time.time() - hit[0] < RADAR_TTL:
+        return hit[1], "memory"
+
+    try:
+        req = urllib.request.Request(RAINVIEWER_INDEX, headers={
+            "User-Agent": USER_AGENT, "Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+            body = json.loads(resp.read())
+    except Exception as exc:  # noqa: BLE001
+        log("radar: %s" % exc)
+        return json.dumps({"frames": [], "error": str(exc)[:120]}).encode(), "error"
+
+    host = body.get("host") or ""
+    past = (body.get("radar") or {}).get("past") or []
+    if not host or not past:
+        return json.dumps({
+            "frames": [],
+            "error": "the index answered with no frames",
+        }).encode(), "error"
+
+    frames = []
+    for f in past:
+        stamp = f.get("time")
+        path = f.get("path")
+        if not stamp or not path:
+            continue
+        frames.append({
+            "time": stamp,
+            "iso": datetime.datetime.fromtimestamp(
+                stamp, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "age_min": int((time.time() - stamp) / 60),
+            # 256-pixel tiles, colour scheme 4, smoothed, no snow layer. The
+            # trailing numbers are RainViewer's: {size}/{z}/{x}/{y}/{scheme}/
+            # {smooth}_{snow}.png
+            "url": "%s%s/256/{z}/{x}/{y}/4/1_1.png" % (host, path),
+        })
+
+    data = json.dumps({
+        "frames": frames,
+        "newest": frames[-1]["iso"] if frames else "",
+        "source": "RainViewer",
+        "attribution": "Radar mosaic by RainViewer - rainviewer.com",
+        "note": "national radar networks stitched into one mosaic. It is the "
+                "past, not a forecast, and the newest frame is already a few "
+                "minutes old. Coverage follows where radars exist: dense over "
+                "Europe, North America and Japan, thin over oceans and much of "
+                "Africa and central Asia. Empty there means nobody is looking, "
+                "not that nothing is falling.",
+        "terms": "free for personal and educational use. RainViewer give no "
+                 "uptime guarantee and say a source can withdraw at any time.",
+    }).encode()
+    _mem_put("radar", data)
+    log("radar: %d frames, newest %d min old · RainViewer"
+        % (len(frames), frames[-1]["age_min"] if frames else -1))
+    return data, "network"
+
+
 # --------------------------------------------------------------- open waters
 
 # Ships from an open AIS network that asks for no account at all.
@@ -7034,6 +7115,8 @@ class Handler(SimpleHTTPRequestHandler):
                     float(query.get("east", ["0"])[0]))
             elif name == "taf":
                 data, source = taf(query.get("icao", [""])[0])
+            elif name == "radar":
+                data, source = radar()
             elif name == "openwaters":
                 data, source = openwaters(
                     float(query.get("south", ["0"])[0]),

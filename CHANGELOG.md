@@ -6,6 +6,52 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.5.0 - rain radar, and the performance switch where you can find it
+
+### Rain radar
+
+The one thing this globe could not say was what the weather is doing right now.
+SMHI warns about tomorrow and METAR reports one airfield an hour ago; neither
+shows the front crossing the country while you watch.
+
+**Rain radar (2 h)** plays the last two hours as thirteen frames at ten-minute
+steps, from RainViewer, who stitch national radar networks into one mosaic and
+serve it as plain tiles with no account.
+
+Each frame is an imagery layer built once and then shown or hidden, rather than
+one layer whose provider is swapped. That matters: Cesium caches tiles per
+layer, so the first loop pays for the tiles and every loop after is free.
+Swapping providers would re-fetch the same tiles forever.
+
+Every frame carries its own timestamp on screen, and the loop pauses on the
+newest one. Radar is the past — the newest frame was nine minutes old when this
+was tested — and a layer that animates without saying when would read as live
+weather. Empty is not dry, either: coverage follows where radars exist, and the
+help says so.
+
+Free for personal and educational use, and RainViewer publish no uptime
+guarantee, so it withdraws in commercial-safe mode with the rest.
+
+Thrifty machines get every second frame. The animation still reads as motion at
+half the tiles, and tiles are the whole cost.
+
+### The performance switch
+
+It was inside the Broadcast section, which it has nothing to do with, and which
+is folded by default. The person who needs that switch is the one whose globe is
+already stuttering, and asking them to hunt for it through the panel that is
+causing the stutter is the wrong way round.
+
+It sits on its own above the layer list now, in amber, because it is the one
+control in the panel that changes how the app behaves rather than what it shows.
+
+### Found while building it
+
+The layer group insert matched `'weather',` in the layer list instead of in the
+groups, and wrote `{ id: 'weather', 'radar', name: ... }` — broken JavaScript
+that the self-check happily passed, because it does not parse the client. The
+check that caught it was the one asking whether every layer belongs to a group.
+
 ## 1.4.3 - the launcher notices it is inside the ZIP
 
 Reported from a user's machine: Python complaining about a file it could not

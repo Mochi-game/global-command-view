@@ -42,6 +42,20 @@
   <!-- Built from the sections themselves, so adding one cannot leave it
        unreachable at the bottom of a six-thousand-pixel column. -->
   <nav id="section-index"></nav>
+  <!--
+    Performance mode sits on its own, above everything, because the person who
+    needs it is the person for whom the globe is already stuttering - and asking
+    them to find it under Broadcast, which it has nothing to do with, is asking
+    them to hunt through a panel that is the problem.
+  -->
+  <section class="block" id="perf-block">
+    <label class="toggle-row perf-row">
+      <input type="checkbox" id="thrifty">
+      <span>Performance mode</span>
+    </label>
+    <p id="thrifty-note" class="adds"></p>
+  </section>
+
   <section class="block">
     <h2 data-section="layers">Layers</h2>
     <ul id="layers"></ul>
@@ -197,11 +211,6 @@
     </label>
     <p id="safe-note" class="adds"></p>
     <label class="toggle-row">
-      <input type="checkbox" id="thrifty">
-      <span>Performance mode</span>
-    </label>
-    <p id="thrifty-note" class="adds"></p>
-    <label class="toggle-row">
       <input type="checkbox" id="tour">
       <span>Auto tour the briefing</span>
     </label>
@@ -290,6 +299,14 @@
   </div>
   <audio id="np-audio" controls preload="none"></audio>
   <span id="np-where"></span>
+</div>
+
+<div id="radarbar" hidden>
+  <span class="rb-tag">RADAR</span>
+  <button id="radar-play" title="play or pause">&#x275A;&#x275A;</button>
+  <button id="radar-step" title="step one frame">&#x25B8;&#x2758;</button>
+  <span id="radar-time">--:--</span>
+  <span id="radar-age"></span>
 </div>
 
 <section id="detail" hidden>
@@ -541,6 +558,29 @@
         minutes. A published approach plate says what should happen; this is what
         did. Fifteen aircraft queuing for one runway draw the real pattern,
         descent and all, and there is no licensed chart anywhere in it.
+      </p>
+
+      <h4>Rain radar, and what it is not</h4>
+      <p>
+        <b>Rain radar (2 h)</b> plays the last two hours of precipitation as
+        thirteen frames, ten minutes apart. The strip at the bottom right says
+        which minute is on screen and how old it is; the play button stops it,
+        and the step button walks one frame at a time.
+      </p>
+      <p class="guide-note">
+        <b>It is the past, not a forecast.</b> The newest frame is already
+        several minutes old when it reaches you, which is why every frame carries
+        its own timestamp rather than the layer implying it is now.
+        <br><br>
+        <b>Empty is not the same as dry.</b> RainViewer stitch national radar
+        networks together, so coverage follows where radars exist: dense over
+        Europe, North America and Japan, thin over oceans and much of Africa and
+        central Asia. Nothing drawn there means nobody is looking, not that
+        nothing is falling.
+        <br><br>
+        Free for personal and educational use, and RainViewer give no uptime
+        guarantee &mdash; they say themselves a source can withdraw at any time.
+        It is withdrawn in commercial-safe mode along with the others.
       </p>
 
       <h4>Frequencies, beacons, and the one thing that is not here</h4>

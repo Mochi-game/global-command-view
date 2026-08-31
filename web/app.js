@@ -466,7 +466,7 @@ const LAYER_GROUPS = [
   { name: 'Radio', ids: ['broadcast', 'radio', 'scanners', 'airports', 'aprs'] },
   { name: 'Aviation', ids: ['runways', 'aeroway', 'metar', 'navaids'] },
   { name: 'Moving', ids: ['flights', 'services', 'vessels', 'openships', 'trains', 'capital', 'fishing'] },
-  { name: 'Earth', ids: ['fires', 'quakes', 'volcanoes', 'weather'] },
+  { name: 'Earth', ids: ['fires', 'quakes', 'volcanoes', 'weather', 'radar'] },
   { name: 'People', ids: ['outbreaks', 'news', 'air', 'own'] },
   { name: 'Infrastructure',
     ids: ['cameras', 'cables', 'plants', 'netout', 'mesh', 'bases', 'infra', 'traffic', 'jams'] },
@@ -498,6 +498,7 @@ const LAYERS = [
   { id: 'aprs', name: 'Amateur radio (APRS)', color: '#a78bfa', on: false, count: 0, note: 'APRS-IS — operators broadcasting their own positions' },
   { id: 'airports', name: 'Airports & ATC', color: '#fcd34d', on: false, count: 0, note: 'OurAirports — LiveATC for the tower, and that is mostly North America' },
   { id: 'weather', name: 'Severe weather (US)', color: '#f472b6', on: false, count: 0, note: 'NWS — United States only, no open feed covers the rest' },
+  { id: 'radar', name: 'Rain radar (2 h)', color: '#5eead4', on: false, count: 0, note: 'RainViewer — national radar networks stitched together, the last two hours running. The past, not a forecast, and empty where no radar looks' },
   { id: 'plants', name: 'Power stations', color: '#a3e635', on: false, count: 0, note: 'WRI — 35 000 stations, sized by capacity' },
   { id: 'launches', name: 'Rocket launches', color: '#fb923c', on: false, count: 0, note: 'Launch Library — scheduled, and a schedule slips' },
   { id: 'infra', name: 'Data centres & dams', color: '#c084fc', on: false, count: 0, note: 'OpenStreetMap — queried live for the view, ODbL' },
@@ -740,6 +741,7 @@ function applyVisibility() {
   collections.services.show = on('services');
   collections.vessels.show = on('vessels');
   openShips.show = on('openships');
+  if (!on('radar') && radarLayers.length) clearRadar();
   courseVectors.show = on('vessels');
   wakes.show = on('vessels');
   collections.cameras.show = on('cameras');
@@ -9548,6 +9550,140 @@ viewer.camera.moveEnd.addEventListener(() => loadOpenWaters(false));
 // AIS positions age quickly; this is the same cadence the other moving layers
 // use and well inside what the network asks of an anonymous caller.
 setInterval(whileOn('openships', () => loadOpenWaters(true)), 30_000);
+
+/* ------------------------------------------------------------------- radar */
+
+/*
+ * Precipitation radar, the last two hours, running.
+ *
+ * The globe could say what the weather will do tomorrow and what one airfield
+ * reported an hour ago, and nothing at all about the front crossing the country
+ * while you watched. This is that.
+ *
+ * Thirteen frames at ten-minute steps, each an imagery layer built once and
+ * then shown or hidden. Building them once matters: Cesium caches tiles per
+ * layer, so the first loop pays for the tiles and every loop after is free.
+ * Rebuilding a provider per frame would re-fetch the same tiles forever.
+ *
+ * Every frame carries its own timestamp on screen. Radar is the past - the
+ * newest frame is already several minutes old when it reaches you - and a
+ * layer that animates without saying when would look like live weather.
+ */
+
+let radarLayers = [];
+let radarFrames = [];
+let radarAt = 0;
+let radarTimer = null;
+let radarPlaying = true;
+
+const RADAR_STEP_MS = 700;
+// A pause on the newest frame, so the loop reads as "and this is now" rather
+// than sliding past the only frame that matters.
+const RADAR_HOLD_MS = 1600;
+
+async function loadRadar() {
+  if (!layerOn('radar')) return;
+  if (radarLayers.length) { showRadarStrip(true); return; }
+
+  let data;
+  try {
+    data = await getJSON('/api/radar');
+  } catch (err) {
+    log(`radar unavailable (${err.message})`, 'warn');
+    return;
+  }
+  if (data.error || !(data.frames || []).length) {
+    setCount('radar', 0);
+    log(`radar: ${data.error || 'no frames offered'}`, 'warn');
+    return;
+  }
+
+  radarFrames = data.frames;
+  // Thrifty machines get every second frame. The animation still reads as
+  // motion at half the tiles, and tiles are the whole cost here.
+  if (thrifty && radarFrames.length > 6) {
+    radarFrames = radarFrames.filter((_, i) => i % 2 === 0 || i === data.frames.length - 1);
+  }
+
+  for (const frame of radarFrames) {
+    const layer = viewer.imageryLayers.addImageryProvider(
+      new Cesium.UrlTemplateImageryProvider({
+        url: frame.url,
+        maximumLevel: 10,
+        credit: new Cesium.Credit(data.attribution, true),
+      })
+    );
+    layer.alpha = 0;
+    radarLayers.push(layer);
+  }
+
+  radarAt = radarFrames.length - 1;
+  paintRadar();
+  showRadarStrip(true);
+  startRadar();
+  setCount('radar', radarFrames.length);
+  log(`radar: ${radarFrames.length} frames over ${
+    Math.round((radarFrames[radarFrames.length - 1].time - radarFrames[0].time) / 60)
+  } minutes · RainViewer`);
+}
+
+function paintRadar() {
+  radarLayers.forEach((l, i) => { l.alpha = i === radarAt ? 0.72 : 0; });
+  const f = radarFrames[radarAt];
+  if (!f) return;
+  const newest = radarAt === radarFrames.length - 1;
+  $('#radar-time').textContent = f.iso.slice(11, 16) + 'Z';
+  $('#radar-age').textContent = newest
+    ? `newest, ${f.age_min} min old`
+    : `${Math.round((radarFrames[radarFrames.length - 1].time - f.time) / 60)} min before that`;
+  scene.requestRender();
+}
+
+function startRadar() {
+  stopRadar();
+  const tick = () => {
+    radarAt = (radarAt + 1) % radarFrames.length;
+    paintRadar();
+    radarTimer = setTimeout(tick,
+      radarAt === radarFrames.length - 1 ? RADAR_HOLD_MS : RADAR_STEP_MS);
+  };
+  radarTimer = setTimeout(tick, RADAR_HOLD_MS);
+  radarPlaying = true;
+  $('#radar-play').textContent = '❚❚';
+}
+
+function stopRadar() {
+  if (radarTimer) clearTimeout(radarTimer);
+  radarTimer = null;
+  radarPlaying = false;
+  const b = $('#radar-play');
+  if (b) b.textContent = '▶';
+}
+
+function showRadarStrip(on) {
+  $('#radarbar').hidden = !on;
+  if (!on) stopRadar();
+}
+
+function clearRadar() {
+  stopRadar();
+  for (const l of radarLayers) viewer.imageryLayers.remove(l, true);
+  radarLayers = [];
+  radarFrames = [];
+  showRadarStrip(false);
+  setCount('radar', 0);
+}
+
+$('#radar-play').addEventListener('click', () => {
+  if (radarPlaying) stopRadar(); else startRadar();
+});
+$('#radar-step').addEventListener('click', () => {
+  stopRadar();
+  radarAt = (radarAt + 1) % radarFrames.length;
+  paintRadar();
+});
+
+LAYER_ON_DEMAND.radar = () => loadRadar();
 
 /* ------------------------------------------------------------------ aeroway */
 
