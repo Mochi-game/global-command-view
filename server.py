@@ -6251,6 +6251,16 @@ def forecast(lat, lon):
 
     data = json.dumps({
         "lat": lat, "lon": lon,
+        # Where this is, in words. A card headed 39.570, 2.942 is accurate and
+        # tells you nothing, which was the complaint: "forecast, overcast" is
+        # not much use until you know it is the Balearics.
+        #
+        # Region and country rather than the nearest town, because that is what
+        # place_name already answers and it is cached on an eleven-kilometre
+        # grid - fine for "which country", too coarse to name a village
+        # honestly. Nominatim is a donated service and this reuses the courtesy
+        # gap the rest of the app already keeps.
+        "place": place_name(lat, lon),
         "elevation_m": body.get("elevation"),
         "timezone": body.get("timezone"),
         "now": {

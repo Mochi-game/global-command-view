@@ -28,6 +28,14 @@ what happened and this is what was expected.
 
 Wind in metres per second, because the rest of the app is.
 
+The card is headed by where you clicked rather than by the coordinates.
+*Forecast, overcast* over a pair of numbers is accurate and says nothing; it now
+reads *Trentino &ndash; Alto Adige/S&uuml;dtirol, Italy* with the coordinates beside it.
+Region and country, because that is what the app's existing place lookup answers
+and it is cached on an eleven-kilometre grid &mdash; fine for which country, too
+coarse to name a village honestly. Over open water there is no name, and the
+card says that rather than leaving the line blank.
+
 ## 1.5.0 - rain radar, and the performance switch where you can find it
 
 ### Rain radar

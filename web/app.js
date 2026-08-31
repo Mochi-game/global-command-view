@@ -9595,6 +9595,8 @@ async function showForecast(lat, lon) {
 
   const where = `${lat.toFixed(3)}, ${lon.toFixed(3)}`;
   showDetail(where, 'forecast · looking…', [['Weather', 'asking Open-Meteo…']]);
+  // The coordinates are the title only until the answer arrives with a name.
+  // "Forecast, overcast" over a pair of numbers says nothing about where.
 
   let f;
   try {
@@ -9622,6 +9624,8 @@ async function showForecast(lat, lon) {
     ['Humidity', num(n.humidity, '%')],
     ['Pressure', num(n.pressure_hpa, 'hPa')],
     ['Falling now', num(n.rain_mm, 'mm')],
+    ['Where', f.place || 'no name for this point — open water, most likely'],
+    ['Position', `${lat.toFixed(4)}, ${lon.toFixed(4)}`],
     ['Ground height', num(f.elevation_m, 'm')],
     // The outlook as one block: five short lines read faster than five rows,
     // and the card is already long by the time it gets here.
@@ -9639,7 +9643,8 @@ async function showForecast(lat, lon) {
       + 'measured one, and the two will disagree.'],
     ['Source', f.attribution || 'Open-Meteo'],
   ];
-  showDetail(where, `forecast · ${n.what || 'Open-Meteo'}`, rows);
+  showDetail(f.place || where,
+    `forecast · ${n.what || 'Open-Meteo'}${f.place ? ` · ${where}` : ''}`, rows);
 }
 
 LAYER_ON_DEMAND.forecast = () => {
