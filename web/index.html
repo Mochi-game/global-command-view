@@ -246,6 +246,18 @@
   </section>
 
   <section class="block">
+    <h2 data-section="radio-search">Find a radio station</h2>
+    <form id="rq" autocomplete="off">
+      <input id="rq-q" type="search" spellcheck="false"
+             placeholder="jazz, Sweden, Varberg, P4&hellip;"
+             aria-label="Search radio stations by name, country, state, tag or place">
+      <button type="submit" class="chip">FIND</button>
+    </form>
+    <p id="rq-said" class="note" hidden></p>
+    <ol id="rq-list"></ol>
+  </section>
+
+  <section class="block">
     <h2 data-section="jump-to">Jump to</h2>
     <form id="find" autocomplete="off">
       <input id="find-q" type="search" spellcheck="false"
@@ -558,6 +570,32 @@
         minutes. A published approach plate says what should happen; this is what
         did. Fifteen aircraft queuing for one runway draw the real pattern,
         descent and all, and there is no licensed chart anywhere in it.
+      </p>
+
+      <h4>Finding a station the map cannot show</h4>
+      <p>
+        <b>Find a radio station</b> in the left panel reaches the whole
+        catalogue, which the globe cannot. Only <b>12 411</b> of Radio
+        Browser&rsquo;s <b>52 988</b> working stations carry coordinates, and a
+        station with no position cannot be drawn anywhere &mdash; about four
+        fifths of what exists is invisible on a map and reachable only by
+        searching.
+      </p>
+      <p>
+        One box, tried five ways at once: as a station name, as a country, as a
+        state, as a tag, and as a place on the map. Type <b>Varberg</b> and
+        nothing is named that &mdash; but there is a town there, so what comes back
+        is what is on the air near it, nearest first. Type <b>jazz</b> and you
+        get the tag and the names. Type <b>Sweden</b> and you get the country.
+        Every result says which of those matched it.
+      </p>
+      <p class="guide-note">
+        An asterisk is not needed and does no harm: the search already matches
+        parts of words, and typing one just says so.
+        <br><br>
+        Clicking a result plays it, and flies you there if it knows where it is.
+        The ones with no position simply play &mdash; which is the whole reason
+        this exists.
       </p>
 
       <h4>Weather where you click</h4>

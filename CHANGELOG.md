@@ -6,6 +6,41 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.7.0 - the four fifths of the radio catalogue the globe cannot draw
+
+The Radio stations layer only shows what has coordinates, because a station with
+no position cannot be put on a globe. Counted rather than assumed: **12 411 of
+52 988** working stations in Radio Browser carry a position. The other four
+fifths were unreachable, however long you flew around.
+
+**Find a radio station** asks the catalogue directly, and asks in five senses at
+once - as a station name, a country, a state, a tag, and a place on the map.
+
+That last one is what makes it useful. *Varberg* matches no station name at all;
+nothing is called that. But there is a town at 57.1, 12.3, so the search
+geocodes the word and comes back with what is on the air near it, nearest first
+- P4 Halland at 38 km. Every result says which of the five matched it, because
+"why is this one here" is otherwise a guess.
+
+An asterisk is stripped rather than refused. It is what people type when they
+mean "contains", and this already contains; the note says so instead of
+correcting anyone.
+
+Clicking a result plays it, and flies there if it has a position. The ones
+without simply play, which is the point.
+
+### The forecast card says which town
+
+It said *Sweden* over Varberg - true, and no use. Reverse geocoding at zoom 5
+answers a country, which is right for "where is the camera looking" and wrong
+for "where did I click", so clicks now ask at zoom 12 against their own cache:
+a hundredth of a degree, about a kilometre, close enough to name a town without
+claiming a street.
+
+*Varberg, Halland County, Sweden*. And where a Swedish kommun repeats the town
+the region is dropped, because "Varberg, Varbergs kommun, Sweden" reads as a
+stutter. Open water still has no name, which is still the honest answer.
+
 ## 1.6.0 - the weather where you click
 
 The radar says what is falling. This says how warm, how windy, and whether it is

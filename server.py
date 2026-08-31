@@ -39,7 +39,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.6.0"
+VERSION = "1.7.0"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -1652,6 +1652,67 @@ def place_name(lat, lon):
         record["country"] = country
     except Exception as exc:  # noqa: BLE001 - a nameless place is acceptable
         log("place lookup failed for %.1f,%.1f: %s" % (lat, lon, exc))
+
+    data = json.dumps(record).encode()
+    _mem_put(key, data)
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    with open(path, "wb") as fh:
+        fh.write(data)
+    _sweep_disk()
+    return record["place"]
+
+
+# Zoom 5 is a country and a region, which is right for "where is the camera"
+# and wrong for "where did I click". A forecast is for a point, and a card
+# headed "Sweden" over Varberg is technically true and no use.
+NOMINATIM_NEAR = ("https://nominatim.openstreetmap.org/reverse"
+                  "?lat={lat}&lon={lon}&format=jsonv2&zoom=12"
+                  "&addressdetails=1&accept-language=en")
+
+
+def place_detail(lat, lon):
+    """The nearest named settlement, with its region and country.
+
+    Separate from place_name because they answer different questions and cache
+    at different grains. place_name is asked about the whole view and rounds to
+    a tenth of a degree - eleven kilometres, fine for a country. This is asked
+    about one point, so it rounds to a hundredth, about a kilometre, which is
+    close enough to name a town without claiming a street.
+    """
+    key = "near_%.2f_%.2f" % (lat, lon)
+    hit = _mem_get(key)
+    if hit:
+        return json.loads(hit[1]).get("place", "")
+    path = _disk_path(key)
+    if os.path.exists(path):
+        with open(path, "rb") as fh:
+            data = fh.read()
+        _mem_put(key, data)
+        return json.loads(data).get("place", "")
+
+    record = {"place": ""}
+    try:
+        with _nominatim_lock:
+            wait = NOMINATIM_GAP - (time.time() - _nominatim_last[0])
+            if wait > 0:
+                time.sleep(wait)
+            raw = fetch(NOMINATIM_NEAR.format(lat=lat, lon=lon))
+            _nominatim_last[0] = time.time()
+        a = (json.loads(raw).get("address") or {})
+        # Nearest first, widening until something answers. A hamlet is a better
+        # answer than a county when you clicked the hamlet.
+        local = (a.get("city") or a.get("town") or a.get("village")
+                 or a.get("hamlet") or a.get("suburb") or a.get("municipality") or "")
+        region = (a.get("state") or a.get("region") or a.get("province")
+                  or a.get("county") or "")
+        country = a.get("country") or ""
+        # Region is dropped when it repeats the town, which Swedish kommuner do
+        # constantly - "Varberg, Varbergs kommun, Sweden" reads as a stutter.
+        if region and local and (region.startswith(local) or local.startswith(region)):
+            region = ""
+        record["place"] = ", ".join(x for x in (local, region, country) if x)
+    except Exception as exc:  # noqa: BLE001 - open water has no name, and that is fine
+        log("near lookup failed for %.2f,%.2f: %s" % (lat, lon, str(exc)[:60]))
 
     data = json.dumps(record).encode()
     _mem_put(key, data)
@@ -6162,6 +6223,155 @@ def overpass(query):
     raise last
 
 
+# ------------------------------------------------------------ station search
+
+# Finding a station anywhere in the catalogue, not just near the camera.
+#
+# The map layer can only draw a station that has coordinates, and most do not:
+# 12 411 of 52 988 working stations, about a fifth. The rest are unreachable by
+# looking, however long you fly around. This is how you reach them.
+#
+# It also answers what a person actually types. "Varberg" matches no station
+# name at all - nothing is called that - but there are stations in Halland and
+# there is a town at 57.1, 12.3. So the word is tried as a name, as a country,
+# as a state, as a tag, and as a place on the map, and everything that answers
+# comes back with a note saying which of those it was.
+
+RADIO_SEARCH_LIMIT = 60
+
+
+def _station_row(s, ref):
+    """One station, trimmed to what the app shows, with a distance if it can."""
+    try:
+        lat = float(s.get("geo_lat"))
+        lon = float(s.get("geo_lon") or s.get("geo_long"))
+    except (TypeError, ValueError):
+        lat = lon = None
+
+    km = None
+    if lat is not None and ref:
+        km = round(_haversine_km(ref[0], ref[1], lat, lon))
+
+    return {
+        "id": s.get("stationuuid") or "",
+        "name": (s.get("name") or "").strip()[:60],
+        "url": s.get("url_resolved") or s.get("url") or "",
+        "codec": (s.get("codec") or "").upper()[:8],
+        "bitrate": s.get("bitrate") or 0,
+        "country": (s.get("country") or "").strip()[:40],
+        "state": (s.get("state") or "").strip()[:40],
+        "tags": (s.get("tags") or "").strip()[:70],
+        "votes": s.get("votes") or 0,
+        "clicks": s.get("clickcount") or 0,
+        "lat": lat, "lon": lon,
+        "km": km,
+        "hls": bool(s.get("hls")),
+    }
+
+
+def _haversine_km(lat1, lon1, lat2, lon2):
+    r = 6371.0
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp = math.radians(lat2 - lat1)
+    dl = math.radians(lon2 - lon1)
+    a = (math.sin(dp / 2) ** 2
+         + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2)
+    return 2 * r * math.asin(math.sqrt(a))
+
+
+def stations(q, lat=None, lon=None):
+    """Search the whole catalogue: by name, country, state, tag, or place."""
+    # An asterisk is what people type when they want "contains", and this search
+    # already contains - Radio Browser matches substrings unless you ask for
+    # exact. So it is stripped rather than refused, and the note says why.
+    wildcard = "*" in q
+    q = q.replace("*", "").strip()
+    if len(q) < 2:
+        return json.dumps({
+            "stations": [],
+            "note": "type at least two letters",
+        }).encode(), "refused"
+
+    key = "stations_%s_%s" % (q.lower(), "%.1f_%.1f" % (lat, lon) if lat is not None else "-")
+    hit = _mem_get(key)
+    if hit and time.time() - hit[0] < 900:
+        return hit[1], "memory"
+
+    def ask(**params):
+        params.setdefault("hidebroken", "true")
+        params.setdefault("limit", RADIO_SEARCH_LIMIT)
+        params.setdefault("order", "clickcount")
+        params.setdefault("reverse", "true")
+        try:
+            raw = fetch(RADIO_BROWSER + "?" + urllib.parse.urlencode(params))
+            return json.loads(raw)
+        except Exception as exc:  # noqa: BLE001 - one angle failing is not the search failing
+            log("stations: %s" % str(exc)[:70])
+            return []
+
+    found = {}
+    why = {}
+
+    def keep(rows, reason):
+        for s in rows:
+            sid = s.get("stationuuid")
+            if not sid:
+                continue
+            if sid not in found:
+                found[sid] = s
+                why[sid] = reason
+
+    keep(ask(name=q), "name")
+    keep(ask(country=q), "country")
+    keep(ask(state=q), "state")
+    keep(ask(tag=q), "tag")
+
+    # And the same word as a place. This is the one that answers "Varberg",
+    # where nothing is named that and the answer is "what is on the air there".
+    place = None
+    if len(found) < RADIO_SEARCH_LIMIT:
+        try:
+            # country_point is what the geocode endpoint uses, and it already
+            # keeps the courtesy gap Nominatim asks for.
+            spot = country_point(q[:120])
+            if spot:
+                place = (spot[0], spot[1])
+                keep(ask(geo_lat="%.4f" % place[0], geo_long="%.4f" % place[1],
+                         geo_distance=120000, has_geo_info="true"), "near")
+        except Exception:  # noqa: BLE001 - not every word is a place
+            pass
+
+    ref = place or ((lat, lon) if lat is not None else None)
+    rows = []
+    for sid, s in found.items():
+        row = _station_row(s, ref)
+        row["why"] = why[sid]
+        rows.append(row)
+
+    # Nearest first when there is something to be near, then the ones with no
+    # position at all - they are not worse, they are just unplaceable, and
+    # burying them would defeat the point of searching outside the map.
+    rows.sort(key=lambda r: (r["km"] is None, r["km"] if r["km"] is not None else 0,
+                             -r["clicks"]))
+
+    data = json.dumps({
+        "q": q,
+        "stations": rows[:RADIO_SEARCH_LIMIT],
+        "found": len(rows),
+        "near": {"lat": place[0], "lon": place[1], "name": q} if place else None,
+        "wildcard": wildcard,
+        "source": "Radio Browser",
+        "note": "searched as a station name, a country, a state, a tag, and as "
+                "a place on the map. Each result says which of those matched it. "
+                "Stations without coordinates cannot be drawn on the globe and "
+                "are only reachable this way - about four fifths of the "
+                "catalogue.",
+    }).encode()
+    _mem_put(key, data)
+    log("stations: '%s' -> %d found%s" % (q, len(rows), ", near " + q if place else ""))
+    return data, "network"
+
+
 # ------------------------------------------------------------------ forecast
 
 # The weather where you clicked, now and for the next few days.
@@ -6260,7 +6470,7 @@ def forecast(lat, lon):
         # grid - fine for "which country", too coarse to name a village
         # honestly. Nominatim is a donated service and this reuses the courtesy
         # gap the rest of the app already keeps.
-        "place": place_name(lat, lon),
+        "place": place_detail(lat, lon) or place_name(lat, lon),
         "elevation_m": body.get("elevation"),
         "timezone": body.get("timezone"),
         "now": {
@@ -7244,6 +7454,11 @@ class Handler(SimpleHTTPRequestHandler):
                     float(query.get("east", ["0"])[0]))
             elif name == "taf":
                 data, source = taf(query.get("icao", [""])[0])
+            elif name == "stations":
+                data, source = stations(
+                    query.get("q", [""])[0][:80],
+                    float(query.get("lat", ["nan"])[0]) if query.get("lat") else None,
+                    float(query.get("lon", ["nan"])[0]) if query.get("lon") else None)
             elif name == "forecast":
                 data, source = forecast(
                     float(query.get("lat", ["0"])[0]),

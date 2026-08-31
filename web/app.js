@@ -9564,6 +9564,99 @@ viewer.camera.moveEnd.addEventListener(() => loadOpenWaters(false));
 // use and well inside what the network asks of an anonymous caller.
 setInterval(whileOn('openships', () => loadOpenWaters(true)), 30_000);
 
+/* ---------------------------------------------------------- station search */
+
+/*
+ * Reaching the four fifths of the catalogue the map cannot draw.
+ *
+ * The Radio stations layer only shows what has coordinates - 12 411 of 52 988
+ * working stations - because a station with no position cannot be put on a
+ * globe. The rest are unreachable by flying around, however long you look.
+ *
+ * So this asks the catalogue directly, and it asks in every sense at once: the
+ * word as a station name, as a country, as a state, as a tag, and as a place on
+ * the map. "Varberg" matches no station name at all and there is a town there,
+ * so what comes back is what is on the air near it, nearest first. Each result
+ * says which of those it was, because "why is this here" is otherwise a guess.
+ */
+
+let stationHits = [];
+
+async function findStations(q) {
+  const said = $('#rq-said');
+  const list = $('#rq-list');
+  said.hidden = false;
+  said.textContent = 'searching the catalogue…';
+  list.innerHTML = '';
+
+  const c = scene.camera.positionCartographic;
+  const lat = Cesium.Math.toDegrees(c.latitude);
+  const lon = Cesium.Math.toDegrees(c.longitude);
+
+  let d;
+  try {
+    d = await getJSON(`/api/stations?q=${encodeURIComponent(q)}`
+      + `&lat=${lat.toFixed(3)}&lon=${lon.toFixed(3)}`);
+  } catch (err) {
+    said.textContent = `could not search (${err.message})`;
+    return;
+  }
+
+  stationHits = d.stations || [];
+  if (!stationHits.length) {
+    said.textContent = `nothing for “${d.q}”. It is tried as a name, a country, `
+      + 'a state, a tag and a place — so a miss here means the catalogue really '
+      + 'has none of those.';
+    return;
+  }
+
+  said.textContent = `${d.found} found`
+    + (d.near ? `, nearest to ${d.near.name} first` : '')
+    + (d.wildcard ? ' · the asterisk was not needed, this already matches parts of words' : '');
+
+  for (const [i, s] of stationHits.entries()) {
+    const li = document.createElement('li');
+    li.className = 'rq-hit';
+
+    const line = document.createElement('div');
+    line.className = 'rq-name';
+    line.textContent = s.name || '(unnamed)';
+    li.appendChild(line);
+
+    const under = document.createElement('div');
+    under.className = 'rq-meta';
+    under.textContent = [
+      s.why === 'near' ? `${s.km} km` : s.why,
+      [s.state, s.country].filter(Boolean).join(', '),
+      s.bitrate ? `${s.codec} ${s.bitrate}k` : s.codec,
+      s.lat === null ? 'no position' : '',
+    ].filter(Boolean).join(' · ');
+    li.appendChild(under);
+
+    li.onclick = () => {
+      playStation({
+        name: s.name, url: s.url, codec: s.codec,
+        bitrate: s.bitrate, country: s.country, state: s.state, hls: s.hls,
+      });
+      // A station that knows where it is gets flown to as well; one that does
+      // not simply plays, which is the whole reason this search exists.
+      if (s.lat !== null && s.lon !== null) {
+        viewer.camera.flyTo({
+          destination: Cesium.Cartesian3.fromDegrees(s.lon, s.lat, 90000),
+          duration: 1.4,
+        });
+      }
+    };
+    list.appendChild(li);
+  }
+}
+
+$('#rq').addEventListener('submit', (e) => {
+  e.preventDefault();
+  const q = $('#rq-q').value.trim();
+  if (q.length >= 2) findStations(q);
+});
+
 /* ---------------------------------------------------------------- forecast */
 
 /*
