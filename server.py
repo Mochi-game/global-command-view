@@ -39,7 +39,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.5.0"
+VERSION = "1.6.0"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -6162,6 +6162,125 @@ def overpass(query):
     raise last
 
 
+# ------------------------------------------------------------------ forecast
+
+# The weather where you clicked, now and for the next few days.
+#
+# The radar says what is falling and where, and stops there. This answers the
+# other half: how warm, how windy, and whether it is about to.
+#
+# Open-Meteo serve it with no account, from national weather services' own
+# models - DWD, Meteo-France, ECMWF and the rest, picked per region. CC BY 4.0
+# data, and the free tier is non-commercial only, so it withdraws in
+# commercial-safe mode with the others.
+#
+# A forecast is a model's opinion, not a measurement, and it is labelled that
+# way on the card. METAR beside it is the measured one.
+
+OPEN_METEO = "https://api.open-meteo.com/v1/forecast"
+FORECAST_TTL = 900
+
+# What the code means, in words. Open-Meteo use WMO weather codes; the numbers
+# alone would be honest and useless.
+WMO = {
+    0: "clear", 1: "mainly clear", 2: "partly cloudy", 3: "overcast",
+    45: "fog", 48: "freezing fog",
+    51: "light drizzle", 53: "drizzle", 55: "heavy drizzle",
+    56: "freezing drizzle", 57: "heavy freezing drizzle",
+    61: "light rain", 63: "rain", 65: "heavy rain",
+    66: "freezing rain", 67: "heavy freezing rain",
+    71: "light snow", 73: "snow", 75: "heavy snow", 77: "snow grains",
+    80: "light showers", 81: "showers", 82: "violent showers",
+    85: "light snow showers", 86: "snow showers",
+    95: "thunderstorm", 96: "thunderstorm with hail",
+    99: "thunderstorm with heavy hail",
+}
+
+
+def _compass(deg):
+    if deg is None:
+        return ""
+    points = ("N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE",
+              "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW")
+    return points[int((deg % 360) / 22.5 + 0.5) % 16]
+
+
+def forecast(lat, lon):
+    """Current conditions and a short outlook for one point."""
+    if not (math.isfinite(lat) and math.isfinite(lon)):
+        return json.dumps({"error": "that is not a place"}).encode(), "refused"
+
+    key = "forecast_%.2f_%.2f" % (lat, lon)
+    hit = _mem_get(key)
+    if hit and time.time() - hit[0] < FORECAST_TTL:
+        return hit[1], "memory"
+
+    params = urllib.parse.urlencode({
+        "latitude": "%.4f" % lat,
+        "longitude": "%.4f" % lon,
+        "current": "temperature_2m,apparent_temperature,relative_humidity_2m,"
+                   "precipitation,weather_code,wind_speed_10m,wind_direction_10m,"
+                   "wind_gusts_10m,cloud_cover,pressure_msl",
+        "daily": "weather_code,temperature_2m_max,temperature_2m_min,"
+                 "precipitation_sum,wind_speed_10m_max",
+        "forecast_days": 5,
+        "timezone": "auto",
+        "wind_speed_unit": "ms",
+    })
+    try:
+        req = urllib.request.Request(OPEN_METEO + "?" + params, headers={
+            "User-Agent": USER_AGENT, "Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+            body = json.loads(resp.read())
+    except Exception as exc:  # noqa: BLE001
+        log("forecast: %s" % exc)
+        return json.dumps({"error": str(exc)[:120]}).encode(), "error"
+
+    cur = body.get("current") or {}
+    daily = body.get("daily") or {}
+    days = []
+    for i, when in enumerate(daily.get("time") or []):
+        days.append({
+            "date": when,
+            "what": WMO.get((daily.get("weather_code") or [None])[i], ""),
+            "high": (daily.get("temperature_2m_max") or [None])[i],
+            "low": (daily.get("temperature_2m_min") or [None])[i],
+            "rain_mm": (daily.get("precipitation_sum") or [None])[i],
+            "wind_ms": (daily.get("wind_speed_10m_max") or [None])[i],
+        })
+
+    data = json.dumps({
+        "lat": lat, "lon": lon,
+        "elevation_m": body.get("elevation"),
+        "timezone": body.get("timezone"),
+        "now": {
+            "when": cur.get("time"),
+            "what": WMO.get(cur.get("weather_code"), ""),
+            "temp_c": cur.get("temperature_2m"),
+            "feels_c": cur.get("apparent_temperature"),
+            "humidity": cur.get("relative_humidity_2m"),
+            "rain_mm": cur.get("precipitation"),
+            "wind_ms": cur.get("wind_speed_10m"),
+            "gust_ms": cur.get("wind_gusts_10m"),
+            "wind_from": cur.get("wind_direction_10m"),
+            "wind_compass": _compass(cur.get("wind_direction_10m")),
+            "cloud_pct": cur.get("cloud_cover"),
+            "pressure_hpa": cur.get("pressure_msl"),
+        },
+        "days": days,
+        "source": "Open-Meteo",
+        "attribution": "Weather data by Open-Meteo.com, CC BY 4.0",
+        "note": "a model's forecast, not a measurement. Open-Meteo pick a "
+                "national weather service's model for the region - DWD, "
+                "Meteo-France, ECMWF and others - so accuracy follows whose "
+                "model covers you. Airfield weather (METAR) beside this is the "
+                "measured one, and the two will disagree.",
+        "terms": "free for non-commercial use. Withdrawn in commercial-safe mode.",
+    }).encode()
+    _mem_put(key, data)
+    return data, "network"
+
+
 # ---------------------------------------------------------------- rain radar
 
 # Precipitation radar, the last two hours of it, as tiles you can run.
@@ -7115,6 +7234,10 @@ class Handler(SimpleHTTPRequestHandler):
                     float(query.get("east", ["0"])[0]))
             elif name == "taf":
                 data, source = taf(query.get("icao", [""])[0])
+            elif name == "forecast":
+                data, source = forecast(
+                    float(query.get("lat", ["0"])[0]),
+                    float(query.get("lon", ["0"])[0]))
             elif name == "radar":
                 data, source = radar()
             elif name == "openwaters":

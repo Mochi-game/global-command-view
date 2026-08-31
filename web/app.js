@@ -466,7 +466,7 @@ const LAYER_GROUPS = [
   { name: 'Radio', ids: ['broadcast', 'radio', 'scanners', 'airports', 'aprs'] },
   { name: 'Aviation', ids: ['runways', 'aeroway', 'metar', 'navaids'] },
   { name: 'Moving', ids: ['flights', 'services', 'vessels', 'openships', 'trains', 'capital', 'fishing'] },
-  { name: 'Earth', ids: ['fires', 'quakes', 'volcanoes', 'weather', 'radar'] },
+  { name: 'Earth', ids: ['fires', 'quakes', 'volcanoes', 'weather', 'radar', 'forecast'] },
   { name: 'People', ids: ['outbreaks', 'news', 'air', 'own'] },
   { name: 'Infrastructure',
     ids: ['cameras', 'cables', 'plants', 'netout', 'mesh', 'bases', 'infra', 'traffic', 'jams'] },
@@ -499,6 +499,7 @@ const LAYERS = [
   { id: 'airports', name: 'Airports & ATC', color: '#fcd34d', on: false, count: 0, note: 'OurAirports — LiveATC for the tower, and that is mostly North America' },
   { id: 'weather', name: 'Severe weather (US)', color: '#f472b6', on: false, count: 0, note: 'NWS — United States only, no open feed covers the rest' },
   { id: 'radar', name: 'Rain radar (2 h)', color: '#5eead4', on: false, count: 0, note: 'RainViewer — national radar networks stitched together, the last two hours running. The past, not a forecast, and empty where no radar looks' },
+  { id: 'forecast', name: 'Weather where you click', color: '#7dd3fc', on: false, count: 0, note: 'Open-Meteo — click any ground and get the forecast there. A model’s opinion, not a measurement; free for non-commercial use only' },
   { id: 'plants', name: 'Power stations', color: '#a3e635', on: false, count: 0, note: 'WRI — 35 000 stations, sized by capacity' },
   { id: 'launches', name: 'Rocket launches', color: '#fb923c', on: false, count: 0, note: 'Launch Library — scheduled, and a schedule slips' },
   { id: 'infra', name: 'Data centres & dams', color: '#c084fc', on: false, count: 0, note: 'OpenStreetMap — queried live for the view, ODbL' },
@@ -742,6 +743,7 @@ function applyVisibility() {
   collections.vessels.show = on('vessels');
   openShips.show = on('openships');
   if (!on('radar') && radarLayers.length) clearRadar();
+  if (!on('forecast')) forecastMark.removeAll();
   courseVectors.show = on('vessels');
   wakes.show = on('vessels');
   collections.cameras.show = on('cameras');
@@ -4933,7 +4935,18 @@ viewer.screenSpaceEventHandler.setInputAction((click) => {
     return;
   }
   const picked = scene.pick(click.position);
-  if (!picked || !picked.id || !picked.id.type) return;
+  if (!picked || !picked.id || !picked.id.type) {
+    // Nothing was under the cursor. That used to be the end of it; with the
+    // forecast layer on it is a question about that patch of ground instead.
+    if (layerOn('forecast')) {
+      const ground = surfacePoint(click.position);
+      if (ground) {
+        const c = Cesium.Cartographic.fromCartesian(ground);
+        showForecast(Cesium.Math.toDegrees(c.latitude), Cesium.Math.toDegrees(c.longitude));
+      }
+    }
+    return;
+  }
   const { type, ref } = picked.id;
 
   describePicked(type, ref);
@@ -9550,6 +9563,88 @@ viewer.camera.moveEnd.addEventListener(() => loadOpenWaters(false));
 // AIS positions age quickly; this is the same cadence the other moving layers
 // use and well inside what the network asks of an anonymous caller.
 setInterval(whileOn('openships', () => loadOpenWaters(true)), 30_000);
+
+/* ---------------------------------------------------------------- forecast */
+
+/*
+ * The weather where you clicked, on empty ground.
+ *
+ * Every other layer here answers by putting something on the map and letting you
+ * click it. This one has nothing to draw - a forecast is true of everywhere -
+ * so it changes what an empty click does instead, and only while it is on.
+ *
+ * That is why it is a layer rather than always-on: it is a data source with
+ * terms like any other, non-commercial only, and commercial-safe mode has to be
+ * able to withdraw it. A switch you turned on is also the only honest way to
+ * explain why clicking the sea suddenly answers.
+ */
+
+const forecastMark = scene.primitives.add(new Cesium.PointPrimitiveCollection());
+
+async function showForecast(lat, lon) {
+  forecastMark.removeAll();
+  forecastMark.add({
+    position: Cesium.Cartesian3.fromDegrees(lon, lat, 0),
+    pixelSize: 11,
+    color: Cesium.Color.fromCssColorString('#7dd3fc').withAlpha(0.9),
+    outlineColor: Cesium.Color.fromCssColorString('#0b0e14').withAlpha(0.9),
+    outlineWidth: 2,
+    disableDepthTestDistance: MARK_THROUGH_M,
+  });
+  scene.requestRender();
+
+  const where = `${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+  showDetail(where, 'forecast · looking…', [['Weather', 'asking Open-Meteo…']]);
+
+  let f;
+  try {
+    f = await getJSON(`/api/forecast?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`);
+  } catch (err) {
+    f = { error: err.message };
+  }
+  if ($('#detail-title').textContent !== where) return;
+
+  if (f.error) {
+    showDetail(where, 'forecast · Open-Meteo', [['Could not fetch it', f.error]]);
+    return;
+  }
+
+  const n = f.now || {};
+  const num = (v, unit) => (v === null || v === undefined ? 'not given' : `${v} ${unit}`);
+
+  const rows = [
+    ['Now', [n.what, n.temp_c !== undefined ? `${n.temp_c} °C` : ''].filter(Boolean).join(', ')],
+    ['Feels like', num(n.feels_c, '°C')],
+    ['Wind', n.wind_ms === undefined ? 'not given'
+      : `${n.wind_ms} m/s from ${n.wind_compass} (${Math.round(n.wind_from)}°)`
+        + (n.gust_ms ? `, gusting ${n.gust_ms}` : '')],
+    ['Cloud', num(n.cloud_pct, '%')],
+    ['Humidity', num(n.humidity, '%')],
+    ['Pressure', num(n.pressure_hpa, 'hPa')],
+    ['Falling now', num(n.rain_mm, 'mm')],
+    ['Ground height', num(f.elevation_m, 'm')],
+    // The outlook as one block: five short lines read faster than five rows,
+    // and the card is already long by the time it gets here.
+    ['Next days', (f.days || []).map((d) => {
+      const day = new Date(d.date + 'T12:00:00Z')
+        .toLocaleDateString('en-GB', { weekday: 'short' });
+      return `${day}  ${String(Math.round(d.low)).padStart(3)}–${
+        String(Math.round(d.high)).padEnd(3)}°C  ${
+        String(d.rain_mm ?? 0).padStart(4)} mm  ${d.what}`;
+    }).join('\n')],
+    ['Local time', f.timezone || ''],
+    ['How sure', 'a model’s forecast, not a measurement. Open-Meteo pick a '
+      + 'national weather service’s model for the region, so accuracy '
+      + 'follows whose model covers you. Airfield weather (METAR) is the '
+      + 'measured one, and the two will disagree.'],
+    ['Source', f.attribution || 'Open-Meteo'],
+  ];
+  showDetail(where, `forecast · ${n.what || 'Open-Meteo'}`, rows);
+}
+
+LAYER_ON_DEMAND.forecast = () => {
+  log('forecast: click anywhere on the ground for the weather there');
+};
 
 /* ------------------------------------------------------------------- radar */
 

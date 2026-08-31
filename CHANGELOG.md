@@ -6,6 +6,28 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.6.0 - the weather where you click
+
+The radar says what is falling. This says how warm, how windy, and whether it is
+about to.
+
+**Weather where you click** turns an empty click into a question about that
+patch of ground: temperature and what it feels like, wind and gusts with the
+direction, cloud, humidity, pressure, ground height, and five days ahead.
+Clicking a marker still opens the marker - this only takes over clicks that
+would otherwise do nothing at all.
+
+A layer rather than always-on, for two reasons. It is a data source with terms
+like any other - Open-Meteo, CC BY 4.0, free for non-commercial use - and
+commercial-safe mode has to be able to withdraw it. And a switch you turned on
+is the only honest way to explain why clicking the sea suddenly answers.
+
+The card says it is a model's opinion and not a measurement, and points at METAR
+beside it as the measured one. They will disagree, and when they do the METAR is
+what happened and this is what was expected.
+
+Wind in metres per second, because the rest of the app is.
+
 ## 1.5.0 - rain radar, and the performance switch where you can find it
 
 ### Rain radar
