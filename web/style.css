@@ -1635,3 +1635,26 @@ audio.stream-player {
 
 .rq-name { color: var(--ink); font-size: 12px; }
 .rq-meta { color: var(--dim); font-size: 10.5px; margin-top: 1px; }
+
+/* The one warning in the help that is about losing your own work.
+ *
+ * Amber and boxed rather than the usual dim note, because everything else in
+ * these tabs explains how something works and this one says what not to do.
+ * It sits at the top of the keys section, which is where somebody who has just
+ * spent an afternoon setting keys up is looking. */
+.guide-warn {
+  border: 1px solid var(--amber);
+  border-left-width: 3px;
+  background: rgba(255, 179, 71, 0.07);
+  padding: 12px 14px;
+  margin: 0 0 16px;
+  color: var(--ink);
+  line-height: 1.65;
+}
+
+.guide-warn b { color: var(--amber); }
+.guide-warn code {
+  color: var(--amber);
+  background: rgba(255, 179, 71, 0.12);
+  padding: 1px 4px;
+}

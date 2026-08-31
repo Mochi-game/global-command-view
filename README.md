@@ -158,6 +158,15 @@ stays open and puts the reason on screen instead of vanishing.
 
 ## Upgrading without losing your keys
 
+> ### ⚠ Copy two things first
+>
+> Before installing a newer version, copy **`keys.json`** and the **`data`**
+> folder somewhere safe. That is every key you have set up and every view you
+> have saved. Ten seconds, and the whole risk is gone.
+>
+> Nothing here is recoverable from anyone else. The keys are yours, held only on
+> your machine, and this project never sees them.
+
 **Unpack the new version straight over the old folder.** Nothing you made is in
 the download, so there is nothing for it to overwrite: `keys.json`, your saved
 views in `data/marks.json`, the Google spend tally and the disk cache are all

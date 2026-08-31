@@ -6,6 +6,27 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.7.1 - a warning where somebody who has just set up keys will see it
+
+Asked for, and right to ask. Upgrading is safe - `keys.json` and the `data`
+folder are deliberately kept out of the download, so unpacking a new version
+over the old one cannot overwrite them, which the README already said in prose.
+
+But that is not how people lose them. They lose them by deleting the old folder
+first to start clean, or by unpacking somewhere new and later tidying away the
+folder the keys were still sitting in. Neither is prevented by the download
+being safe.
+
+So there is a warning now, boxed and in amber, at the top of the **Accounts &
+keys** tab - which is exactly where somebody who has just spent an afternoon on
+keys is looking. Copy two things before upgrading: `keys.json` and `data`. Ten
+seconds, and the risk is gone.
+
+The same warning heads the upgrade section in the README and the Mac note. And
+it says the part that matters most: nothing here is recoverable from anyone
+else. The keys are yours, held only on your machine, and this project never sees
+them.
+
 ## 1.7.0 - the four fifths of the radio catalogue the globe cannot draw
 
 The Radio stations layer only shows what has coordinates, because a station with
