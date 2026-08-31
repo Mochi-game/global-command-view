@@ -45,6 +45,20 @@ causing the stutter is the wrong way round.
 It sits on its own above the layer list now, in amber, because it is the one
 control in the panel that changes how the app behaves rather than what it shows.
 
+### Louder, and reaching the zoom it claimed to
+
+Asked for more colour. RainViewer's tile path carries a colour-scheme number,
+and it turns out to do nothing: seven different values came back byte-identical,
+while changing the tile size, the coordinates or the smoothing all changed the
+image. So the palette is whatever they serve, and the colour is boosted in
+Cesium instead - saturation, contrast and brightness, the same controls the
+basemaps already use.
+
+Looking that up found a real fault. The layer asked for tiles up to zoom 10 and
+RainViewer document a ceiling of 7, so coming in close would have stopped the
+rain drawing entirely - which reads as the shower having passed rather than the
+map having run out. Capped at 7, where Cesium stretches the last tile instead.
+
 ### Found while building it
 
 The layer group insert matched `'weather',` in the layer list instead of in the

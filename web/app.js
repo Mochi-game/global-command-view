@@ -9576,6 +9576,12 @@ let radarAt = 0;
 let radarTimer = null;
 let radarPlaying = true;
 
+// Louder than it arrives. Radar over a dark basemap reads as washed out at the
+// alpha needed to see the ground through it, so saturation carries the weight
+// and the alpha stays low enough that coastlines show underneath.
+const RADAR_TUNE = { saturation: 1.9, contrast: 1.25, brightness: 1.12 };
+const RADAR_ALPHA = 0.82;
+
 const RADAR_STEP_MS = 700;
 // A pause on the newest frame, so the loop reads as "and this is now" rather
 // than sliding past the only frame that matters.
@@ -9609,11 +9615,25 @@ async function loadRadar() {
     const layer = viewer.imageryLayers.addImageryProvider(
       new Cesium.UrlTemplateImageryProvider({
         url: frame.url,
-        maximumLevel: 10,
+        // Seven is RainViewer's documented ceiling. This said ten, which asks
+        // for tiles they do not serve - the layer simply stops drawing as you
+        // come in, which reads as the rain having ended rather than the map
+        // having run out. Cesium stretches the level-7 tile instead now.
+        maximumLevel: 7,
         credit: new Cesium.Credit(data.attribution, true),
       })
     );
     layer.alpha = 0;
+    // Colour is boosted here rather than asked for in the URL.
+    //
+    // RainViewer's tile path carries a colour-scheme number and it does nothing:
+    // seven different values returned byte-identical files, while changing the
+    // tile size, the coordinates or the smoothing all changed the image. So the
+    // palette is whatever they serve, and Cesium's own imagery controls are what
+    // is left - the same ones the basemaps already use.
+    layer.saturation = RADAR_TUNE.saturation;
+    layer.contrast = RADAR_TUNE.contrast;
+    layer.brightness = RADAR_TUNE.brightness;
     radarLayers.push(layer);
   }
 
@@ -9628,7 +9648,7 @@ async function loadRadar() {
 }
 
 function paintRadar() {
-  radarLayers.forEach((l, i) => { l.alpha = i === radarAt ? 0.72 : 0; });
+  radarLayers.forEach((l, i) => { l.alpha = i === radarAt ? RADAR_ALPHA : 0; });
   const f = radarFrames[radarAt];
   if (!f) return;
   const newest = radarAt === radarFrames.length - 1;
