@@ -2111,6 +2111,17 @@ function describePicked(type, ref) {
       ['Stream', ref.bitrate ? `${ref.codec} ${ref.bitrate} kbps` : ref.codec],
       ['How live', 'the station\'s own internet stream — what is going out '
         + 'over the air right now, a few seconds behind.'],
+      // Reported as confusing: Swedish adverts on a station branded Ibiza and
+      // registered in Germany. Nothing here did that, and somebody hearing it
+      // could reasonably think otherwise.
+      ['Adverts', 'adverts in your own language on a station from somewhere '
+        + 'else are the station, not this app. Commercial internet radio '
+        + 'inserts them into the stream on its own server, chosen by the '
+        + 'listener’s address, so the same broadcast carries different ones '
+        + 'in every country. Nothing here can strip them, and something that '
+        + 'did would be blocking another broadcaster’s output. Public '
+        + 'service and non-profit stations mostly carry none — try the tag '
+        + 'public radio or classical.'],
       ['Homepage', ref.homepage],
       ['Note', 'a community catalogue, so a stream can be stale or a station '
         + 'missing. Only stations with coordinates can be drawn at all.'],

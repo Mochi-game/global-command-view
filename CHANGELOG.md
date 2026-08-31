@@ -29,6 +29,24 @@ correcting anyone.
 Clicking a result plays it, and flies there if it has a position. The ones
 without simply play, which is the point.
 
+### Whose adverts those are
+
+Reported as confusing: searching *jazz*, playing a station branded *Ibiza
+Chillout Lounge*, and hearing Swedish advertising.
+
+Two things, neither of them this app. The station is registered in North
+Rhine-Westphalia and streams from Germany &mdash; the name is a brand, not a
+location, which the card already said. And commercial internet radio inserts
+advertising into the stream on its own server, chosen by the listener&rsquo;s
+address, so the same broadcast carries Swedish adverts in Sweden and German ones
+in Germany at the same moment.
+
+The station card and the help say so now. Somebody hearing their own language on
+a foreign station can reasonably assume something here did it, and nothing here
+did &mdash; nor could it, without blocking another broadcaster&rsquo;s output.
+The note points at the tags *public radio* and *classical* instead, which mostly
+carry none.
+
 ### The forecast card says which town
 
 It said *Sweden* over Varberg - true, and no use. Reverse geocoding at zoom 5
