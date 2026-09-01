@@ -465,7 +465,11 @@ const SCALE = {
 const LAYER_GROUPS = [
   { name: 'Radio', ids: ['broadcast', 'radio', 'scanners', 'airports', 'aprs'] },
   { name: 'Aviation', ids: ['runways', 'aeroway', 'metar', 'navaids'] },
-  { name: 'Moving', ids: ['flights', 'services', 'vessels', 'openships', 'trains', 'capital', 'fishing'] },
+  // Swedish trains live here rather than under Sweden, where they were.
+  // Somebody looking for a train looks under the things that move, not
+  // under the country - reported by someone tracking a train from Halmstad
+  // to Varberg who found only Trains (US) and concluded there were none.
+  { name: 'Moving', ids: ['flights', 'services', 'vessels', 'openships', 'trains', 'swrail', 'capital', 'fishing'] },
   { name: 'Earth', ids: ['fires', 'quakes', 'volcanoes', 'weather', 'radar', 'forecast'] },
   { name: 'People', ids: ['outbreaks', 'news', 'air', 'own'] },
   { name: 'Infrastructure',
@@ -473,7 +477,7 @@ const LAYER_GROUPS = [
   { name: 'Reference', ids: ['names'] },
   { name: 'Ground change', ids: ['sar', 'disturb', 'water'] },
   { name: 'Above', ids: ['satellites', 'launches'] },
-  { name: 'Sweden', ids: ['swroad', 'swrail', 'smhi'] },
+  { name: 'Sweden', ids: ['swroad', 'smhi'] },
 ];
 
 const LAYERS = [
@@ -518,7 +522,7 @@ const LAYERS = [
   { id: 'metar', name: 'Airfield weather (METAR)', color: '#7dffab', on: false, count: 0, note: 'NOAA aviation weather — an observation at the field, not a forecast for the area; coloured by flight category and bigger where something is falling' },
   { id: 'runways', name: 'Runways & approaches', color: '#cbd5e1', on: false, count: 0, note: 'OurAirports — real runway geometry; the approach line is 10 NM of arithmetic from the published heading, not a procedure off a chart' },
   { id: 'swroad', name: 'Swedish road disruption', color: '#ff9f45', on: false, count: 0, note: 'Trafikverket Situation — roadworks, incidents and ferries, Sweden only; some are stretches of road with no single point' },
-  { id: 'swrail', name: 'Swedish trains', color: '#5fe3c0', on: false, count: 0, note: 'Trafikverket TrainPosition — where trains report themselves, Sweden only; a stale position is dropped rather than shown standing still' },
+  { id: 'swrail', name: 'Trains (Sweden)', color: '#5fe3c0', on: false, count: 0, note: 'Trafikverket TrainPosition — where trains report themselves, Sweden only; a stale position is dropped rather than shown standing still' },
   { id: 'smhi', name: 'SMHI warnings', color: '#ffd166', on: false, count: 0, note: 'SMHI — areas, not points: a warning covers a coastline rather than a spot on it. Sweden only, no key needed' },
   { id: 'bases', name: 'Submarine bases', color: '#b58cff', on: false, count: 0, note: 'where they are based, not where they are' },
 ];
@@ -8176,14 +8180,14 @@ const SERVICES = [
     name: 'Google Maps Platform',
     tier: 4,
     cost: 'billed',
-    adds: 'Photorealistic 3D — the measured, textured mesh of some 2500 cities, with roofs, trees and shadows instead of grey boxes. Also Street View: an actual photograph taken from the spot you are standing on, on most roads on earth.',
+    adds: 'Skip this one unless you specifically want photorealistic 3D. Every other layer in the app works without it, and Cesium ion above already gives world terrain and 3D buildings for free. What this adds is the measured, textured mesh of some 2500 cities — roofs, trees and shadows instead of grey boxes — and Street View: an actual photograph from the spot you are standing on, on most roads on earth.',
     url: 'https://console.cloud.google.com/google/maps-apis/start',
     steps: [
       'Open the Google Cloud console and make a project. A card is required even on the free tier; Google will not charge it without you switching off the spending cap.',
       'Under <b>APIs &amp; Services → Library</b> enable <b>Maps JavaScript API</b> for the walkable Street View panorama, and <b>Map Tiles API</b> for the 3D mesh where it is served. Do this even if you ticked <i>enable all Google Maps APIs</i> at signup — that box covers neither, and without it the switches fail.',
       'Under <b>Credentials</b> create an <b>API key</b>. Restrict it: <i>Application restrictions → Websites</i>, allow <b>both</b> <code>http://127.0.0.1:8820/*</code> and <code>http://localhost:8820/*</code> — Google counts them as different sites and the app opens itself on the first — and <i>API restrictions → Map Tiles API</i>. An unrestricted key is one leak away from someone else spending your money.',
       'Paste it below, reload, and turn on <b>Photoreal 3D</b> under Descent.',
-      'Cost: the Photorealistic 3D Tiles SKU bills per <i>root tile request</i>, and one buys three hours of streaming. <b>1000 a month are free.</b> This app asks for exactly one per session, the first time you flip the switch — so ordinary use never reaches the free limit.',
+      'Cost, and why it is hard to spend anything. Google bills the Photorealistic 3D Tiles SKU per <i>root tile request</i>, not per tile and not per minute. One request opens a session that lasts three hours, and this app asks for exactly one — when you first switch Photoreal 3D on in a page load. Flying, zooming, orbiting a building, looking at another continent: all of it is inside that one session and costs nothing more. <b>1000 sessions a month are free.</b> That is 33 a day, every day, which means switching it on 33 separate times daily before anything is billed. <b>Google spend</b> in the left panel counts every one this app asks for, and turns amber at 80 per cent and red at the cap — so you can watch it rather than hope.',
       '<b>EEA billing loses the 3D half.</b> Under the EEA terms Google does not serve satellite or photorealistic 3D tiles to projects billed to an address in the European Economic Area, and returns 403. A project created on or after 8 July 2025 with EEA billing is <i>not eligible</i> for the exemption at all; one created before it keeps the exemption only until it is materially modified, and enabling another Maps Platform service counts. Google document no way back from either. What matters is the date and billing country of the <i>Cloud project</i>, not of this app.',
     ],
   },

@@ -973,7 +973,36 @@
       </ul>
 
       <h3>What each key costs, and what runs out</h3>
-      <ul>
+            <h4>Do you need Google at all? Probably not</h4>
+      <p>
+        <b>Every layer in this app works without a Google key.</b> Aircraft,
+        ships, radio, radar, forecasts, cameras, satellites, cables &mdash; none
+        of them touch Google. A free <b>Cesium ion</b> token already gives world
+        terrain and 3D buildings everywhere. Google adds one thing: the
+        photographed, textured mesh of about 2500 cities, and Street View.
+      </p>
+      <p class="guide-note">
+        <b>And if you do want it, it is hard to spend anything.</b> Google bills
+        photorealistic 3D per <i>root tile request</i> &mdash; not per tile, not
+        per minute, not per city. One request opens a session that runs for three
+        hours, and this app asks for exactly one: when you first switch Photoreal
+        3D on in a page load. Flying across a continent, orbiting a building,
+        zooming in and out for an hour &mdash; all inside that one session, all
+        costing nothing more.
+        <br><br>
+        <b>1000 of those are free every month.</b> That is 33 a day, every day of
+        the month: you would have to switch the layer on thirty-three separate
+        times a day before a single request is billed. Ordinary use does not come
+        near it.
+        <br><br>
+        <b>And you can watch it rather than hope.</b> <b>Google spend</b> in the
+        left panel counts every session this app asks for, shows what is left
+        rather than what is spent, and turns amber at 80 per cent and red at the
+        cap. It counts only what this app did; the console linked beneath it is
+        the authority, and is what you are actually billed on.
+      </p>
+
+<ul>
         <li><b>Cesium ion</b> — terrain and 3D buildings. Community tier is free
           and licensed for <i>personal, non-commercial</i> use. No metering that
           matters here.</li>

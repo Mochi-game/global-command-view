@@ -6,6 +6,44 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.7.2 - trains where you look for them, and what a Google session actually is
+
+### Trains (Sweden), under Moving
+
+Reported while trying to find a train from Halmstad to Varberg: it was not
+there. It was &mdash; 339 of them, reporting fine &mdash; but the layer sat under
+**Sweden**, beside road disruption and weather warnings, while **Moving** offered
+only *Trains (US)*. Somebody looking for a train looks under the things that
+move, sees Amtrak, and concludes there is no Swedish feed. The panel said exactly
+that.
+
+Grouping by country is logical while building and illogical while looking. It is
+`Trains (Sweden)` now, next to `Trains (US)`, so the two read as one choice with
+the country as the difference.
+
+### What a Google session actually is
+
+The facts were in the app and buried: one line inside a dense list under Limits,
+between the billing model and the EEA terms. They are stated where somebody
+decides whether to get a key at all.
+
+**You almost certainly do not need one.** Every layer works without Google, and
+a free Cesium ion token already gives world terrain and 3D buildings. Google
+adds the photographed mesh of about 2500 cities, and Street View.
+
+**And if you do want it, spending anything is hard.** Google bills per *root
+tile request* &mdash; not per tile, not per minute, not per city. One request
+opens a session that runs three hours, and this app asks for exactly one, when
+you first switch Photoreal 3D on in a page load. Flying across a continent,
+orbiting a building, an hour of zooming: all inside that session, all free.
+**1000 sessions a month are free** &mdash; 33 a day, every day, before anything
+is billed.
+
+**And you can watch rather than hope.** Google spend in the left panel counts
+every session this app asks for, shows what is left rather than what is spent,
+and turns amber at 80 per cent and red at the cap. The console linked beneath it
+is the authority, and says so.
+
 ## 1.7.1 - a warning where somebody who has just set up keys will see it
 
 Asked for, and right to ask. Upgrading is safe - `keys.json` and the `data`
