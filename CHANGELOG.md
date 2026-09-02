@@ -43,6 +43,31 @@ of marks and nothing to declutter.
 rain radar and against satellite shadow alike. Twelve pixels in the same dark
 ring the airport dot needed before it stayed visible.
 
+### The Google key instructions told you to fence the key off from the app
+
+Asked whether the setup text was any good for somebody who is not technical. It
+was not, but the readability was the smaller half.
+
+The app reaches Street View and photoreal 3D through `Map3DElement` in the
+**Maps JavaScript API**. `googleTiles` was declared and never assigned or read
+&mdash; a leftover from the abandoned Cesium route &mdash; and
+`tile.googleapis.com` is touched only when asking Google why it refused
+something. Yet step 3 said to restrict the key to *Map Tiles API*, which is the
+one API the app never calls. Following that step fenced the key away from
+everything it was for.
+
+And step 6 told European readers they could not have the 3D half. The EEA
+blockade is on Map Tiles &mdash; which is precisely why this route was chosen.
+Both features run here on a Swedish account with Swedish billing, and the note
+now says which claim is true of what.
+
+The rest is legibility. The verdict &mdash; *you probably do not need this*
+&mdash; sat in the same grey text as everything else with six numbered steps
+under it, and a numbered list reads as an instruction whatever stands above it.
+It has its own block now, the steps fold away behind a summary, and the two
+facts that actually decide it (Google wants a card; what you have read about
+Europe) are stated before the steps rather than buried at 1 and 6.
+
 ### STAND HERE armed itself with nothing to click
 
 Reported as no longer being able to get down to Street View, and correctly
