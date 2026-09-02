@@ -4718,26 +4718,55 @@ function renderMarks() {
     li.title = `${mark.lat.toFixed(5)}, ${mark.lon.toFixed(5)} · ${Math.round(mark.height)} m`;
     list.append(li);
 
+    /*
+     * Marks were the one thing on this globe drawn without the two lines every
+     * other marker here carries, and it showed exactly where you would expect.
+     *
+     * A mark is placed at ellipsoid height zero - sea level - while terrain
+     * depth testing is on. Anywhere the ground is above sea level, that puts
+     * the mark inside the hill it was placed on, and zooming in resolves the
+     * terrain to finer detail and buries it deeper. Hence worst close up: the
+     * further down you went, the more solid ground stood in front of it.
+     *
+     * A point primitive cannot be clamped to the ground - checked in the
+     * browser, PointPrimitive has no heightReference in Cesium 1.132 and the
+     * collection takes no scene, so writing either is silently ignored. What
+     * the rest of the app does instead, and what these were missing, is to
+     * stop depth testing them within fifty kilometres. Up close the mark draws
+     * over the hill it is inside; beyond that the far side of the planet still
+     * hides the ones behind you.
+     */
     markPoints.add({
       position: Cesium.Cartesian3.fromDegrees(mark.lon, mark.lat, 0),
-      pixelSize: 8,
+      disableDepthTestDistance: MARK_THROUGH_M,
+      // Eight pixels of mid-blue with a hairline ring lost against sea, against
+      // radar and against satellite shadow alike. The dark ring is what the
+      // airport dot needed twice before it stayed visible.
+      pixelSize: 12,
       color: Cesium.Color.fromCssColorString('#4fd6ff'),
-      outlineColor: Cesium.Color.BLACK,
-      outlineWidth: 1,
-      scaleByDistance: new Cesium.NearFarScalar(1000, 1.3, 8_000_000, 0.5),
+      outlineColor: MARK_HALO,
+      outlineWidth: 2.5,
+      scaleByDistance: new Cesium.NearFarScalar(1000, 1.3, 8_000_000, 0.65),
       id: { type: 'mark', ref: mark },
     });
     markLabels.add({
+      // A label can be clamped to terrain where a point cannot. Doing it would
+      // walk the name up the hill and leave its own dot at sea level, so they
+      // stay on the one position and share the exemption instead.
       position: Cesium.Cartesian3.fromDegrees(mark.lon, mark.lat, 0),
+      disableDepthTestDistance: MARK_THROUGH_M,
       text: mark.name,
       font: '600 11px "JetBrains Mono", Consolas, monospace',
       fillColor: Cesium.Color.fromCssColorString('#4fd6ff'),
       showBackground: true,
-      backgroundColor: new Cesium.Color(0.02, 0.05, 0.08, 0.75),
-      backgroundPadding: new Cesium.Cartesian2(5, 3),
+      backgroundColor: new Cesium.Color(0.02, 0.05, 0.08, 0.88),
+      backgroundPadding: new Cesium.Cartesian2(6, 4),
       horizontalOrigin: Cesium.HorizontalOrigin.LEFT,
       pixelOffset: new Cesium.Cartesian2(10, 0),
-      distanceDisplayCondition: new Cesium.DistanceDisplayCondition(0, 3_000_000),
+      // The name used to stop being drawn past three thousand kilometres, which
+      // left an unlabelled dot at exactly the height you fly to when you are
+      // looking for where you put something. A distance cap is for a feed of
+      // thousands; there are a handful of marks, and nothing to declutter.
     });
   }
   applyMarksHidden();
@@ -7637,6 +7666,21 @@ async function loadStreetview(lat, lon) {
 const standing = { active: false, picking: false, heading: 0, pitch: 0, fov: 60, position: null, saved: null };
 
 function armViewpoint() {
+  // Photoreal 3D hides the Cesium globe and puts Google's own renderer over it,
+  // so there is no globe left to click a spot on. The button used to arm itself
+  // anyway: the label changed to CLICK A SPOT ON THE MAP, the click went to
+  // Google's element instead, and nothing happened and nothing was said.
+  // Reported as no longer being able to get down to Street View.
+  //
+  // The two cannot both be up, and somebody pressing this has said which one
+  // they want. So it switches the other off and says that it did.
+  if (!standing.picking && $('#photoreal').checked) {
+    $('#photoreal').checked = false;
+    showPhotoreal(false);
+    log('photoreal 3D off — standing somewhere needs the globe underneath, and '
+      + 'the Google 3D view replaces it. Switch it back on afterwards.', 'warn');
+  }
+
   standing.picking = !standing.picking;
   $('#globe').classList.toggle('picking', standing.picking);
   $('#standhere').classList.toggle('active', standing.picking);

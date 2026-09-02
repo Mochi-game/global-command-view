@@ -6,6 +6,57 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.7.3 - two things that were switched on and invisible
+
+### Your own marks were the only markers drawn without the exemption
+
+Reported as not being able to see marks that had been placed, and worst zoomed
+in.
+
+A mark is drawn at ellipsoid height zero &mdash; sea level. Terrain depth testing
+is on. Anywhere the ground is above sea level, that puts the mark *inside* the
+hill it was placed on, and zooming in resolves the terrain to finer detail and
+buries it further. That is why it got worse the closer you went: more solid
+ground stood between the camera and the dot.
+
+Every other marker in this app &mdash; airports, ships, aircraft, stations,
+cameras &mdash; carries `disableDepthTestDistance: MARK_THROUGH_M`, which stops
+depth testing within fifty kilometres so a marker shows through the slope in
+front of it while the far side of the planet still hides the ones behind you.
+Marks were the one thing on the globe that did not have it. Now they do.
+
+The obvious fix &mdash; clamping the mark to the terrain instead &mdash; is not
+available: checked in the browser, `PointPrimitive` has no `heightReference` in
+Cesium 1.132 and `PointPrimitiveCollection` accepts no scene, so writing either
+is ignored without an error. A label *can* be clamped, but doing only the label
+would walk the name up the hill and leave its dot at sea level. Both stay on the
+one position and share the exemption.
+
+Two other things in the same block:
+
+**The name stopped being drawn past three thousand kilometres,** leaving an
+unlabelled dot at exactly the height you fly to when you are looking for where
+you put something. A distance cap is for a feed of thousands; there are a handful
+of marks and nothing to declutter.
+
+**Eight pixels of mid-blue with a hairline ring** lost against sea, against
+rain radar and against satellite shadow alike. Twelve pixels in the same dark
+ring the airport dot needed before it stayed visible.
+
+### STAND HERE armed itself with nothing to click
+
+Reported as no longer being able to get down to Street View, and correctly
+self-diagnosed: photoreal 3D was on.
+
+Photoreal 3D hides the Cesium globe and puts Google's renderer over it. Standing
+somewhere works by clicking a spot on the globe &mdash; which is no longer there.
+The button armed anyway: the label changed to CLICK A SPOT ON THE MAP, the click
+went to Google's element instead, and nothing happened and nothing was said.
+
+The two cannot both be up, and pressing the button says which one you want. So
+photoreal switches off, and the log says why rather than leaving you to work it
+out.
+
 ## 1.7.2 - trains where you look for them, and what a Google session actually is
 
 ### Trains (Sweden), under Moving
