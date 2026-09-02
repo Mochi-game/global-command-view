@@ -578,6 +578,17 @@ h2 .tally {
 }
 .key-row .state { font-size: 10px; letter-spacing: 0.14em; padding: 2px 7px; border: 1px solid var(--line); color: var(--dim); }
 .key-row .state.set { color: #7dffab; border-color: rgba(125, 255, 171, 0.5); }
+.key-verdict {
+  margin: 0 0 8px; padding: 9px 11px; font-size: 11.5px; line-height: 1.5;
+  color: var(--ink); border-left: 3px solid #8ab4ff;
+  background: rgba(138, 180, 255, 0.07);
+}
+.key-steps { margin: 0 0 10px; }
+.key-steps > summary {
+  cursor: pointer; font-size: 10.5px; letter-spacing: 0.1em;
+  text-transform: uppercase; color: var(--cyan); padding: 4px 0;
+}
+.key-steps[open] > summary { color: var(--dim); }
 .key-row .adds { margin: 0 0 8px; color: var(--dim); font-size: 11.5px; }
 .key-row ol { margin: 0 0 10px; padding-left: 18px; color: var(--dim); font-size: 11.5px; }
 .key-row ol b { color: var(--ink); }

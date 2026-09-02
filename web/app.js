@@ -5546,7 +5546,6 @@ enableIon();
  * a second request. Leaving the switch alone costs nothing at all.
  */
 
-let googleTiles = null;
 let googleBusy = false;
 
 /** Ask Google why it refused, because Cesium will not say. */
@@ -8224,15 +8223,18 @@ const SERVICES = [
     name: 'Google Maps Platform',
     tier: 4,
     cost: 'billed',
-    adds: 'Skip this one unless you specifically want photorealistic 3D. Every other layer in the app works without it, and Cesium ion above already gives world terrain and 3D buildings for free. What this adds is the measured, textured mesh of some 2500 cities — roofs, trees and shadows instead of grey boxes — and Street View: an actual photograph from the spot you are standing on, on most roads on earth.',
+    verdict: '<b>You probably do not need this one.</b> Everything else in the app works without it — the globe, the terrain, the 3D buildings, every feed. It adds exactly two things: <b>Street View</b>, a real photograph taken from the spot you are standing on, and <b>Photoreal 3D</b>, about 2500 cities measured and textured, with roofs and trees and shadows instead of grey boxes. If neither is what you came here for, skip it and nothing is missing.',
+    adds: '<b>Two things worth knowing before you begin.</b> Google asks for a payment card, even for the free allowance. It cannot be charged while the spending cap is on, and turning that cap off is something you would have to go in and do deliberately — meanwhile the app counts every request it makes, in the left panel, so you can watch rather than hope. And you will find advice online saying 3D no longer works in Europe: that is about a different way into Google 3D, the one this app deliberately does not use. Both features here run on a Swedish account with Swedish billing.',
+    stepsLabel: 'Show me how to get the key, step by step at Google',
     url: 'https://console.cloud.google.com/google/maps-apis/start',
     steps: [
-      'Open the Google Cloud console and make a project. A card is required even on the free tier; Google will not charge it without you switching off the spending cap.',
-      'Under <b>APIs &amp; Services → Library</b> enable <b>Maps JavaScript API</b> for the walkable Street View panorama, and <b>Map Tiles API</b> for the 3D mesh where it is served. Do this even if you ticked <i>enable all Google Maps APIs</i> at signup — that box covers neither, and without it the switches fail.',
-      'Under <b>Credentials</b> create an <b>API key</b>. Restrict it: <i>Application restrictions → Websites</i>, allow <b>both</b> <code>http://127.0.0.1:8820/*</code> and <code>http://localhost:8820/*</code> — Google counts them as different sites and the app opens itself on the first — and <i>API restrictions → Map Tiles API</i>. An unrestricted key is one leak away from someone else spending your money.',
-      'Paste it below, reload, and turn on <b>Photoreal 3D</b> under Descent.',
-      'Cost, and why it is hard to spend anything. Google bills the Photorealistic 3D Tiles SKU per <i>root tile request</i>, not per tile and not per minute. One request opens a session that lasts three hours, and this app asks for exactly one — when you first switch Photoreal 3D on in a page load. Flying, zooming, orbiting a building, looking at another continent: all of it is inside that one session and costs nothing more. <b>1000 sessions a month are free.</b> That is 33 a day, every day, which means switching it on 33 separate times daily before anything is billed. <b>Google spend</b> in the left panel counts every one this app asks for, and turns amber at 80 per cent and red at the cap — so you can watch it rather than hope.',
-      '<b>EEA billing loses the 3D half.</b> Under the EEA terms Google does not serve satellite or photorealistic 3D tiles to projects billed to an address in the European Economic Area, and returns 403. A project created on or after 8 July 2025 with EEA billing is <i>not eligible</i> for the exemption at all; one created before it keeps the exemption only until it is materially modified, and enabling another Maps Platform service counts. Google document no way back from either. What matters is the date and billing country of the <i>Cloud project</i>, not of this app.',
+      'Open the Google Cloud console with the button below and make a project. Any name will do. This is where Google asks for the card.',
+      'Switch on the one service this app uses. Go to <b>APIs &amp; Services → Library</b>, search for <b>Maps JavaScript API</b>, and press <b>Enable</b>. That single API carries both Street View and the Photoreal 3D view. Do this even if you ticked <i>enable all Google Maps APIs</i> when you signed up — that box does not cover it, and both switches fail without it.',
+      'Make the key. <b>Credentials → Create credentials → API key</b>. Copy what it gives you.',
+      'Fence the key in, so that a copy of it is not worth anything to anybody else. Still on the key: under <i>Application restrictions</i> pick <b>Websites</b> and add <b>both</b> <code>http://127.0.0.1:8820/*</code> and <code>http://localhost:8820/*</code> — Google treats those as two different sites and the app opens itself on the first. Under <i>API restrictions</i> pick <b>Restrict key</b> and tick <b>Maps JavaScript API</b>. A key with no fence is one screenshot away from someone else spending your money.',
+      'Paste it into the box below and reload the page. <b>Photoreal 3D</b> is under Descent; Street View is the <b>STAND HERE</b> button. Only one of the two can be up at a time, because the Google 3D view replaces the globe you would otherwise be clicking on.',
+      'Why it is hard to spend anything here. Google charges when a <i>session</i> opens, not for how long you look. This app opens exactly one — the first time you switch Photoreal 3D on after loading the page — and it lasts three hours. Flying, zooming, circling a building, crossing to another continent: all of that is inside the one session and adds nothing. <b>A thousand sessions a month are free</b>, which is 33 every day of the month. You would have to switch it on 33 separate times in a day before a bill could start. <b>Google spend</b> in the left panel counts them as they happen and turns amber at 80 per cent.',
+      '<b>If you have read that European accounts cannot have 3D.</b> That is true, but of the <i>Map Tiles API</i>, which Google stopped serving to accounts billed inside the European Economic Area. This app does not use it. The photoreal view here comes through the Maps JavaScript API instead, which still serves Europe, and that is exactly why step 2 enables that one and nothing else. Checked on a Swedish account with Swedish billing.',
     ],
   },
   {
@@ -8468,8 +8470,17 @@ async function renderKeyRows() {
       row.innerHTML = `
         <h4><span class="num">${number}</span>${service.name}<span class="state ${st.code}">${st.label}</span></h4>
         ${st.note ? `<p class="state-note">${st.note}</p>` : ''}
+        ${service.verdict ? `<p class="key-verdict">${service.verdict}</p>` : ''}
         <p class="adds">${service.adds}</p>
-        <ol>${service.steps.map((step) => `<li>${step}</li>`).join('')}</ol>
+        ${service.stepsLabel
+          // A numbered list reads as an instruction whatever it says above it.
+          // Folding the steps away lets somebody who was told they do not need
+          // this service stop reading, instead of scrolling past six steps that
+          // look like homework.
+          ? `<details class="key-steps"><summary>${service.stepsLabel}</summary>
+              <ol>${service.steps.map((step) => `<li>${step}</li>`).join('')}</ol>
+             </details>`
+          : `<ol>${service.steps.map((step) => `<li>${step}</li>`).join('')}</ol>`}
         <p class="key-go"><a class="chip" href="${service.url}" target="_blank" rel="noreferrer">GET THE KEY ↗</a></p>
         ${service.fields.map((f) => `
           <div class="key-field">
