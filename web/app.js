@@ -1627,6 +1627,7 @@ const GSV_CONTROLS = {
 let mapsJs = null;
 let pano = null;
 let panoService = null;
+let gsvFetched = null;
 // Both directions are wired - the globe moves the panorama, the panorama moves the
 // globe - so without this the first move starts a loop that never settles.
 let gsvSyncing = false;
@@ -1754,8 +1755,14 @@ async function showStreetView() {
 
   gsvLast = where;
   const data = found.data;
-  const at = data.location.latLng;
   $('#gsv-pano').hidden = false;
+  // What we hold metadata for. The panorama can walk away from it and the date
+  // cannot follow, so panoNote below knows which one the date belongs to.
+  gsvFetched = {
+    pano: data.location.pano,
+    imageDate: data.imageDate || '',
+    copyright: (data.copyright || '').replace(/^\u00a9\s*/, ''),
+  };
 
   gsvSyncing = true;
   if (!pano) {
@@ -1767,6 +1774,7 @@ async function showStreetView() {
     // Every arrival at a new panorama is the billed event, so the tally is kept
     // here rather than at the request - a turn in place must not count.
     pano.addListener('pano_changed', countStreetView);
+    pano.addListener('pano_changed', panoNote);
     pano.addListener('position_changed', panoMovedGlobe);
     pano.addListener('pov_changed', panoMovedGlobe);
   } else {
@@ -1774,12 +1782,41 @@ async function showStreetView() {
     pano.setPov({ heading, pitch: 0 });
   }
   gsvSyncing = false;
+  panoNote();
+}
 
+/*
+ * The line under the panorama, kept true while you walk.
+ *
+ * It was written once, on arrival, and never again. The arrows exist to move
+ * you to a different panorama, and the line went on reporting the coordinates
+ * and the capture date of wherever you first landed. Found by reverse geocoding
+ * the coordinates it printed for a house and getting a building eighty metres
+ * up the road: that was the arrival point, and the walk was not in it.
+ *
+ * The date was the worse half. A date is a claim about the photograph on
+ * screen, and drives along one road are flown in different months, so carrying
+ * it forward states something false rather than merely stale. It is shown for
+ * the panorama whose metadata we hold and is simply absent for the ones you
+ * walked to, which is the honest version of not knowing.
+ *
+ * Position and description come off the panorama object itself, so keeping
+ * those current costs no request.
+ */
+function panoNote() {
+  if (!pano) return;
+  const loc = pano.getLocation();
+  if (!loc) return;
+  const here = loc.latLng;
+  const dated = gsvFetched && gsvFetched.pano === loc.pano;
   $('#gsv-note').textContent = [
     // Google give a month, not a day. Reported as given rather than dressed up.
-    data.imageDate ? `captured ${data.imageDate}` : '',
-    at ? `${at.lat().toFixed(5)}, ${at.lng().toFixed(5)}` : '',
-    (data.copyright || '').replace(/^\u00a9\s*/, ''),
+    dated && gsvFetched.imageDate ? `captured ${gsvFetched.imageDate}` : '',
+    here ? `${here.lat().toFixed(5)}, ${here.lng().toFixed(5)}` : '',
+    // Google name the panorama, not the building in front of you: it is the
+    // nearest address they hold to the spot the camera car stood on.
+    (loc.description || loc.shortDescription || '').trim(),
+    gsvFetched ? gsvFetched.copyright : '',
     `arrows walk — the globe follows`,
   ].filter(Boolean).join(` · `);
 }

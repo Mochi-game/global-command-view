@@ -43,6 +43,27 @@ of marks and nothing to declutter.
 rain radar and against satellite shadow alike. Twelve pixels in the same dark
 ring the airport dot needed before it stayed visible.
 
+### The line under Street View stopped at the door and never walked
+
+Asked whether a wrong address under a Street View picture could be corrected at
+Google. It could not &mdash; that card names the panorama, not the building, and
+Google label it with the nearest address they hold to where the camera car
+stood. But checking the claim found one of ours instead.
+
+Reverse geocoding the coordinates the app printed for a house returned a
+building eighty metres up the road. The footer was written once, on arrival, and
+never again: the arrows exist to move you to a different panorama, and the line
+went on reporting where you first landed.
+
+The capture date was the worse half. A date is a claim about the photograph on
+screen, and drives along one road are flown in different months, so carrying it
+forward states something false rather than merely stale. It is now shown for the
+panorama whose metadata we hold and is simply absent for the ones you walked to.
+
+Position and description are read off the panorama itself, so keeping them
+current costs no request &mdash; and the line now also carries Google own name
+for the spot, which is the thing people take for the address of the house.
+
 ### The Google key instructions told you to fence the key off from the app
 
 Asked whether the setup text was any good for somebody who is not technical. It
