@@ -42,3 +42,21 @@ certs/* linguist-vendored=true
 # downloads and no user needs. The screenshots stay, because README.md points at
 # them and somebody reading it in the folder should see them.
 docs/social-preview.png export-ignore
+
+# Release notes live on the release page, not in the folder. They are written
+# for somebody deciding whether to download, which is a question already
+# answered by the time the archive is open, and they accumulate: every version
+# leaves another one behind. CHANGELOG.md is the copy that belongs beside the
+# code, and it ships.
+docs/release-*.md export-ignore
+
+# A working file for the radar colour work, kept because it records what the
+# schemes actually look like, referenced by nothing.
+docs/_radar-schemes.png export-ignore
+
+# Repository plumbing. FUNDING.yml is read by GitHub and by nothing else, and
+# the two git files describe how this repository is checked out - neither means
+# anything inside an unpacked download.
+.github export-ignore
+.gitattributes export-ignore
+.gitignore export-ignore
