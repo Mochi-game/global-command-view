@@ -26,6 +26,20 @@ It is not only politics. From the middle of that lake the app returns
 list. OpenStreetMap also carries *Ganyadáiyoˀ* in Cayuga and
 *ᑭᐦᒋ ᓵᑲᐦᐃᑲᐣ* in Cree. A map with room for one label drops all of them.
 
+### Green and red on the key badges
+
+Asked for: SAVED green, NOT SET red. The right instinct &mdash; scanning that
+page you want to know which ones you have done.
+
+The amber on SAVED was carrying something real, though: the key is entered and
+nothing has used it yet this session. Painting that green would claim it works
+when nobody knows, which is the sentence that state was invented to avoid.
+
+So the two questions get two channels. **Colour says whether a key is there**
+&mdash; red for nothing, green for something. **The word beside it says whether
+it has been seen to work** &mdash; SAVED against WORKING &mdash; and the green
+is outlined while it is only entered, filled once a call using it has come back.
+
 ### The globe named Port Moresby and nothing else
 
 Reported with two pictures of New Guinea side by side. Google's photoreal view

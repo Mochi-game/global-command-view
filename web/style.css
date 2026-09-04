@@ -577,7 +577,6 @@ h2 .tally {
   gap: 8px;
 }
 .key-row .state { font-size: 10px; letter-spacing: 0.14em; padding: 2px 7px; border: 1px solid var(--line); color: var(--dim); }
-.key-row .state.set { color: #7dffab; border-color: rgba(125, 255, 171, 0.5); }
 .key-verdict {
   margin: 0 0 8px; padding: 9px 11px; font-size: 11.5px; line-height: 1.5;
   color: var(--ink); border-left: 3px solid #8ab4ff;
@@ -1326,12 +1325,33 @@ audio.stream-player {
 #guide-setup .key-tier h4 { font-size: 12px; }
 #guide-setup .key-tier p { font-size: 12px; }
 
-/* Three states, and each one looks like what it means: nothing yet, saved but
-   unproven, and seen to work. */
-.key-row .state.unset { color: var(--dim); }
+/* Colour answers one question and the word answers another.
+ *
+ * Asked for red on NOT SET and green on SAVED, which is the right instinct:
+ * scanning the page you want to know which ones you have done. But the amber
+ * on SAVED was carrying something real - the key is entered and nothing has
+ * used it yet - and painting that green would claim it works when nobody
+ * knows.
+ *
+ * So the colour says whether a key is there: red for nothing, green for
+ * something. The distinction lives in the word beside it, SAVED against
+ * WORKING, and in how solid the green is - outlined while it is only entered,
+ * filled once a call using it has come back.
+ */
+.key-row .state.unset {
+  color: #ff8f7a;
+  border-color: rgba(255, 143, 122, 0.45);
+}
 .key-row .state.saved,
-.key-row .state.browser { color: var(--amber); border-color: rgba(255, 176, 0, 0.45); }
-.key-row .state.working { color: #7dffab; border-color: rgba(125, 255, 171, 0.5); }
+.key-row .state.browser {
+  color: #7dffab;
+  border-color: rgba(125, 255, 171, 0.35);
+}
+.key-row .state.working {
+  color: #7dffab;
+  border-color: rgba(125, 255, 171, 0.7);
+  background: rgba(125, 255, 171, 0.13);
+}
 .key-row .state-note {
   margin: -4px 0 8px;
   font-size: 11px;
