@@ -914,6 +914,26 @@ USAGE_LIMITS = {"google_root": GOOGLE_FREE_ROOTS, "google_streetview": 10000}
 def bump_usage(raw):
     """Record one billable Google request. Months are kept, so history stays."""
     incoming = json.loads(raw or b"{}")
+
+    # The browser vouching for a key the server never uses.
+    #
+    # Cesium ion and the Google key are handed to the page, not to this process,
+    # so nothing here ever sends a request with them and SETUP said as much:
+    # "used by the browser, so the server cannot vouch for it". True when it was
+    # written, and useless to somebody looking at photoreal 3D on screen while
+    # the panel declines to confirm the key it is running on.
+    #
+    # The page knows. It is what loaded the Maps API and the terrain, so it says
+    # so, through the channel it already uses to count billable requests. Only
+    # the two browser-side keys may be reported this way - anything else the
+    # server can and does prove for itself.
+    proved = incoming.get("worked")
+    if proved:
+        if proved not in CLIENT_SIDE_KEYS:
+            raise ValueError("not a key the browser can vouch for")
+        key_worked(proved)
+        return json.dumps({"ok": True, "worked": proved}).encode()
+
     service = incoming.get("service", "google_root")
     if service not in USAGE_LIMITS:
         raise ValueError("unknown service")
@@ -7649,8 +7669,10 @@ class Handler(SimpleHTTPRequestHandler):
                     k: {
                         "set": bool(KEYS.get(k)),
                         "worked": _key_ok.get(k),
-                        # A key the browser uses is one the server never sends a
-                        # request with, so it has nothing to report about it.
+                        # A key the browser uses is one the server never sends
+                        # a request with. It can still be proven - the page
+                        # reports back when it has used one - so this now means
+                        # "proof comes from the page", not "no proof exists".
                         "client_side": k in CLIENT_SIDE_KEYS,
                     } for k in ALLOWED_KEYS
                 }).encode()

@@ -1648,7 +1648,12 @@ function loadMapsJs() {
       'Google refused the key for the Maps JavaScript API. Enable "Maps '
       + 'JavaScript API" in the Cloud console, and allow this address on the '
       + "key's website restrictions."));
-    window.__gsvReady = () => resolve(google.maps);
+    window.__gsvReady = () => {
+      // Google answered with a working API, which is the key being
+      // accepted - a refused one never reaches this line.
+      keyWorked('google_maps');
+      resolve(google.maps);
+    };
     const tag = document.createElement('script');
     tag.src = 'https://maps.googleapis.com/maps/api/js'
       + `?key=${encodeURIComponent(googleKey)}&v=weekly&loading=async`
@@ -1671,6 +1676,26 @@ function loadMapsJs() {
     document.head.append(tag);
   });
   return mapsJs;
+}
+
+/*
+ * Tell the server a browser-side key has just worked.
+ *
+ * Cesium ion and the Google key never pass through the server, so it had
+ * nothing to say about them and SETUP admitted as much. The page is the only
+ * thing that can know, and it does: this is called from the point where Google
+ * handed back its API and from the point where ion returned terrain. Failing to
+ * report is not worth a word to the user - the badge simply stays at SAVED,
+ * which is what it said before.
+ */
+async function keyWorked(name) {
+  try {
+    await fetch('/api/usage', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ worked: name }),
+    });
+  } catch (_) { /* the picture matters more than the badge */ }
 }
 
 async function countStreetView() {
@@ -5650,6 +5675,9 @@ async function enableIon() {
     });
     scene.globe.depthTestAgainstTerrain = true;
     $('#terrain-row').hidden = false;
+    // ion returned terrain, which is the token being accepted. A refused one
+    // throws instead of reaching here.
+    keyWorked('cesium_ion');
     log('terrain: Cesium World Terrain on');
   } catch (err) {
     log(`world terrain unavailable (${err.message})`, 'warn');
@@ -8615,14 +8643,21 @@ async function renderKeyRows() {
   const stateOf = (service) => {
     const parts = service.fields.map((f) => state[f] || {});
     if (!parts.every((p) => p.set)) return { code: 'unset', label: 'NOT SET' };
-    if (parts.some((p) => p.client_side)) {
-      return { code: 'browser', label: 'SAVED', note: 'used by the browser, so '
-        + 'the server cannot vouch for it' };
-    }
+    // Proof first, whoever produced it.
+    //
+    // This used to check client_side before worked, so a browser-side key could
+    // never read as anything but SAVED - even with photoreal 3D on screen,
+    // running on that very key. The page reports its own successes now, so the
+    // proof exists and has to be looked at before the excuse for not having it.
     const when = parts.map((p) => p.worked).filter(Boolean);
     if (when.length === parts.length) {
       return { code: 'working', label: 'WORKING',
         note: `a call using it succeeded ${keyAgo(Math.max(...when))}` };
+    }
+    if (parts.some((p) => p.client_side)) {
+      return { code: 'browser', label: 'SAVED', note: 'used by the browser '
+        + 'rather than the server — it turns WORKING once something here '
+        + 'has actually loaded with it' };
     }
     return { code: 'saved', label: 'SAVED', note: 'nothing has used it yet this '
       + 'session — switch on a layer that needs it' };

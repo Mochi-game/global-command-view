@@ -26,6 +26,30 @@ It is not only politics. From the middle of that lake the app returns
 list. OpenStreetMap also carries *Ganyadáiyoˀ* in Cayuga and
 *ᑭᐦᒋ ᓵᑲᐦᐃᑲᐣ* in Cree. A map with room for one label drops all of them.
 
+### The browser can now vouch for the keys only it uses
+
+Reported while looking at Google Maps Platform: *"I think I use it?"* &mdash;
+with photoreal 3D on screen, running on that very key, and the panel saying
+**used by the browser, so the server cannot vouch for it**.
+
+True when it was written, and useless. Cesium ion and the Google key are handed
+to the page rather than to the server, so nothing here ever sends a request with
+them. But the page knows. It is what loaded the Maps API and the terrain.
+
+So it says so, through the channel it already uses to count billable requests.
+Only those two keys may be reported this way &mdash; anything else the server
+proves for itself, and `{"worked": "windy"}` is refused with a 400.
+
+**And the order was wrong.** `stateOf` checked *is this a browser key* before
+*has it been seen to work*, so a browser-side key could never read as anything
+but SAVED however plainly it was working. Proof is looked at first now, whoever
+produced it.
+
+Cesium ion turns **WORKING** as soon as terrain loads, which is on startup. The
+Google key turns WORKING the first time you open Street View or photoreal 3D
+&mdash; the app does not load it before then, because loading it costs a
+request.
+
 ### Green and red on the key badges
 
 Asked for: SAVED green, NOT SET red. The right instinct &mdash; scanning that
