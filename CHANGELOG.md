@@ -6,6 +6,36 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.7.4 - the self-check blamed sixty feeds for one dead server
+
+Reported from a run of **Check Global Command View**: every endpoint printed
+`FAILED`, most of them `[WinError 10061]` &mdash; the connection refused. It
+reads as though every source in the app has stopped answering.
+
+Not one of them had been asked anything. The test starts its own server on a
+free port and calls the endpoints through it; that server took the first
+connection and went away, so every call after it was refused by nothing at all.
+Each `FAILED` line was true about the call and false about the feed.
+
+Three changes, and the first is the one that matters:
+
+**The server is asked whether it is there before it is asked about the world.**
+`/api/version` is the app's own statement that it started, so it goes first now.
+If it does not answer, the run stops with one line naming the port and the
+error, and says plainly that the feeds were not called. Sixty lines of blame
+became one line of fact.
+
+**A server that dies part-way through is noticed.** The process is checked
+before the next feed is blamed, and the run stops there rather than printing a
+column of refusals.
+
+**What the server said is kept.** Its output went to `DEVNULL`, which is the
+difference between *the server exited* and knowing why. It goes to a temporary
+file now, and the last few lines are quoted in the failure.
+
+The run in question passed on the next attempt with every feed answering, so
+nothing was wrong with the app. The test was wrong about where to point.
+
 ## 1.7.3 - two things that were switched on and invisible
 
 ### Your own marks were the only markers drawn without the exemption

@@ -28,6 +28,7 @@ import re
 import socket
 import subprocess
 import sys
+import tempfile
 import time
 import urllib.error
 import urllib.request
@@ -789,10 +790,58 @@ def check_openwaters_licence(port, report):
                     % (len(ships), data.get("open_count", 0)))
 
 
-def check_server(port, quick, report):
+def server_died(proc, log_path):
+    """Has the server we started stopped running, and what did it say?
+
+    Reported as sixty broken feeds: the test server took one connection, went
+    away, and every endpoint after it printed FAILED with a refused connection.
+    Which is true of each call and false about the world - not one of those
+    feeds had been asked anything. A test that names the wrong culprit sends
+    somebody hunting a fault that is not there.
+
+    So the process is checked before the feeds are blamed, and its output is
+    kept rather than thrown away, because "the server exited" without a reason
+    is only half an answer.
+    """
+    if proc is None or proc.poll() is None:
+        return None
+    said = ""
+    if log_path and os.path.exists(log_path):
+        try:
+            with open(log_path, encoding="utf-8", errors="replace") as fh:
+                tail = [ln.rstrip() for ln in fh.read().splitlines() if ln.strip()]
+            said = " \u00b7 last said: " + " / ".join(tail[-3:]) if tail else ""
+        except OSError:
+            pass
+    return "exit code %s%s" % (proc.returncode, said)
+
+
+def check_server(port, quick, report, proc=None, log_path=None):
     server_py = read(os.path.join(ROOT, "server.py"))
     endpoints = find_endpoints(server_py)
     report.note("%d endpoints found in server.py" % len(endpoints))
+
+    # Ask the server whether it is there before asking it about the world.
+    #
+    # Reported from a run where the server went away: sixty lines of FAILED,
+    # one per feed, each of them true about the call and all of them false
+    # about the feeds - not one had been asked anything. The reader is told
+    # every source is broken when the truth is that nothing was listening.
+    #
+    # version is the app's own statement that it started, so it is the right
+    # thing to ask first and the only honest thing to report when it does not
+    # answer.
+    status, body, _ = call(port, "/api/version")
+    if status != 200:
+        gone = server_died(proc, log_path)
+        detail = body.decode("utf-8", "replace")[:90] if status == 0 else "HTTP %d" % status
+        report.fail("server", "not answering on port %d (%s)%s. The feeds were "
+                    "not called, so nothing here says anything about them."
+                    % (port, detail, " - " + gone if gone else ""))
+        print("  the server is not answering on %d - nothing was asked of the "
+              "feeds" % port)
+        return
+    report.note("server reports v%s" % json.loads(body).get("version"))
 
     tls_hits = []
 
@@ -805,6 +854,14 @@ def check_server(port, quick, report):
         status, body, took = call(port, path)
 
         if status == 0:
+            gone = server_died(proc, log_path)
+            if gone:
+                print("  %-16s -- the server stopped, so this was never asked"
+                      % name)
+                report.fail("server", "stopped part-way through the endpoints "
+                            "(%s). The feeds below it were never called, so "
+                            "nothing here says they are broken." % gone)
+                return
             report.fail("api/" + name, "no answer: %s" % body.decode()[:90])
             print("  %-16s FAILED   %s" % (name, body.decode()[:60]))
             continue
@@ -837,13 +894,6 @@ def check_server(port, quick, report):
         report.fail("certificates", tls_advice(len(tls_hits), "feeds (%s)"
                                                % ", ".join(sorted(tls_hits))))
 
-    # The version endpoint is the app's own statement that it started.
-    status, body, _ = call(port, "/api/version")
-    if status == 200:
-        version = json.loads(body).get("version")
-        report.note("server reports v%s" % version)
-    else:
-        report.fail("api/version", "the server cannot say what it is")
 
 
 # ------------------------------------------------------------------------ main
@@ -884,17 +934,27 @@ def main():
         print("  " + note)
 
     started = None
+    server_log = None
+    log_handle = None
     port = args.port
     if not port:
         port = free_port()
         print("\nstarting a server on %d" % port)
+        # Its output goes to a file rather than to nowhere. It costs a few
+        # kilobytes and it is the difference between "the server exited" and
+        # knowing why.
+        log_handle = tempfile.NamedTemporaryFile(
+            prefix="gcv-smoke-", suffix=".log", delete=False)
+        server_log = log_handle.name
         started = subprocess.Popen(
             [sys.executable, os.path.join(ROOT, "server.py"),
              "--port", str(port), "--no-open"],
-            cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            cwd=ROOT, stdout=log_handle, stderr=subprocess.STDOUT,
         )
         if not wait_for(port):
-            report.fail("server", "did not begin listening on %d" % port)
+            gone = server_died(started, server_log)
+            report.fail("server", "did not begin listening on %d%s"
+                        % (port, " - " + gone if gone else ""))
             started.kill()
             started = None
     else:
@@ -903,7 +963,7 @@ def main():
     if port and (started or args.port):
         print("\nendpoints")
         try:
-            check_server(port, args.quick, report)
+            check_server(port, args.quick, report, started, server_log)
             if not args.quick:
                 check_openwaters_licence(port, report)
         finally:
@@ -913,6 +973,12 @@ def main():
                     started.wait(timeout=5)
                 except subprocess.TimeoutExpired:
                     started.kill()
+            if server_log:
+                try:
+                    log_handle.close()
+                    os.unlink(server_log)
+                except OSError:
+                    pass
 
     print("\n" + "-" * 62)
     if report.ok():
