@@ -92,8 +92,9 @@ with its tile URLs empty &mdash; they are filled at runtime from a config
 endpoint, and the layer names behind them (`mbmap`, `mbdark`) say the tiles are
 Mapbox's. Pulling those out would mean reverse-engineering an undocumented
 endpoint and landing on someone else's terms. Their geocoding API is documented,
-keyed and free below 15 000 requests a month, and it is the part that carries
-the naming anyway.
+keyed, and has a free tier far larger than this layer can spend — how large is
+on their pricing page, which is where a number that changes belongs.
+It is also the part that carries the naming anyway.
 
 ### Two smaller decisions
 

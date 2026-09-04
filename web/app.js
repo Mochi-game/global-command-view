@@ -8397,9 +8397,8 @@ const SERVICES = [
         + 'application it creates for you.',
       'Paste it below and reload. Switch on <b>What it is called</b> under '
         + 'Reference, then click any spot on the globe.',
-      'The free tier is generous for this: a paid plan starts above 15 000 '
-        + 'requests a month, and each click here is one request, cached for a '
-        + 'week per spot.',
+      'There is a free tier and it is far more than this layer can use. How big it is belongs on <i>their</i> pricing page rather than in here — it was 15 000 a month, the starter tier now advertises 50 000, and that one says <i>limited time</i>. A number copied into an app is a number that goes stale without telling anyone.',
+      'What this layer actually spends: one request per click, and the answer is kept for a week per hundred-metre spot. Clicking a hundred different places every day is three thousand a month.',
       'It answers with an address rather than a feature, so over open water it '
         + 'often says nothing. That is their geocoder working as designed, not '
         + 'a fault, and the layer says so rather than leaving a blank.',
