@@ -489,7 +489,7 @@ const LAYERS = [
   { id: 'cameras', name: 'Public cameras', color: '#7dffab', on: false, count: 0, note: 'Digitraffic, TfL, Trafikverket and Windy merged — a still from the camera, not a live stream' },
   { id: 'naming', name: 'What it is called', color: '#c4b5fd', on: false, count: 0, noCount: true, note: 'Click any spot and see what every mapmaker calls it \u2014 OpenStreetMap, Wikidata, and MapQuest if you have a key. Takes the click ahead of the weather layer when both are on' },
   { id: 'names', name: 'Names & borders', color: '#cbd5e1', on: false, count: 0, note: 'Natural Earth lines, and Esri place labels drawn for laying over imagery \u2014 towns, provinces, seas' },
-  { id: 'sar', name: 'Radar backscatter', color: '#8fbcd4', on: false, count: 0, note: 'NASA OPERA Sentinel-1 \u2014 sees through cloud and darkness', noCount: true },
+  { id: 'sar', name: 'Radar backscatter', color: '#8fbcd4', on: false, count: 0, note: 'NASA OPERA Sentinel-1 \u2014 sees through cloud and darkness. Open water reads dark purple, land grey, cities bright, and the hard-edged band is one satellite pass rather than a finding', noCount: true },
   { id: 'disturb', name: 'Ground disturbance', color: '#e879a0', on: false, count: 0, note: 'NASA OPERA DIST-ALERT \u2014 vegetation lost since a baseline', noCount: true },
   { id: 'water', name: 'Surface water / flood', color: '#38bdf8', on: false, count: 0, note: 'NASA OPERA DSWx \u2014 radar, so cloud does not hide the flood', noCount: true },
   { id: 'satellites', name: 'Satellites', color: '#ffffff', on: false, count: 0, note: 'CelesTrak orbital elements, propagated here — 16 000 objects, and most of them are debris' },
