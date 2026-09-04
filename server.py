@@ -7103,9 +7103,19 @@ def _naming_mapquest(lat, lon):
 
 def naming(lat, lon):
     """Every name this point carries, and who says so."""
-    lat = round(lat, 2)
-    lon = round(lon, 2)
-    key = "naming_%.2f_%.2f_%s" % (lat, lon, "mq" if KEYS.get("mapquest") else "-")
+    # Three decimals, not two.
+    #
+    # Two decimals is a grid about a kilometre across, and rounding a click to
+    # it walks off small features entirely. Measured on four named lakes near
+    # Varberg: Vallgraven, Sodra Valasjo and Stora Maresjo all answered with
+    # nothing at two decimals and with their own names at three. Reported as
+    # lakes not being named, and it was the rounding rather than the data.
+    #
+    # A hundred metres still caches usefully - a second click in the same lake
+    # is free - and it is fine enough to stay inside anything worth naming.
+    lat = round(lat, 3)
+    lon = round(lon, 3)
+    key = "naming_%.3f_%.3f_%s" % (lat, lon, "mq" if KEYS.get("mapquest") else "-")
     hit = _mem_get(key)
     if hit and time.time() - hit[0] < NAMING_TTL:
         return hit[1], "memory"

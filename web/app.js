@@ -4718,6 +4718,7 @@ let marksHidden = localStorage.getItem('gcv-marks-hidden') === '1';
 function applyMarksHidden() {
   markPoints.show = !marksHidden;
   markLabels.show = !marksHidden;
+  if (!marksHidden) declutterMarks();
   $('#marks-hide').checked = marksHidden;
 }
 
@@ -4802,6 +4803,7 @@ function renderMarks() {
       backgroundPadding: new Cesium.Cartesian2(6, 4),
       horizontalOrigin: Cesium.HorizontalOrigin.LEFT,
       pixelOffset: new Cesium.Cartesian2(10, 0),
+      id: { type: 'mark', ref: mark },
       // The name used to stop being drawn past three thousand kilometres, which
       // left an unlabelled dot at exactly the height you fly to when you are
       // looking for where you put something. A distance cap is for a feed of
@@ -4809,7 +4811,95 @@ function renderMarks() {
     });
   }
   applyMarksHidden();
+  declutterMarks();
 }
+
+/*
+ * Stop mark labels printing on top of each other.
+ *
+ * Reported as unreadable text over Florida: three marks share one coordinate to
+ * four decimal places - Bayshore Drive Florida, The Don CeSar and MJ-FLORIDA
+ * were all saved from the same spot - and a fourth sits four kilometres away.
+ * Cesium draws every label it is given, so what appeared was three names
+ * superimposed into nonsense.
+ *
+ * Saving several views of one place is a reasonable thing to do, so the data is
+ * not the problem. The label layer simply had no rule for what to do when two
+ * want the same pixel.
+ *
+ * Nearest to the camera wins, and the ones it hides are counted onto its name:
+ * "The Don CeSar +2". A label that vanishes silently is the failure to avoid -
+ * you would be left wondering where a mark went, which is the complaint this
+ * whole area started with.
+ */
+
+const MARK_LABEL_GAP = 30;  // px; roughly a label's height, so rows do not touch
+
+function markLabelName(label) {
+  return (label.id && label.id.ref && label.id.ref.name) || label.text;
+}
+
+function declutterMarks() {
+  const count = markLabels.length;
+  if (!count || marksHidden) return;
+
+  // Everything below is arithmetic on screen positions, and without a canvas
+  // there are none.
+  //
+  // Caught in testing: in a pane where the canvas reports zero by zero, every
+  // projection came back as 0,0 - so the whole planet collapsed into one
+  // cluster and ten of eleven marks were hidden, Leiden and Stockholm included.
+  // A declutter that cannot see the screen must do nothing at all rather than
+  // guess, because the failure mode is exactly the complaint it exists to fix.
+  const width = scene.canvas.clientWidth;
+  const height = scene.canvas.clientHeight;
+  const usable = width > 0 && height > 0;
+
+  const items = [];
+  for (let i = 0; i < count; i += 1) {
+    const label = markLabels.get(i);
+    label.text = markLabelName(label);
+    label.show = true;
+    if (!usable) continue;
+    const win = Cesium.SceneTransforms.worldToWindowCoordinates(scene, label.position);
+    // A point behind the camera projects to nothing, and one that lands exactly
+    // on the origin is far likelier to be a failed projection than a label in
+    // the very corner. Neither blocks anything and neither is hidden - Cesium
+    // still occludes what is behind the globe on its own.
+    if (!win || (win.x === 0 && win.y === 0)) continue;
+    items.push({
+      label,
+      win,
+      away: Cesium.Cartesian3.distance(scene.camera.positionWC, label.position),
+      hidden: 0,
+    });
+  }
+  if (!items.length) {
+    scene.requestRender();
+    return;
+  }
+
+  // Nearest first, so the one you are closest to is the one that keeps its name.
+  items.sort((a, b) => a.away - b.away);
+
+  const kept = [];
+  for (const item of items) {
+    const clash = kept.find((k) => Math.abs(k.win.x - item.win.x) < MARK_LABEL_GAP
+      && Math.abs(k.win.y - item.win.y) < MARK_LABEL_GAP);
+    if (clash) {
+      item.label.show = false;
+      clash.hidden += 1;
+    } else {
+      kept.push(item);
+    }
+  }
+  for (const k of kept) {
+    if (k.hidden) k.label.text = `${markLabelName(k.label)} +${k.hidden}`;
+  }
+  scene.requestRender();
+}
+
+viewer.camera.moveEnd.addEventListener(declutterMarks);
 
 function markThisView() {
   const input = $('#mark-name');
@@ -9881,12 +9971,24 @@ async function showNaming(lat, lon) {
     return;
   }
 
-  rows.push(['OpenStreetMap calls it', first.name]);
-  if (first.official && first.official !== first.name) {
+  // English leads, and the local name follows it.
+  //
+  // The first version led with OpenStreetMap's primary name tag, which is
+  // whatever the place is called locally: the Gulf of Mexico came up as Golfo
+  // de Mexico and Lake Ontario only read as English by luck. The app is in
+  // English and so is the person reading it, so the English name goes first
+  // and the local one is shown as its own row rather than lost.
+  const english = (first.variants.find(([lang]) => lang === 'en') || [])[1];
+  const lead = english || first.name;
+
+  rows.push(['Name', lead]);
+  if (first.name !== lead) rows.push(['Called locally', first.name]);
+  if (first.official && first.official !== lead && first.official !== first.name) {
     rows.push(['Official name (Wikidata)', first.official]);
   }
   for (const [lang, value] of first.variants) {
-    if (value !== first.name) rows.push([`In ${lang}`, value]);
+    if (lang === 'en' || value === lead || value === first.name) continue;
+    rows.push([`In ${lang}`, value]);
   }
   if (first.other_languages) {
     rows.push(['Also named in', `${first.other_languages} more languages, not shown`]);
@@ -9902,8 +10004,8 @@ async function showNaming(lat, lon) {
     rows.push(['MapQuest', 'no key set \u2014 add one under SETUP for a third opinion']);
   }
 
-  showDetail(first.name, `names \u00b7 ${first.kind || 'place'}`, rows);
-  log(`names: ${first.name} \u00b7 ${first.variants.length} language(s) shown `
+  showDetail(lead, `names \u00b7 ${first.kind || 'place'}`, rows);
+  log(`names: ${lead} \u00b7 ${first.variants.length} language(s) shown `
     + `\u00b7 ${d.asked.join(', ')}`);
 }
 

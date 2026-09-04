@@ -26,6 +26,42 @@ It is not only politics. From the middle of that lake the app returns
 list. OpenStreetMap also carries *Ganyadáiyoˀ* in Cayuga and
 *ᑭᐦᒋ ᓵᑲᐦᐃᑲᐣ* in Cree. A map with room for one label drops all of them.
 
+### English leads, and the local name follows it
+
+The first version led with OpenStreetMap's primary name tag, which is whatever
+a place is called locally. The Gulf of Mexico therefore came up as
+**Golfo de México**, and Lake Ontario only read as English by luck. The app is
+in English and so is the person reading it, so the English name is the heading
+now and the local one is its own row rather than lost.
+
+### Small lakes were being missed, and it was the rounding
+
+Reported as lakes not being named. Measured on four named lakes near Varberg:
+**Vallgraven**, **Södra Välasjö** and **Stora Maresjö** all answered with
+nothing, and with their own names once the click stopped being rounded to two
+decimals.
+
+Two decimals is a grid about a kilometre across, and rounding a click to it
+walks off any feature smaller than that. Three decimals is a hundred metres —
+still coarse enough that a second click in the same lake is free, fine enough
+to stay inside anything worth naming.
+
+### Mark labels stopped printing on top of each other
+
+Reported as unreadable text over Florida. Three marks share one coordinate to
+four decimal places — three views of the same spot, saved separately, which is
+a reasonable thing to do — and Cesium draws every label it is given, so what
+appeared was three names superimposed into nonsense.
+
+Nearest to the camera keeps its name and the ones it hides are counted onto it:
+`The Don CeSar +2`. A label that simply vanished would be the same complaint
+this area started with.
+
+Caught while testing it: in a pane where the canvas reports zero by zero, every
+projection came back as `0,0`, the whole planet collapsed into one cluster and
+ten of eleven marks were hidden. A declutter that cannot see the screen now
+does nothing at all rather than guess.
+
 ### Reverse geocoding was the wrong tool, and it took a measurement to find out
 
 The obvious build is a reverse geocoder. From the middle of Lake Ontario,
