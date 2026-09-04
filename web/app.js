@@ -1654,6 +1654,17 @@ function loadMapsJs() {
       + `?key=${encodeURIComponent(googleKey)}&v=weekly&loading=async`
       // weekly, not alpha: maps3d is on the stable channel, and alpha
       // puts a "development purposes only" banner across the view.
+      //
+      // English, because with no language given Google reads the browser's.
+      // Reported from Sweden as the Gulf of Mexico appearing in Swedish while
+      // every other word on screen was English - and it was not our naming
+      // layer at all. Photoreal 3D replaces our globe with Google's, so those
+      // labels are theirs, and this is the only say we have over them.
+      //
+      // No region is set on purpose. Google serves different names for
+      // disputed places depending on it, and picking one here would be this
+      // app quietly taking the side it built a whole layer to avoid taking.
+      + '&language=en'
       + '&callback=__gsvReady';
     tag.async = true;
     tag.onerror = () => reject(new Error('the Maps JavaScript API script would not load'));
