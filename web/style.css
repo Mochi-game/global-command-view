@@ -577,6 +577,9 @@ h2 .tally {
   gap: 8px;
 }
 .key-row .state { font-size: 10px; letter-spacing: 0.14em; padding: 2px 7px; border: 1px solid var(--line); color: var(--dim); }
+/* A source that did not answer, told apart from one that answered with
+   nothing at all. */
+.layer .count.failed { color: var(--amber); }
 .key-verdict {
   margin: 0 0 8px; padding: 9px 11px; font-size: 11.5px; line-height: 1.5;
   color: var(--ink); border-left: 3px solid #8ab4ff;

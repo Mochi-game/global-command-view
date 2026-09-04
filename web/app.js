@@ -718,9 +718,20 @@ function renderLayerList() {
       // there was nothing there". Fourteen rows reading 0 look like fourteen
       // empty feeds rather than fourteen unasked questions, which is the one
       // misreading the whole layer list exists to prevent.
-      `<span class="count">${layer.noCount || !layer.on ? '·'
-        : layer.count.toLocaleString('en-US')}</span>`;
-    li.title = `source: ${layer.note}`;
+      //
+      // And a third state, which was missing and cost somebody a recording:
+      // asked, and the source did not answer. That is not zero. Global
+      // Fishing Watch stopped responding mid-session and the row went on
+      // reading 0, which in this app means the feed replied and there was
+      // nothing there - so it looked like an empty ocean rather than a
+      // service that was down. The reason was in the log, and logs scroll.
+      `<span class="count${layer.count === null ? ' failed' : ''}">${
+        layer.noCount || !layer.on ? '·'
+          : layer.count === null ? '—'
+            : layer.count.toLocaleString('en-US')}</span>`;
+    li.title = layer.on && layer.count === null
+      ? `the source did not answer, so this is not a count of zero\nsource: ${layer.note}`
+      : `source: ${layer.note}`;
     li.onclick = () => {
       layer.on = !layer.on;
       applyVisibility();
@@ -795,6 +806,14 @@ function applyVisibility() {
   if (cablePrimitive) cablePrimitive.show = on('cables');
 }
 
+/*
+ * n is a number when the feed answered, and null when it did not.
+ *
+ * Those are different facts and the panel draws them differently now: a
+ * figure, or a dash meaning nobody replied. Passing 0 for a failure is the
+ * thing to avoid - it is a claim about the ocean rather than about the
+ * connection.
+ */
 function setCount(id, n) {
   const layer = LAYERS.find((l) => l.id === id);
   if (layer && layer.count !== n) {
@@ -5979,6 +5998,9 @@ async function loadFishing(force) {
     }
     if (data.error) {
       log(`fishing activity unavailable: ${data.error}`, 'warn');
+      // Not zero. The row says so, rather than leaving a nought that reads
+      // as an empty sea.
+      setCount('fishing', null);
       return;
     }
     fishingMarks.removeAll();

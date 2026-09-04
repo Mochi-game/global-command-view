@@ -6,6 +6,32 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.7.6 - a source that did not answer is not a count of zero
+
+Reported mid-recording: **Fishing & AIS gaps** showing 0 when it had worked
+earlier.
+
+Global Fishing Watch had stopped answering. Their gateway replies in two tenths
+of a second with *invalid token* when called without one, so the host is up -
+but a real query with a real key times out. Measured three ways: three datasets
+over fourteen days, one dataset over fourteen days, three datasets over three
+days. All timed out at forty-five seconds. Nothing to do with the query, and
+nothing to do with this app.
+
+**But the panel said 0, and that was ours.** In this app a zero means the feed
+replied and there was nothing there. The client logged the failure and returned
+without touching the count, so the row kept reading 0 and looked like an empty
+ocean rather than a service that was down. The reason was in the log, and logs
+scroll.
+
+The counter had two states: a dot for a layer that has not been asked, and a
+figure for one that answered. It has a third now &mdash; **an em dash in amber,
+for asked and no reply** &mdash; and the row's tooltip says *the source did not
+answer, so this is not a count of zero*.
+
+`setCount(id, null)` is how a layer reports that. Fishing uses it; the same
+shape is available to every other layer that currently swallows a failure.
+
 ## 1.7.5 - what it is called, and who says so
 
 A new layer under Reference: **What it is called**. Click any spot and the app
