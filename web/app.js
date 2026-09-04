@@ -10622,12 +10622,26 @@ async function loadSwedenRail() {
     for (const t of data.trains) {
       swRail.add({
         position: Cesium.Cartesian3.fromDegrees(t.lon, t.lat, 0),
-        pixelSize: 7,
-        color: Cesium.Color.fromCssColorString('#5fe3c0').withAlpha(0.9),
-        outlineColor: Cesium.Color.fromCssColorString('#0b0e14').withAlpha(0.75),
-        outlineWidth: 1,
-        disableDepthTestDistance: MARK_THROUGH_M,
-        scaleByDistance: new Cesium.NearFarScalar(1e5, 1.4, 4e6, 0.5),
+        // Seven pixels at half scale is four, and four pixels of pale green on
+        // a satellite photograph is not a train, it is a speck.
+        pixelSize: 10,
+        color: Cesium.Color.fromCssColorString('#5fe3c0'),
+        outlineColor: MARK_HALO,
+        outlineWidth: 2,
+        // A thousand kilometres, not the fifty a saved mark uses.
+        //
+        // Reported as the trains being small half-round dots. Half-round is the
+        // clue: a point at ground level, depth tested against the terrain it is
+        // standing in, comes out with its lower half inside the hill. Fifty
+        // kilometres is right for a mark in a valley you have flown down to.
+        // This is a layer you look at from three hundred kilometres up, where
+        // every train in the country is past that line and half buried.
+        //
+        // A thousand still leaves the planet itself doing the occluding: from
+        // any view that fits Sweden on screen the far side is further away
+        // than this, so trains in Japan do not shine through the Earth.
+        disableDepthTestDistance: 1e6,
+        scaleByDistance: new Cesium.NearFarScalar(1e5, 1.4, 4e6, 0.8),
         id: { type: 'swrail', ref: t },
       });
     }

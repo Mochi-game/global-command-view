@@ -32,6 +32,23 @@ answer, so this is not a count of zero*.
 `setCount(id, null)` is how a layer reports that. Fishing uses it; the same
 shape is available to every other layer that currently swallows a failure.
 
+### The Swedish trains were small half-round dots
+
+Reported while filming, and *half-round* was the clue. A point drawn at ground
+level and depth tested against the terrain it stands in comes out with its lower
+half inside the hill.
+
+The layer used the fifty-kilometre depth exemption a saved mark uses, which is
+right for a mark in a valley you have flown down to. This is a layer you look at
+from three hundred kilometres up, where **every train in the country** is past
+that line and half buried. It is a thousand kilometres now &mdash; still short
+enough that the planet does the occluding, so trains in Japan do not shine
+through the Earth.
+
+And they were too small regardless: seven pixels scaled to half is three and a
+half, which on a satellite photograph is a speck rather than a train. Ten
+pixels, a proper dark ring, and eight at the far end of the scale.
+
 ## 1.7.5 - what it is called, and who says so
 
 A new layer under Reference: **What it is called**. Click any spot and the app
