@@ -6,6 +6,68 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.7.5 - what it is called, and who says so
+
+A new layer under Reference: **What it is called**. Click any spot and the app
+asks the map sources what they call it, and shows every answer with whoever
+said it.
+
+The occasion was Lake Ontario. In August 2026 an executive order renamed it
+Lake America; Google and Apple relabelled it for users in the United States,
+and MapQuest refused. Which one is *the* name depends entirely on whose map you
+are holding &mdash; and a globe that prints one label has quietly taken a side.
+
+So this shows the disagreement rather than settling it, which is the same rule
+every other layer here follows: the answer arrives attached to its source.
+
+It is not only politics. From the middle of that lake the app returns
+**Ontariosjön**, **Ontariosee**, **Lac Ontario**, **Jezioro Ontario**,
+**озеро Онтарио**, **オンタリオ湖**, and eighteen more it does not have room to
+list. OpenStreetMap also carries *Ganyadáiyoˀ* in Cayuga and
+*ᑭᐦᒋ ᓵᑲᐦᐃᑲᐣ* in Cree. A map with room for one label drops all of them.
+
+### Reverse geocoding was the wrong tool, and it took a measurement to find out
+
+The obvious build is a reverse geocoder. From the middle of Lake Ontario,
+Nominatim answers **"Central Ontario, Ontario, Canada"** &mdash; at zoom 8, 10,
+12 and 14 alike. Reverse geocoders find the nearest address, and open water has
+none.
+
+Overpass `is_in` asks a different question &mdash; which mapped areas contain
+this point &mdash; and answers with the lake, its province, its country, and
+every name each of them carries.
+
+That still left the most disputed water of all returning nothing: the high seas
+are inside no mapped area, so the Gulf of Mexico came back empty. The big
+waters are mapped as a single `place=sea` node instead, so when the first query
+finds no feature the nearest such node is asked instead. It answers
+**Golfo de México**, with `Gulf of Mexico` in English and *Mexikanska golfen* in
+Swedish, in fifty-five languages.
+
+### MapQuest, and what is not used
+
+`mapquest` is a new optional key. The layer works without it, on OpenStreetMap
+and Wikidata; the key adds a third opinion from the mapmaker that took a public
+position on this.
+
+**Their map tiles are not used, and cannot be.** The old open tile service does
+not resolve in DNS at all any more, and the raster map inside their SDK ships
+with its tile URLs empty &mdash; they are filled at runtime from a config
+endpoint, and the layer names behind them (`mbmap`, `mbdark`) say the tiles are
+Mapbox's. Pulling those out would mean reverse-engineering an undocumented
+endpoint and landing on someone else's terms. Their geocoding API is documented,
+keyed and free below 15 000 requests a month, and it is the part that carries
+the naming anyway.
+
+### Two smaller decisions
+
+**Naming takes the click ahead of the weather layer** when both are on, because
+it is the more specific question, and the layer note says so rather than leaving
+the other looking broken.
+
+**Nothing named here is an answer, not a failure.** Most of the ocean and most
+of a desert carry no name at all, and the card says which sources were asked.
+
 ## 1.7.4 - the self-check blamed sixty feeds for one dead server
 
 Reported from a run of **Check Global Command View**: every endpoint printed

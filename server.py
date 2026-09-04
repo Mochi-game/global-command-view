@@ -39,7 +39,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.7.4"
+VERSION = "1.7.5"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -951,7 +951,7 @@ def bump_usage(raw):
 ALLOWED_KEYS = (
     "windy", "trafikverket", "opensky_client_id", "opensky_client_secret",
     "aisstream", "cesium_ion", "google_maps", "openaq", "gfw", "tomtom",
-    "copernicus",
+    "copernicus", "mapquest",
 )
 
 
@@ -6979,6 +6979,243 @@ def aeroway(south, west, north, east):
     return data, "network"
 
 
+
+# ------------------------------------------------------------------- naming
+
+# What the mapmakers call this spot, and where they disagree.
+#
+# The occasion was Lake Ontario: in August 2026 an executive order renamed it
+# Lake America, Google and Apple relabelled it for users in the United States,
+# and MapQuest refused. Which one is "the" name depends entirely on whose map
+# you are holding - and a globe that shows one label silently picks a side.
+#
+# So this shows the disagreement instead of resolving it. Every answer comes
+# back attached to whoever said it, which is the same rule every other layer
+# here follows.
+#
+# It is not only politics. The same point carries Ganyadaiyo in Cayuga and
+# kihci-sakahikan in Cree, and a map with room for one label drops both.
+#
+# Reverse geocoding is the wrong tool for this and it took a measurement to
+# find out: Nominatim answers "Central Ontario, Ontario, Canada" from the
+# middle of the lake at every zoom level, because reverse geocoders are built
+# to find the nearest address and open water has none. Overpass is_in asks a
+# different question - which mapped areas contain this point - and answers with
+# the lake, its province, its country and every name each of them carries.
+
+NAMING_TTL = 604800
+
+# Enough languages to show that the name is not one thing, few enough to read.
+# Anything the feature carries beyond these is counted rather than listed.
+NAMING_LANGS = ("en", "sv", "de", "fr", "es", "it", "pl", "ru", "uk",
+                "ar", "zh", "ja", "ko", "fi", "no", "da", "nl", "pt", "tr")
+
+# What you clicked on comes first, and the containing areas after it.
+#
+# The first version sorted by nothing and put the province above the lake,
+# which is the wrong way round: from the middle of Lake Ontario the lake is the
+# answer and Ontario is the context. So physical features outrank settlements,
+# settlements outrank provinces, and provinces outrank countries.
+NAMING_FEATURE_TAGS = ("natural", "waterway", "place", "landuse", "leisure")
+
+NAMING_SETTLEMENTS = {
+    "city", "town", "village", "hamlet", "suburb", "neighbourhood", "quarter",
+    "borough", "island", "islet", "archipelago", "sea", "ocean", "locality",
+}
+
+# Timezone boundaries contain every point on earth and are named after
+# themselves. True, and not what anybody means by "what is this place called".
+NAMING_SKIP = {"timezone"}
+
+
+def _naming_rank(tags):
+    """Smallest thing first. Lower sorts earlier."""
+    if "natural" in tags or "waterway" in tags:
+        return 0
+    place = tags.get("place", "")
+    if place in NAMING_SETTLEMENTS:
+        return 1
+    if place:
+        return 2
+    if "landuse" in tags or "leisure" in tags:
+        return 2
+    return 3
+
+MAPQUEST_REVERSE = ("https://www.mapquestapi.com/geocoding/v1/reverse"
+                    "?key={key}&location={lat},{lon}&includeRoadMetadata=false"
+                    "&includeNearestIntersection=false")
+
+
+def _naming_wikidata(qid):
+    """The official name and a couple of labels, straight from Wikidata.
+
+    P1448 is "official name" - what an authority calls the thing, as opposed to
+    what people call it. It is the closest thing to a neutral answer, and it is
+    frequently absent, which is itself worth showing.
+    """
+    out = {"official": "", "labels": {}}
+    if not qid or not re.match(r"^Q\d+$", qid):
+        return out
+    try:
+        data = _wikidata({
+            "action": "wbgetentities", "ids": qid,
+            "props": "labels|claims",
+            "languages": "|".join(NAMING_LANGS[:8]),
+        })["entities"][qid]
+    except Exception as exc:  # noqa: BLE001 - a missing item is an answer
+        log("naming: wikidata %s: %s" % (qid, str(exc)[:60]))
+        return out
+    for lang, entry in (data.get("labels") or {}).items():
+        out["labels"][lang] = entry.get("value", "")
+    for claim in (data.get("claims") or {}).get("P1448", [])[:1]:
+        value = (claim.get("mainsnak") or {}).get("datavalue", {}).get("value")
+        if isinstance(value, dict):
+            out["official"] = value.get("text", "")
+    return out
+
+
+def _naming_mapquest(lat, lon):
+    """MapQuest's own answer, if a key is set.
+
+    Their tile service is gone - the old open tile host does not resolve at all
+    - and the raster map inside their SDK is served through a config endpoint
+    that is theirs to change. Geocoding is the documented, keyed API, and it is
+    the part that carries the naming anyway.
+    """
+    key = KEYS.get("mapquest")
+    if not key:
+        return None
+    try:
+        raw = fetch(MAPQUEST_REVERSE.format(key=urllib.parse.quote(key),
+                                            lat=lat, lon=lon))
+        results = (json.loads(raw).get("results") or [])
+        loc = (results[0].get("locations") or [{}])[0] if results else {}
+        said = ", ".join(x for x in (
+            loc.get("adminArea6"), loc.get("adminArea5"),
+            loc.get("adminArea4"), loc.get("adminArea3"),
+            loc.get("adminArea1")) if x)
+        key_worked("mapquest")
+        return said or "(no name returned)"
+    except Exception as exc:  # noqa: BLE001
+        log("naming: mapquest: %s" % str(exc)[:70])
+        return "unavailable (%s)" % str(exc)[:40]
+
+
+def naming(lat, lon):
+    """Every name this point carries, and who says so."""
+    lat = round(lat, 2)
+    lon = round(lon, 2)
+    key = "naming_%.2f_%.2f_%s" % (lat, lon, "mq" if KEYS.get("mapquest") else "-")
+    hit = _mem_get(key)
+    if hit and time.time() - hit[0] < NAMING_TTL:
+        return hit[1], "memory"
+    path = _disk_path(key)
+    if os.path.exists(path) and time.time() - os.path.getmtime(path) < NAMING_TTL:
+        with open(path, "rb") as fh:
+            data = fh.read()
+        _mem_put(key, data)
+        return data, "disk"
+
+    record = {
+        "lat": lat, "lon": lon,
+        "features": [], "context": [], "mapquest": None,
+        "asked": [],
+        "note": "Names as each source gives them. Where they disagree, both are "
+                "shown - this does not decide which is correct, and being on "
+                "one map does not make a name official.",
+    }
+
+    query = ("[out:json][timeout:25];is_in(%f,%f)->.a;"
+             "way(pivot.a);out tags;relation(pivot.a);out tags;" % (lat, lon))
+    elements = []
+    try:
+        elements = json.loads(overpass(query)).get("elements", [])
+        record["asked"].append("OpenStreetMap")
+    except Exception as exc:  # noqa: BLE001 - open ocean contains nothing
+        log("naming: overpass %.2f,%.2f: %s" % (lat, lon, str(exc)[:60]))
+
+    # Open water is inside nothing.
+    #
+    # is_in answers with the areas that contain a point, and beyond territorial
+    # waters there are none - the Gulf of Mexico came back empty, which is the
+    # one place this feature most obviously has to work. The big waters are
+    # mapped as a single place=sea node at their centre instead, so when the
+    # first query finds no feature, the nearest such node within four degrees
+    # is asked for instead.
+    if not any(_naming_rank(el.get("tags") or {}) <= 2 and (el.get("tags") or {}).get("name")
+               for el in elements):
+        span = 4.0
+        sea_q = ('[out:json][timeout:25];'
+                 'node["place"~"^(sea|ocean|bay|strait|gulf)$"]["name"]'
+                 '(%f,%f,%f,%f);out;' % (lat - span, lon - span,
+                                         lat + span, lon + span))
+        try:
+            found = json.loads(overpass(sea_q)).get("elements", [])
+            found.sort(key=lambda el: _haversine_km(
+                lat, lon, el.get("lat", 0.0), el.get("lon", 0.0)))
+            if found:
+                elements = found[:1] + elements
+                if "OpenStreetMap" not in record["asked"]:
+                    record["asked"].append("OpenStreetMap")
+        except Exception as exc:  # noqa: BLE001 - the middle of an ocean is fine
+            log("naming: sea lookup %.2f,%.2f: %s" % (lat, lon, str(exc)[:60]))
+
+    rows = []
+    for el in elements:
+        tags = el.get("tags") or {}
+        name = tags.get("name")
+        if not name or tags.get("boundary") in NAMING_SKIP:
+            continue
+        variants = {k[5:]: v for k, v in tags.items() if k.startswith("name:")}
+        kind = next((tags[t] for t in NAMING_FEATURE_TAGS if t in tags), "")
+        rows.append((_naming_rank(tags), {
+            "name": name,
+            "kind": kind or tags.get("boundary") or el.get("type", ""),
+            "qid": tags.get("wikidata", ""),
+            "variants": variants,
+            "official": "",
+        }))
+    rows.sort(key=lambda pair: pair[0])
+
+    # One Wikidata call, for the thing you actually clicked on. Asking for every
+    # containing area would be four calls to say what a country is called.
+    #
+    # Its labels are merged into the name list rather than shown apart: OSM has
+    # no name:sv for Lake Ontario and Wikidata has Ontariosjon, and a reader
+    # wanting the Swedish name does not care which of the two happened to hold
+    # it. Where both have one and they differ, OSM keeps the row and Wikidata
+    # is shown as the official name if it has one.
+    if rows and rows[0][1]["qid"]:
+        extra = _naming_wikidata(rows[0][1]["qid"])
+        rows[0][1]["official"] = extra["official"]
+        for lang, label in extra["labels"].items():
+            rows[0][1]["variants"].setdefault(lang, label)
+        record["asked"].append("Wikidata")
+
+    for rank, row in rows:
+        variants = row.pop("variants")
+        row["variants"] = [[lang, variants[lang]] for lang in NAMING_LANGS
+                           if lang in variants]
+        row["other_languages"] = max(0, len(variants) - len(row["variants"]))
+        (record["features"] if rank <= 2 else record["context"]).append(row)
+
+    said = _naming_mapquest(lat, lon)
+    if said is not None:
+        record["mapquest"] = said
+        record["asked"].append("MapQuest")
+
+    data = json.dumps(record).encode()
+    _mem_put(key, data)
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    with open(path, "wb") as fh:
+        fh.write(data)
+    _sweep_disk()
+    log("naming: %.2f,%.2f -> %d feature(s), %d area(s), asked %s"
+        % (lat, lon, len(record["features"]), len(record["context"]),
+           ", ".join(record["asked"]) or "nothing"))
+    return data, "network"
+
+
 def buildings(tile_lat, tile_lon):
     """OSM building footprints for one 0.01° tile, extruded client-side.
 
@@ -7426,6 +7663,12 @@ class Handler(SimpleHTTPRequestHandler):
                 if len(box) != 4:
                     return self._send(400, b'{"error":"bbox=w,s,e,n required"}')
                 data, source = airports(tuple(float(v) for v in box))
+            elif name == "naming":
+                try:
+                    data, source = naming(float(query["lat"][0]),
+                                          float(query["lon"][0]))
+                except (KeyError, ValueError, IndexError):
+                    return self._send(400, b'{"error":"lat and lon required"}')
             elif name == "entity":
                 q = query.get("q", [""])[0].strip()
                 if not q:

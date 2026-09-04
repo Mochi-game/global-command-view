@@ -474,7 +474,7 @@ const LAYER_GROUPS = [
   { name: 'People', ids: ['outbreaks', 'news', 'air', 'own'] },
   { name: 'Infrastructure',
     ids: ['cameras', 'cables', 'plants', 'netout', 'mesh', 'bases', 'infra', 'traffic', 'jams'] },
-  { name: 'Reference', ids: ['names'] },
+  { name: 'Reference', ids: ['names', 'naming'] },
   { name: 'Ground change', ids: ['sar', 'disturb', 'water'] },
   { name: 'Above', ids: ['satellites', 'launches'] },
   { name: 'Sweden', ids: ['swroad', 'smhi'] },
@@ -487,6 +487,7 @@ const LAYERS = [
   { id: 'openships', name: 'Vessels (open network)', color: '#5ee0c0', on: false, count: 0, note: 'openwaters.io — Kystverket, AISHub, volunteer receivers and more, deduplicated, no account needed; licence is per source and commercial-safe keeps only the clean ones' },
   { id: 'cables', name: 'Submarine cables', color: '#b58cff', on: false, count: 0, note: 'TeleGeography — fine to watch; ask them before monetising' },
   { id: 'cameras', name: 'Public cameras', color: '#7dffab', on: false, count: 0, note: 'Digitraffic, TfL, Trafikverket and Windy merged — a still from the camera, not a live stream' },
+  { id: 'naming', name: 'What it is called', color: '#c4b5fd', on: false, count: 0, noCount: true, note: 'Click any spot and see what every mapmaker calls it \u2014 OpenStreetMap, Wikidata, and MapQuest if you have a key. Takes the click ahead of the weather layer when both are on' },
   { id: 'names', name: 'Names & borders', color: '#cbd5e1', on: false, count: 0, note: 'Natural Earth lines, Esri dark-canvas labels \u2014 works over satellite too' },
   { id: 'sar', name: 'Radar backscatter', color: '#8fbcd4', on: false, count: 0, note: 'NASA OPERA Sentinel-1 \u2014 sees through cloud and darkness', noCount: true },
   { id: 'disturb', name: 'Ground disturbance', color: '#e879a0', on: false, count: 0, note: 'NASA OPERA DIST-ALERT \u2014 vegetation lost since a baseline', noCount: true },
@@ -748,6 +749,7 @@ function applyVisibility() {
   openShips.show = on('openships');
   if (!on('radar') && radarLayers.length) clearRadar();
   if (!on('forecast')) forecastMark.removeAll();
+  if (!on('naming')) namingMark.removeAll();
   courseVectors.show = on('vessels');
   wakes.show = on('vessels');
   collections.cameras.show = on('cameras');
@@ -5019,11 +5021,18 @@ viewer.screenSpaceEventHandler.setInputAction((click) => {
   if (!picked || !picked.id || !picked.id.type) {
     // Nothing was under the cursor. That used to be the end of it; with the
     // forecast layer on it is a question about that patch of ground instead.
-    if (layerOn('forecast')) {
+    // Two layers want an empty click. Naming goes first when both are on,
+    // because it is the more specific question and the layer note says so -
+    // silently picking one and leaving the other to look broken is the failure
+    // to avoid here.
+    if (layerOn('naming') || layerOn('forecast')) {
       const ground = surfacePoint(click.position);
       if (ground) {
         const c = Cesium.Cartographic.fromCartesian(ground);
-        showForecast(Cesium.Math.toDegrees(c.latitude), Cesium.Math.toDegrees(c.longitude));
+        const lat = Cesium.Math.toDegrees(c.latitude);
+        const lon = Cesium.Math.toDegrees(c.longitude);
+        if (layerOn('naming')) showNaming(lat, lon);
+        else showForecast(lat, lon);
       }
     }
     return;
@@ -8275,6 +8284,38 @@ const SERVICES = [
     ],
   },
   {
+    fields: ['mapquest'],
+    name: 'MapQuest',
+    tier: 3,
+    cost: 'free',
+    verdict: '<b>Optional.</b> The <b>What it is called</b> layer already works '
+      + 'without it, on OpenStreetMap and Wikidata. This adds a third opinion '
+      + 'from a mapmaker that has taken a public position on naming, which is '
+      + 'the whole reason the layer exists.',
+    adds: 'In August 2026 an executive order renamed Lake Ontario to Lake '
+      + 'America. Google and Apple relabelled it for users in the United '
+      + 'States; MapQuest did not. Their geocoder is the part that carries the '
+      + 'naming, so that is what this asks. Their map tiles are not used: the '
+      + 'old open tile service no longer resolves at all, and the raster map '
+      + 'inside their SDK is served through an endpoint that is theirs rather '
+      + 'than ours to depend on.',
+    stepsLabel: 'Show me how to get the key, step by step',
+    url: 'https://developer.mapquest.com/',
+    steps: [
+      'Open developer.mapquest.com with the button below and make a free account.',
+      'Under <b>Manage Keys</b>, copy the <b>Consumer Key</b> from the '
+        + 'application it creates for you.',
+      'Paste it below and reload. Switch on <b>What it is called</b> under '
+        + 'Reference, then click any spot on the globe.',
+      'The free tier is generous for this: a paid plan starts above 15 000 '
+        + 'requests a month, and each click here is one request, cached for a '
+        + 'week per spot.',
+      'It answers with an address rather than a feature, so over open water it '
+        + 'often says nothing. That is their geocoder working as designed, not '
+        + 'a fault, and the layer says so rather than leaving a blank.',
+    ],
+  },
+  {
     fields: ['windy'],
     name: 'Windy',
     tier: 2,
@@ -8587,6 +8628,9 @@ const SOURCE_LICENCES = [
   ['CesiumJS', 'the globe engine', 'Apache 2.0', 'free'],
   ['satellite.js', 'orbit propagation', 'MIT', 'free'],
   ['OpenStreetMap', 'buildings, roads, base map', 'ODbL — attribution, share-alike', 'free'],
+  ['OpenStreetMap', 'place names, in every language a feature carries', 'ODbL 1.0 \u2014 attribution, share-alike', 'free'],
+  ['Wikidata', 'official names and labels', 'CC0 \u2014 public domain', 'free'],
+  ['MapQuest', 'their own name for a place', 'free tier with a key, terms apply', 'free key'],
   ['NASA OPERA', 'radar backscatter, disturbance, surface water', 'public domain', 'free'],
   ['The Space Devs', 'launch schedule', 'CC BY 4.0', 'free'],
   ['OpenStreetMap', 'data centres and dams', 'ODbL 1.0 — share-alike on the data', 'free'],
@@ -9780,6 +9824,88 @@ $('#rq').addEventListener('submit', (e) => {
  */
 
 const forecastMark = scene.primitives.add(new Cesium.PointPrimitiveCollection());
+const namingMark = scene.primitives.add(new Cesium.PointPrimitiveCollection());
+
+/*
+ * What every mapmaker calls this spot.
+ *
+ * The occasion was Lake Ontario. In August 2026 an executive order renamed it
+ * Lake America; Google and Apple relabelled it for users in the United States,
+ * and MapQuest refused. Which one is "the" name depends on whose map you are
+ * holding, and a globe that prints one label has quietly taken a side.
+ *
+ * So this shows the disagreement rather than settling it. Every name arrives
+ * attached to whoever says it, which is the rule every other layer here
+ * follows.
+ *
+ * It is not only politics: the same lake is Ganyadaiyo in Cayuga and
+ * Ontariosjon in Swedish, and a map with room for one label drops both.
+ */
+async function showNaming(lat, lon) {
+  namingMark.removeAll();
+  namingMark.add({
+    position: Cesium.Cartesian3.fromDegrees(lon, lat, 0),
+    pixelSize: 11,
+    color: Cesium.Color.fromCssColorString('#c4b5fd').withAlpha(0.95),
+    outlineColor: MARK_HALO,
+    outlineWidth: 2.5,
+    disableDepthTestDistance: MARK_THROUGH_M,
+  });
+  scene.requestRender();
+
+  const where = `${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+  showDetail(where, 'names \u00b7 asking\u2026', [['Names', 'asking the map sources\u2026']]);
+
+  let d;
+  try {
+    d = await getJSON(`/api/naming?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`);
+  } catch (err) {
+    showDetail(where, 'names', [['Could not ask', err.message]]);
+    log(`names unavailable (${err.message})`, 'warn');
+    return;
+  }
+
+  const rows = [];
+  const first = d.features[0];
+
+  if (!first) {
+    // Nothing named here is a real answer, and a common one: most of the ocean
+    // carries no name at all, and neither does most of a desert.
+    showDetail(where, 'names', [
+      ['Nothing named here', 'No source has a name for this point. Open water '
+        + 'and empty ground often carry none \u2014 this is an answer, not a '
+        + 'failure to look.'],
+      ['Asked', d.asked.join(', ') || 'nothing answered'],
+    ]);
+    log(`names: nothing named at ${where}`);
+    return;
+  }
+
+  rows.push(['OpenStreetMap calls it', first.name]);
+  if (first.official && first.official !== first.name) {
+    rows.push(['Official name (Wikidata)', first.official]);
+  }
+  for (const [lang, value] of first.variants) {
+    if (value !== first.name) rows.push([`In ${lang}`, value]);
+  }
+  if (first.other_languages) {
+    rows.push(['Also named in', `${first.other_languages} more languages, not shown`]);
+  }
+  if (d.mapquest) rows.push(['MapQuest calls it', d.mapquest]);
+
+  const around = d.features.slice(1).concat(d.context).map((f) => f.name);
+  if (around.length) rows.push(['Inside', around.join(' \u00b7 ')]);
+
+  rows.push(['Asked', d.asked.join(', ')]);
+  rows.push(['Note', d.note]);
+  if (!d.mapquest) {
+    rows.push(['MapQuest', 'no key set \u2014 add one under SETUP for a third opinion']);
+  }
+
+  showDetail(first.name, `names \u00b7 ${first.kind || 'place'}`, rows);
+  log(`names: ${first.name} \u00b7 ${first.variants.length} language(s) shown `
+    + `\u00b7 ${d.asked.join(', ')}`);
+}
 
 async function showForecast(lat, lon) {
   forecastMark.removeAll();

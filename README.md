@@ -237,6 +237,7 @@ Copy `keys.example.json` to `keys.json` and paste in whichever you want, or use
 | `openaq` | Air quality measured at ground level. |
 | `gfw` | Fishing behaviour and transponder gaps (granted by hand, expect a wait). |
 | `copernicus` | Sentinel-2 on a given day at 10 m, from your own configuration instance. |
+| `mapquest` | A third opinion on what a place is called, in the **What it is called** layer. Optional — that layer already works without it. |
 
 `keys.json` is in `.gitignore`. Keep it that way.
 

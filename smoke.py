@@ -50,6 +50,10 @@ ENDPOINT_ARGS = {
     "ship": "title=Silja%20Serenade",
     "satellite": "norad=25544&name=ISS%20(ZARYA)",
     "place": "lat=59.33&lon=18.06",
+    # The middle of Lake Ontario, which is the point of the layer: a
+    # reverse geocoder answers "Central Ontario" from here and the
+    # naming lookup answers with the lake.
+    "naming": "lat=43.70&lon=-77.90",
     "buildings": "lat=59.33&lon=18.06",
     "flights": "lamin=55&lomin=10&lamax=62&lomax=25",
     "powerplants": "bbox=10,55,25,70",
@@ -68,7 +72,7 @@ SLOW = {"fires", "briefing", "outbreaks", "satellites", "cables", "landings",
         "cameras", "buildings", "streetview", "place", "satellite",
         "powerplants", "kiwisdr", "headofstate", "netoutages",
         "recon", "weather", "mesh", "newsheat", "trains",
-        "geocode", "aprs", "entity", "airports", "broadcast"}
+        "geocode", "aprs", "entity", "airports", "broadcast", "naming"}
 
 # Endpoints allowed to answer 400 when called without usable arguments.
 MAY_REFUSE = {"buildings", "flights"}
