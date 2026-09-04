@@ -1851,22 +1851,31 @@ def outbreaks():
     return data, "network"
 
 
-def country_point(name):
-    """A point for a country or region name, cached hard and paced politely."""
-    key = "countrypt_%s" % name.lower().replace(" ", "_")[:60]
+def country_place(name):
+    """What the geocoder matched: a point, and the name it gave back.
+
+    The name is the part that was being thrown away, and it mattered. The search
+    box labelled every result with the words the user typed rather than the
+    place that was found, so a misspelling was confirmed back at them: "Lake
+    Onatario" flew to northern Ontario, six hundred kilometres from the lake,
+    under a heading that said Lake Onatario. Nothing on screen suggested it had
+    matched anything else.
+
+    The cache key carries a 2 because the records written before this have no
+    name in them, and a stale entry would keep the old silence going.
+    """
+    key = "countrypt2_%s" % name.lower().replace(" ", "_")[:60]
     hit = _mem_get(key)
     if hit:
-        got = json.loads(hit[1])
-        return (got["lat"], got["lon"]) if got.get("lat") is not None else None
+        return json.loads(hit[1])
     path = _disk_path(key)
     if os.path.exists(path):
         with open(path, "rb") as fh:
             data = fh.read()
         _mem_put(key, data)
-        got = json.loads(data)
-        return (got["lat"], got["lon"]) if got.get("lat") is not None else None
+        return json.loads(data)
 
-    record = {"lat": None, "lon": None}
+    record = {"lat": None, "lon": None, "name": ""}
     try:
         with _nominatim_lock:
             wait = NOMINATIM_GAP - (time.time() - _nominatim_last[0])
@@ -1880,7 +1889,13 @@ def country_point(name):
             _nominatim_last[0] = time.time()
         found = json.loads(raw)
         if found:
-            record = {"lat": float(found[0]["lat"]), "lon": float(found[0]["lon"])}
+            # display_name runs to eight components for a street address. Three
+            # is enough to recognise a place and short enough to read.
+            shown = ", ".join(
+                (found[0].get("display_name") or "").split(", ")[:3]).strip()
+            record = {"lat": float(found[0]["lat"]),
+                      "lon": float(found[0]["lon"]),
+                      "name": shown}
     except Exception as exc:  # noqa: BLE001 - an unplaced outbreak still lists
         log("country lookup failed for %s: %s" % (name, exc))
 
@@ -1890,7 +1905,13 @@ def country_point(name):
     with open(path, "wb") as fh:
         fh.write(data)
     _sweep_disk()
-    return (record["lat"], record["lon"]) if record["lat"] is not None else None
+    return record
+
+
+def country_point(name):
+    """Just the coordinates, for the callers that only place a dot."""
+    got = country_place(name)
+    return (got["lat"], got["lon"]) if got.get("lat") is not None else None
 
 
 # GDACS was already being downloaded whole and mined for two event types. The
@@ -4697,12 +4718,24 @@ def search(q):
     # hundred kilometres from the city, because its name happens to contain the
     # word. Somebody typing a town wants the town. An airport is what a code is
     # for, and codes are matched above without touching the network.
-    where = country_point(q[:120])
-    if where:
+    where = country_place(q[:120])
+    if where.get("lat") is not None:
+        label = where.get("name") or q
+        detail = "geocoded by OpenStreetMap Nominatim"
+        # A geocoder always answers, so a misspelling comes back as somewhere
+        # else rather than as nothing. The longest word typed is the one
+        # carrying the meaning - "lake" is in half the lakes on earth and
+        # "Onatario" is in none of them - so that is the one checked.
+        typed = sorted(re.findall(r"[^\W\d_]{5,}", q.lower()),
+                       key=len, reverse=True)
+        if typed and typed[0] not in label.lower():
+            detail += (" \u2014 %s does not appear in this name, so it is a "
+                       "loose match. Check the spelling." % typed[0])
+        where = (where["lat"], where["lon"])
         return json.dumps({
             "kind": "place",
-            "label": q,
-            "detail": "geocoded by OpenStreetMap Nominatim",
+            "label": label,
+            "detail": detail,
             "lat": where[0], "lon": where[1],
             "height": 30000,
         }).encode(), "nominatim"

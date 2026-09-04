@@ -26,6 +26,33 @@ It is not only politics. From the middle of that lake the app returns
 list. OpenStreetMap also carries *Ganyadáiyoˀ* in Cayuga and
 *ᑭᐦᒋ ᓵᑲᐦᐃᑲᐣ* in Cree. A map with room for one label drops all of them.
 
+### The search box confirmed your typing back to you
+
+Reported as a search for Lake Ontario landing somewhere else. It was a
+misspelling &mdash; *Lake Onatario* &mdash; but the app made that impossible to
+see, and that part was ours.
+
+The result was labelled with **the words you typed**, never with the place that
+was found. Nominatim returns a `display_name` and the code threw it away. So
+"Lake Onatario" flew six hundred kilometres north of the lake, under a heading
+that read *Lake Onatario*, with nothing on screen suggesting it had matched
+anything else.
+
+The heading is now what was actually matched:
+
+| Typed | Now says |
+|---|---|
+| `Lake Ontario` | Lake Ontario, Ontario, Canada |
+| `Lake Onatario` | lake (origin of Davidson River), Unorganized Kenora District |
+
+And because a geocoder always answers &mdash; a misspelling comes back as
+somewhere else rather than as nothing &mdash; the longest word typed is checked
+against the match. *lake* appears in half the lakes on earth; *Onatario* appears
+in none of them, so that is the word tested:
+
+> geocoded by OpenStreetMap Nominatim — onatario does not appear in this name,
+> so it is a loose match. Check the spelling.
+
 ### Google was labelling the world in Swedish
 
 Reported as the Gulf of Mexico appearing in Swedish while every other word on
