@@ -26,6 +26,32 @@ It is not only politics. From the middle of that lake the app returns
 list. OpenStreetMap also carries *Ganyadáiyoˀ* in Cayuga and
 *ᑭᐦᒋ ᓵᑲᐦᐃᑲᐣ* in Cree. A map with room for one label drops all of them.
 
+### Google was labelling the world in Swedish
+
+Reported as the Gulf of Mexico appearing in Swedish while every other word on
+screen was English &mdash; and it looked like the new naming layer had done it.
+It had not. Photoreal 3D replaces this globe with Google's, so those labels are
+theirs.
+
+The Maps JavaScript loader carried no language parameter at all, and with none
+given Google reads the browser's: `navigator.language` here is `sv`. It asks for
+English now.
+
+**No region is set, deliberately.** Google serves different names for disputed
+places depending on it, and choosing one would be this app quietly taking the
+side it built a whole layer to avoid taking. A line under the switch now says
+whose names those are, and points at the layer that shows all of them.
+
+### The daylight switch was named after the wrong thing
+
+Asked for twice as "a button for all daylight", by somebody who had the switch
+on screen both times. It was called **Sun terminator** &mdash; the name of the
+phenomenon rather than the effect. A person who cannot see the United States is
+looking for light, not for a terminator.
+
+It is **Night side** now, with a line underneath saying that off lights the
+whole globe whatever the local time.
+
 ### English leads, and the local name follows it
 
 The first version led with OpenStreetMap's primary name tag, which is whatever
