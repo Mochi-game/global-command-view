@@ -32,6 +32,56 @@ answer, so this is not a count of zero*.
 `setCount(id, null)` is how a layer reports that. Fishing uses it; the same
 shape is available to every other layer that currently swallows a failure.
 
+### Thirty-two markers were half-buried in the ground
+
+Reported as half-moons, then as *"radio stations too, and my own marks, and
+vessels — can you look yourself, it seems to be a lot"*. It was.
+
+A point drawn at ellipsoid height zero sits inside any ground above sea level.
+Depth tested against that ground, half of it disappears into the hill, and what
+is left is drawn as half a point.
+
+A survey of the file found **thirty-three markers drawn on the ground**:
+
+| | |
+|---|---|
+| no depth exemption at all | **17** |
+| the fifty metres a saved mark uses | **15** |
+| already fixed | 1 |
+
+Fifty kilometres is the distance you have flown down to a valley from. It is not
+the distance you look at a country from, and at national scale every marker on
+screen was past it.
+
+**The right value falls out of the geometry, and both bounds matter:**
+
+| camera height | horizon | antipode |
+|---|---|---|
+| 80 km | 1 013 km | 12 822 km |
+| 300 km | 1 978 km | 13 042 km |
+| 1 000 km | 3 707 km | 13 742 km |
+| 20 000 km | 25 590 km | 32 742 km |
+
+Larger than the horizon and markers beyond the curve of the Earth shine through
+the ground in front of them. Larger than the antipode and a dot from the far
+side follows the view around — which is the complaint that produced the fifty
+kilometres in the first place.
+
+**A thousand kilometres** sits inside the horizon from eighty kilometres up and
+everywhere above it, and is nowhere near the antipode at any height. Below
+eighty you are looking at a town, where everything on screen is a few kilometres
+away and none of this applies.
+
+`SURFACE_THROUGH_M` now, on all thirty-three: vessels, earthquakes, fires, power
+stations, radio stations, shortwave receivers, scanners, APRS, mesh nodes,
+volcanoes, outbreaks, airports, navaids, METAR, launch pads, submarine bases,
+capital ships, news attention, internet outages, disaster alerts, both train
+layers, Swedish road disruption, your own marks and entries, and the two click
+markers.
+
+The measuring tool and the aircraft tracking brackets keep the old constant.
+Neither stands on the ground.
+
 ### The Swedish trains were small half-round dots
 
 Reported while filming, and *half-round* was the clue. A point drawn at ground

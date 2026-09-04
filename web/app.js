@@ -1214,6 +1214,7 @@ async function pollVessels() {
           scale: 0.45,
           alignedAxis: Cesium.Cartesian3.ZERO,
           position: Cesium.Cartesian3.fromDegrees(v.lon, v.lat, 0),
+          disableDepthTestDistance: SURFACE_THROUGH_M,
           id: { type: 'vessel', ref: v },
           scaleByDistance: SCALE.vessel,
         });
@@ -1296,6 +1297,7 @@ async function loadCables() {
       const [lon, lat] = feature.geometry.coordinates;
       collections.landings.add({
         position: Cesium.Cartesian3.fromDegrees(lon, lat, 0),
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         pixelSize: 3,
         color: Cesium.Color.fromCssColorString('#e0c3ff').withAlpha(0.9),
         id: { type: 'landing', ref: feature.properties },
@@ -1365,6 +1367,7 @@ async function loadSubmarineBases() {
       subBases.add({
         image: GLYPHS.base,
         position: Cesium.Cartesian3.fromDegrees(base.lon, base.lat, 0),
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         scale: 0.7,
         color: Cesium.Color.fromCssColorString('#b58cff'),
         scaleByDistance: new Cesium.NearFarScalar(50_000, 1.2, 20_000_000, 0.4),
@@ -1429,6 +1432,7 @@ async function loadCarriers() {
       capitalShips.add({
         image: GLYPHS.carrier,
         position: Cesium.Cartesian3.fromDegrees(ship.lon, ship.lat, 0),
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         scale: carrier ? 0.85 : 0.65,
         color: colour,
         scaleByDistance: new Cesium.NearFarScalar(50_000, 1.3, 20_000_000, 0.45),
@@ -1498,6 +1502,7 @@ async function loadQuakes() {
       const shade = QUAKE_DEPTHS.find((d) => (depth || 0) < d.max).color;
       quakes.add({
         position: Cesium.Cartesian3.fromDegrees(lon, lat, 0),
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         pixelSize: 4 + mag * 2.6,
         color: Cesium.Color.fromCssColorString(shade).withAlpha(0.75),
         outlineColor: Cesium.Color.fromCssColorString(shade),
@@ -1575,6 +1580,7 @@ async function loadFires() {
       const shade = FIRE_HEAT.find((h) => frp < h.max).color;
       fires.add({
         position: Cesium.Cartesian3.fromDegrees(lon, lat, 0),
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         pixelSize: 4 + Math.min(Math.sqrt(frp) * 1.1, 12),
         color: Cesium.Color.fromCssColorString(shade).withAlpha(0.8),
         outlineColor: Cesium.Color.fromCssColorString(shade),
@@ -2553,6 +2559,7 @@ async function loadTrains() {
         scale: 0.5,
         alignedAxis: Cesium.Cartesian3.ZERO,
         position: Cesium.Cartesian3.fromDegrees(t.lon, t.lat, 0),
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         color: Cesium.Color.fromCssColorString('#c4b5fd'),
         scaleByDistance: new Cesium.NearFarScalar(5e4, 1.1, 5e6, 0.35),
         id: { type: 'train', ref: t },
@@ -2599,6 +2606,7 @@ async function loadMesh() {
     for (const n of data.nodes) {
       meshNodes.add({
         position: Cesium.Cartesian3.fromDegrees(n.lon, n.lat, 0),
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         pixelSize: 5,
         color: Cesium.Color.fromCssColorString('#34d399').withAlpha(0.7),
         outlineColor: Cesium.Color.fromCssColorString('#6ee7b7'),
@@ -2644,6 +2652,7 @@ async function loadNewsHeat() {
       const share = pl.articles / top;
       newsHeat.add({
         position: Cesium.Cartesian3.fromDegrees(pl.lon, pl.lat, 0),
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         pixelSize: 8 + share * 16,
         color: Cesium.Color.fromCssColorString('#fcd34d').withAlpha(0.2 + share * 0.3),
         outlineColor: Cesium.Color.fromCssColorString('#fcd34d').withAlpha(0.8),
@@ -2684,6 +2693,7 @@ async function loadNetOutages() {
       placed += 1;
       netOut.add({
         position: Cesium.Cartesian3.fromDegrees(o.lon, o.lat, 0),
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         pixelSize: 9 + o.confidence * 4,
         color: Cesium.Color.fromCssColorString('#fb7185').withAlpha(0.3),
         outlineColor: Cesium.Color.fromCssColorString('#fb7185'),
@@ -2805,6 +2815,7 @@ async function loadWeatherAlerts() {
       const shade = ALERT_COLOURS[a.severity] || '#f472b6';
       alerts.add({
         position: Cesium.Cartesian3.fromDegrees(a.lon, a.lat, 0),
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         pixelSize: a.severity === 'Extreme' ? 11 : 8,
         color: Cesium.Color.fromCssColorString(shade).withAlpha(0.45),
         outlineColor: Cesium.Color.fromCssColorString(shade),
@@ -2854,6 +2865,7 @@ async function loadPlants() {
       const shade = FUEL_COLOURS[pl.fuel] || '#a8a29e';
       plants.add({
         position: Cesium.Cartesian3.fromDegrees(pl.lon, pl.lat, 0),
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         // Capacity spans four orders of magnitude, so the root of it, not it.
         pixelSize: 4 + Math.min(Math.sqrt(pl.mw) * 0.5, 14),
         color: Cesium.Color.fromCssColorString(shade).withAlpha(0.55),
@@ -3125,6 +3137,38 @@ function addEntityExpand(name, label) {
  */
 const MARK_THROUGH_M = 50000;
 
+/*
+ * And the same problem, everywhere, at a scale nobody had checked.
+ *
+ * Reported as half-moons: radio stations, saved marks, vessels, trains. A point
+ * drawn at ellipsoid height zero sits inside any ground above sea level, and a
+ * depth-tested point half inside a hill is drawn as half a point.
+ *
+ * A survey of the file found thirty-three markers drawn on the ground.
+ * Seventeen had no exemption at all. Fifteen had the fifty kilometres above,
+ * which is the distance you have flown down to a valley from - not the
+ * distance you look at a country from.
+ *
+ * The right value falls out of the geometry, and both bounds matter:
+ *
+ *     camera height     horizon        antipode
+ *          80 km        1 013 km       12 822 km
+ *         300 km        1 978 km       13 042 km
+ *       1 000 km        3 707 km       13 742 km
+ *      20 000 km       25 590 km       32 742 km
+ *
+ * Bigger than the horizon and markers beyond the curve of the Earth shine
+ * through the ground in front of them. Bigger than the antipode and a dot from
+ * the far side follows the view around - which is the complaint that produced
+ * the fifty kilometres in the first place.
+ *
+ * A thousand kilometres sits inside the horizon from eighty kilometres up and
+ * everywhere above it, and is nowhere near the antipode at any height. Below
+ * eighty you are looking at a town, where everything on screen is a few
+ * kilometres away and none of this applies.
+ */
+const SURFACE_THROUGH_M = 1e6;
+
 const MARK_HALO = Cesium.Color.fromCssColorString('#04070c');
 
 LAYER_ON_DEMAND.broadcast = () => loadBroadcast(true);
@@ -3156,7 +3200,7 @@ async function loadBroadcast(force) {
         outlineWidth: 2.5,
         scaleByDistance: new Cesium.NearFarScalar(5e4, 1.5, 5e6, 0.85),
         disableDepthTestAgainstTerrain: true,
-        disableDepthTestDistance: MARK_THROUGH_M,
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         id: { type: 'broadcast', ref: st },
       });
     }
@@ -3318,7 +3362,7 @@ async function loadAirports() {
         color: Cesium.Color.WHITE.withAlpha(0.95),
         outlineColor: Cesium.Color.fromCssColorString('#0b0e14').withAlpha(0.9),
         outlineWidth: 2,
-        disableDepthTestDistance: MARK_THROUGH_M,
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         scaleByDistance: new Cesium.NearFarScalar(1e5, 1.3, 2e7, 0.5),
         id: { type: 'airport', ref: a },
       });
@@ -3380,6 +3424,7 @@ async function loadAprs() {
       const fresh = Math.max(0.25, 1 - st.ago_s / 3600);
       aprs.add({
         position: Cesium.Cartesian3.fromDegrees(st.lon, st.lat, 0),
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         pixelSize: 6,
         color: Cesium.Color.fromCssColorString('#a78bfa').withAlpha(0.3 + 0.5 * fresh),
         outlineColor: Cesium.Color.fromCssColorString('#c4b5fd'),
@@ -3455,6 +3500,7 @@ async function loadScanners() {
     placed += 1;
     scanners.add({
       position: Cesium.Cartesian3.fromDegrees(point.lon, point.lat, 0),
+      disableDepthTestDistance: SURFACE_THROUGH_M,
       pixelSize: 6 + Math.min((sys.callAvg || 0) * 1.5, 8),
       color: Cesium.Color.fromCssColorString('#60a5fa').withAlpha(0.6),
       outlineColor: Cesium.Color.fromCssColorString('#bfdbfe'),
@@ -3513,7 +3559,7 @@ async function loadRadios() {
         outlineColor: MARK_HALO,
         outlineWidth: 2.5,
         scaleByDistance: new Cesium.NearFarScalar(1e5, 1.5, 2e7, 0.85),
-        disableDepthTestDistance: MARK_THROUGH_M,
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         id: { type: 'radio', ref: r },
       });
     }
@@ -3556,6 +3602,7 @@ async function loadVolcanoes() {
       const size = 8 + (Number.isFinite(vei) ? vei * 2.4 : 0);
       volcanoes.add({
         position: Cesium.Cartesian3.fromDegrees(v.lon, v.lat, 0),
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         pixelSize: size,
         color: Cesium.Color.fromCssColorString('#ff8c42').withAlpha(0.45),
         outlineColor: Cesium.Color.fromCssColorString('#ffb37a'),
@@ -3602,6 +3649,7 @@ async function loadOwnEntries() {
     for (const e of data.events) {
       ownEntries.add({
         position: Cesium.Cartesian3.fromDegrees(e.lon, e.lat, 0),
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         pixelSize: 12,
         color: Cesium.Color.fromCssColorString('#ffb347').withAlpha(0.3),
         outlineColor: Cesium.Color.fromCssColorString('#ffb347'),
@@ -3744,6 +3792,7 @@ async function loadOutbreaks() {
       const fresh = Math.max(0.25, 1 - days / 240);
       outbreaks.add({
         position: Cesium.Cartesian3.fromDegrees(group.lon, group.lat, 0),
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         // Size says how much is going on there, not how loud one report was.
         pixelSize: 9 + Math.min(group.items.length * 3, 9),
         color: Cesium.Color.fromCssColorString('#c77dff').withAlpha(0.35 * fresh + 0.2),
@@ -4857,7 +4906,7 @@ function renderMarks() {
      */
     markPoints.add({
       position: Cesium.Cartesian3.fromDegrees(mark.lon, mark.lat, 0),
-      disableDepthTestDistance: MARK_THROUGH_M,
+      disableDepthTestDistance: SURFACE_THROUGH_M,
       // Eight pixels of mid-blue with a hairline ring lost against sea, against
       // radar and against satellite shadow alike. The dark ring is what the
       // airport dot needed twice before it stayed visible.
@@ -4873,7 +4922,7 @@ function renderMarks() {
       // walk the name up the hill and leave its own dot at sea level, so they
       // stay on the one position and share the exemption instead.
       position: Cesium.Cartesian3.fromDegrees(mark.lon, mark.lat, 0),
-      disableDepthTestDistance: MARK_THROUGH_M,
+      disableDepthTestDistance: SURFACE_THROUGH_M,
       text: mark.name,
       font: '600 11px "JetBrains Mono", Consolas, monospace',
       fillColor: Cesium.Color.fromCssColorString('#4fd6ff'),
@@ -5939,7 +5988,7 @@ async function loadAir(force) {
         color: Cesium.Color.fromCssColorString(shade),
         outlineColor: MARK_HALO,
         outlineWidth: 2.5,
-        disableDepthTestDistance: MARK_THROUGH_M,
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         scaleByDistance: new Cesium.NearFarScalar(5e4, 1.4, 3e6, 0.8),
         id: { type: 'air', ref: r },
       });
@@ -6012,7 +6061,7 @@ async function loadFishing(force) {
         color: Cesium.Color.fromCssColorString(kind.color),
         outlineColor: MARK_HALO,
         outlineWidth: 2.5,
-        disableDepthTestDistance: MARK_THROUGH_M,
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         scaleByDistance: new Cesium.NearFarScalar(1e5, 1.4, 8e6, 0.7),
         id: { type: 'fishing', ref: e },
       });
@@ -6191,7 +6240,7 @@ async function loadLaunches() {
         color: Cesium.Color.fromCssColorString(go ? '#fb923c' : '#7c8794'),
         outlineColor: MARK_HALO,
         outlineWidth: 2.5,
-        disableDepthTestDistance: MARK_THROUGH_M,
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         scaleByDistance: new Cesium.NearFarScalar(1e5, 1.4, 2e7, 0.75),
         id: { type: 'launch', ref: { ...L, hours } },
       });
@@ -6269,7 +6318,7 @@ async function loadInfrastructure(force) {
         color: Cesium.Color.fromCssColorString(dam ? '#38bdf8' : '#c084fc'),
         outlineColor: MARK_HALO,
         outlineWidth: 2.5,
-        disableDepthTestDistance: MARK_THROUGH_M,
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         scaleByDistance: new Cesium.NearFarScalar(5e4, 1.4, 4e6, 0.7),
         id: { type: 'infra', ref: site },
       });
@@ -9475,7 +9524,7 @@ async function loadMetar(force) {
         FLIGHT_CAT_COLOUR[s.category] || '#8a94a6').withAlpha(0.9),
       outlineColor: Cesium.Color.fromCssColorString('#0b0e14').withAlpha(0.75),
       outlineWidth: 1,
-      disableDepthTestDistance: MARK_THROUGH_M,
+      disableDepthTestDistance: SURFACE_THROUGH_M,
       scaleByDistance: new Cesium.NearFarScalar(1e5, 1.4, 4e6, 0.45),
       id: { type: 'metar', ref: s },
     });
@@ -9791,7 +9840,7 @@ async function loadNavaids(force) {
         NAVAID_COLOUR[n.type] || '#8a94a6').withAlpha(0.85),
       outlineColor: Cesium.Color.fromCssColorString('#0b0e14').withAlpha(0.75),
       outlineWidth: 1,
-      disableDepthTestDistance: MARK_THROUGH_M,
+      disableDepthTestDistance: SURFACE_THROUGH_M,
       scaleByDistance: new Cesium.NearFarScalar(1e5, 1.4, 4e6, 0.4),
       id: { type: 'navaid', ref: n },
     });
@@ -9873,7 +9922,7 @@ async function loadOpenWaters(force) {
       color: ((v.sog || 0) > 0.5 ? lit : dim).withAlpha(0.9),
       outlineColor: Cesium.Color.fromCssColorString('#0b0e14').withAlpha(0.7),
       outlineWidth: 1,
-      disableDepthTestDistance: MARK_THROUGH_M,
+      disableDepthTestDistance: SURFACE_THROUGH_M,
       id: { type: 'openship', ref: v },
     });
     drawn++;
@@ -10030,7 +10079,7 @@ async function showNaming(lat, lon) {
     color: Cesium.Color.fromCssColorString('#c4b5fd').withAlpha(0.95),
     outlineColor: MARK_HALO,
     outlineWidth: 2.5,
-    disableDepthTestDistance: MARK_THROUGH_M,
+    disableDepthTestDistance: SURFACE_THROUGH_M,
   });
   scene.requestRender();
 
@@ -10108,7 +10157,7 @@ async function showForecast(lat, lon) {
     color: Cesium.Color.fromCssColorString('#7dd3fc').withAlpha(0.9),
     outlineColor: Cesium.Color.fromCssColorString('#0b0e14').withAlpha(0.9),
     outlineWidth: 2,
-    disableDepthTestDistance: MARK_THROUGH_M,
+    disableDepthTestDistance: SURFACE_THROUGH_M,
   });
   scene.requestRender();
 
@@ -10587,7 +10636,7 @@ async function loadSwedenRoad() {
         outlineWidth: 1,
         // Held off the planet by the same 50 km rule the other marks use, so a
         // disruption in Skane does not draw through the globe from Australia.
-        disableDepthTestDistance: MARK_THROUGH_M,
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         scaleByDistance: new Cesium.NearFarScalar(1e5, 1.5, 4e6, 0.4),
         id: { type: 'swroad', ref: e },
       });
@@ -10628,19 +10677,7 @@ async function loadSwedenRail() {
         color: Cesium.Color.fromCssColorString('#5fe3c0'),
         outlineColor: MARK_HALO,
         outlineWidth: 2,
-        // A thousand kilometres, not the fifty a saved mark uses.
-        //
-        // Reported as the trains being small half-round dots. Half-round is the
-        // clue: a point at ground level, depth tested against the terrain it is
-        // standing in, comes out with its lower half inside the hill. Fifty
-        // kilometres is right for a mark in a valley you have flown down to.
-        // This is a layer you look at from three hundred kilometres up, where
-        // every train in the country is past that line and half buried.
-        //
-        // A thousand still leaves the planet itself doing the occluding: from
-        // any view that fits Sweden on screen the far side is further away
-        // than this, so trains in Japan do not shine through the Earth.
-        disableDepthTestDistance: 1e6,
+        disableDepthTestDistance: SURFACE_THROUGH_M,
         scaleByDistance: new Cesium.NearFarScalar(1e5, 1.4, 4e6, 0.8),
         id: { type: 'swrail', ref: t },
       });
