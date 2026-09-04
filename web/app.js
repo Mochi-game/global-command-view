@@ -488,7 +488,7 @@ const LAYERS = [
   { id: 'cables', name: 'Submarine cables', color: '#b58cff', on: false, count: 0, note: 'TeleGeography — fine to watch; ask them before monetising' },
   { id: 'cameras', name: 'Public cameras', color: '#7dffab', on: false, count: 0, note: 'Digitraffic, TfL, Trafikverket and Windy merged — a still from the camera, not a live stream' },
   { id: 'naming', name: 'What it is called', color: '#c4b5fd', on: false, count: 0, noCount: true, note: 'Click any spot and see what every mapmaker calls it \u2014 OpenStreetMap, Wikidata, and MapQuest if you have a key. Takes the click ahead of the weather layer when both are on' },
-  { id: 'names', name: 'Names & borders', color: '#cbd5e1', on: false, count: 0, note: 'Natural Earth lines, Esri dark-canvas labels \u2014 works over satellite too' },
+  { id: 'names', name: 'Names & borders', color: '#cbd5e1', on: false, count: 0, note: 'Natural Earth lines, and Esri place labels drawn for laying over imagery \u2014 towns, provinces, seas' },
   { id: 'sar', name: 'Radar backscatter', color: '#8fbcd4', on: false, count: 0, note: 'NASA OPERA Sentinel-1 \u2014 sees through cloud and darkness', noCount: true },
   { id: 'disturb', name: 'Ground disturbance', color: '#e879a0', on: false, count: 0, note: 'NASA OPERA DIST-ALERT \u2014 vegetation lost since a baseline', noCount: true },
   { id: 'water', name: 'Surface water / flood', color: '#38bdf8', on: false, count: 0, note: 'NASA OPERA DSWx \u2014 radar, so cloud does not hide the flood', noCount: true },
@@ -3749,8 +3749,27 @@ async function loadOutbreaks() {
  * commercial-safe mode swaps this out along with the rest of them - which is
  * the machinery that already existed for exactly this.
  */
+/*
+ * And then the replacement turned out to be nearly empty.
+ *
+ * World_Dark_Gray_Reference is the label half of Esri's dark grey canvas: drawn
+ * to sit on their own pale-on-charcoal basemap, so it is deliberately sparse
+ * and low contrast. Over satellite imagery it disappears. Reported from New
+ * Guinea, where Google's 3D view names Jayapura, Nabire, Serui, Merauke, Lae,
+ * two provinces, two seas and the country, and this globe named Port Moresby
+ * and nothing else.
+ *
+ * Measured on one tile over Papua at zoom 6: eleven visible pixels out of
+ * 65 536. Not sparse - blank.
+ *
+ * World_Boundaries_and_Places is the layer Esri publish for overlaying imagery,
+ * and the same tile carries 3 531 visible pixels: black text with a near-white
+ * halo, which is the combination that survives being laid over a jungle, a
+ * desert and open water alike. Same provider, so the licensing position is
+ * unchanged.
+ */
 const LABEL_TILES =
-  'https://services.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}';
+  'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}';
 
 let labelLayer = null;
 let borderPrimitive = null;
@@ -3762,7 +3781,12 @@ function showNames(on) {
     labelLayer = viewer.imageryLayers.addImageryProvider(
       new Cesium.UrlTemplateImageryProvider({
         url: LABEL_TILES,
-        maximumLevel: 18,
+        // Sixteen, not eighteen. The service answers above that, but with the
+        // same 872-byte empty tile it returns over unlabelled ocean - so the
+        // names quietly vanished at exactly the zoom where you have flown in
+        // to read them. Capping it makes Cesium enlarge the last real level
+        // instead of fetching nothing.
+        maximumLevel: 16,
         credit: new Cesium.Credit('Labels © Esri and its licensors'),
       })
     );

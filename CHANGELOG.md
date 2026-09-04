@@ -26,6 +26,35 @@ It is not only politics. From the middle of that lake the app returns
 list. OpenStreetMap also carries *Ganyadáiyoˀ* in Cayuga and
 *ᑭᐦᒋ ᓵᑲᐦᐃᑲᐣ* in Cree. A map with room for one label drops all of them.
 
+### The globe named Port Moresby and nothing else
+
+Reported with two pictures of New Guinea side by side. Google's photoreal view
+named Jayapura, Nabire, Serui, Merauke, Lae, two provinces, two seas and the
+country. This globe, on the same island, named **Port Moresby** and stopped.
+
+The labels came from `World_Dark_Gray_Reference` &mdash; the label half of
+Esri's dark grey canvas, drawn to sit on their own pale-on-charcoal basemap, so
+deliberately sparse and low contrast. Over satellite imagery it disappears.
+
+Measured on one tile over Papua at zoom 6:
+
+| | Visible pixels of 65 536 |
+|---|---|
+| `World_Dark_Gray_Reference` | **11** |
+| `World_Boundaries_and_Places` | **3 531** |
+
+Not sparse. Blank.
+
+`World_Boundaries_and_Places` is the layer Esri publish for overlaying imagery,
+and it is black text with a near-white halo &mdash; the combination that
+survives being laid over jungle, desert and open water alike, which is why
+every other map uses it. Same provider, so the licensing position is unchanged.
+
+**And the depth was wrong.** The layer was capped at zoom 18, but the service
+returns the same 872-byte empty tile above 16 &mdash; so the names quietly
+vanished at exactly the zoom you fly in to read them. Capped at 16, Cesium
+enlarges the last real level instead of fetching nothing.
+
 ### The search box confirmed your typing back to you
 
 Reported as a search for Lake Ontario landing somewhere else. It was a
