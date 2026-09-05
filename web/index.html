@@ -267,6 +267,10 @@
              aria-label="Search radio stations by name, country, state, tag or place">
       <button type="submit" class="chip">FIND</button>
     </form>
+    <!-- Filled from Radio Browser's own count rather than written here, so it
+         cannot quietly go stale the way the figure in HELP did. Empty until it
+         answers: no number beats a number that might be a year old. -->
+    <p id="rq-total" class="adds"></p>
     <p id="rq-said" class="note" hidden></p>
     <ol id="rq-list"></ol>
   </section>
@@ -607,11 +611,12 @@
       <h4>Finding a station the map cannot show</h4>
       <p>
         <b>Find a radio station</b> in the left panel reaches the whole
-        catalogue, which the globe cannot. Only <b>12 411</b> of Radio
-        Browser&rsquo;s <b>52 988</b> working stations carry coordinates, and a
-        station with no position cannot be drawn anywhere &mdash; about four
-        fifths of what exists is invisible on a map and reachable only by
-        searching.
+        catalogue, which the globe cannot. Only about <b>a fifth</b> of Radio
+        Browser&rsquo;s working stations carry coordinates, and a station with no
+        position cannot be drawn anywhere &mdash; four fifths of what exists is
+        invisible on a map and reachable only by searching. The live count sits
+        under the search box; a proportion is written here instead of a figure,
+        because the figure moves and a printed one goes stale without saying so.
       </p>
       <p>
         One box, tried five ways at once: as a station name, as a country, as a

@@ -3253,6 +3253,51 @@ RADIO_BROWSER = "https://de1.api.radio-browser.info/json/stations/search"
 BROADCAST_TTL = 43200
 
 
+# How big the catalogue actually is, asked rather than asserted.
+#
+# The help text carried "12 411 of 52 988 working stations", measured once in
+# August and then left standing as a fact. It drifted: Radio Browser reports
+# 58 761 stations with 5 373 broken today, so the working figure had grown by
+# four hundred while the app went on quoting the old one. Reported as stations
+# having disappeared, which is the opposite of what happened.
+#
+# Radio Browser publishes the counts itself, so the app asks. Six hours is far
+# finer than the number moves and costs one small request a session.
+RADIO_STATS = "https://de1.api.radio-browser.info/json/stats"
+RADIO_STATS_TTL = 21600
+
+
+def radio_stats():
+    """Total, broken and working, straight from Radio Browser."""
+    key = "radiostats"
+    hit = _mem_get(key)
+    if hit and time.time() - hit[0] < RADIO_STATS_TTL:
+        return hit[1], "memory"
+
+    record = {"working": None, "total": None, "broken": None,
+              "source": "Radio Browser"}
+    try:
+        got = json.loads(fetch(RADIO_STATS))
+        total = int(got.get("stations") or 0)
+        broken = int(got.get("stations_broken") or 0)
+        record.update({
+            "total": total,
+            "broken": broken,
+            "working": max(0, total - broken),
+            "tags": got.get("tags"),
+            "countries": got.get("countries"),
+        })
+    except Exception as exc:  # noqa: BLE001 - a missing count is not a failure
+        # No number is better than a stale one presented as current. The page
+        # says nothing rather than repeating what it was told last August.
+        record["error"] = str(exc)[:90]
+        log("radio stats unavailable: %s" % str(exc)[:70])
+
+    data = json.dumps(record).encode()
+    _mem_put(key, data)
+    return data, "network"
+
+
 def broadcast_stations(lat, lon, radius_km):
     """Internet streams of broadcast stations near a point."""
     radius = max(20, min(int(radius_km), 800))
@@ -6281,7 +6326,7 @@ def overpass(query):
 # Finding a station anywhere in the catalogue, not just near the camera.
 #
 # The map layer can only draw a station that has coordinates, and most do not:
-# 12 411 of 52 988 working stations, about a fifth. The rest are unreachable by
+# about a fifth of the working stations. The rest are unreachable by
 # looking, however long you fly around. This is how you reach them.
 #
 # It also answers what a person actually types. "Varberg" matches no station
@@ -7715,6 +7760,8 @@ class Handler(SimpleHTTPRequestHandler):
                     return self._send(400, b'{"error":"country required"}')
                 data = json.dumps(head_of_state(who)).encode()
                 source = "memory"
+            elif name == "radio-stats":
+                data, source = radio_stats()
             elif name == "broadcast":
                 try:
                     lat = float(query.get("lat", ["0"])[0])

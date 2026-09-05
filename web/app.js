@@ -9950,7 +9950,7 @@ setInterval(whileOn('openships', () => loadOpenWaters(true)), 30_000);
 /*
  * Reaching the four fifths of the catalogue the map cannot draw.
  *
- * The Radio stations layer only shows what has coordinates - 12 411 of 52 988
+ * The Radio stations layer only shows what has coordinates - about a fifth of
  * working stations - because a station with no position cannot be put on a
  * globe. The rest are unreachable by flying around, however long you look.
  *
@@ -10031,6 +10031,28 @@ async function findStations(q) {
     list.appendChild(li);
   }
 }
+
+/*
+ * How many stations there are, from the catalogue rather than from a comment.
+ *
+ * The help text quoted a figure measured once and never again. It drifted by
+ * four hundred inside three weeks and was read as stations disappearing. This
+ * asks Radio Browser, and says nothing at all when it cannot - a blank line is
+ * better than a number that might be a year old.
+ */
+async function showRadioTotal() {
+  const box = $('#rq-total');
+  if (!box) return;
+  try {
+    const d = await getJSON('/api/radio-stats');
+    if (!d.working) return;
+    box.textContent = `${d.working.toLocaleString('en-US')} working stations in `
+      + 'the catalogue right now. The globe can only draw the fifth of them that '
+      + 'carry coordinates \u2014 this box reaches the rest.';
+  } catch (_) { /* the search works without knowing the total */ }
+}
+
+showRadioTotal();
 
 $('#rq').addEventListener('submit', (e) => {
   e.preventDefault();
