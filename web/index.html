@@ -260,6 +260,18 @@
   </section>
 
   <section class="block">
+    <!-- Ninety-nine owners, and the interesting ones are not at the top. Sweden
+         has two satellites up; a convenient top ten would hide them, so the
+         whole list ships and a filter box finds the row. -->
+    <h2 data-section="sat-owners">Satellites by owner</h2>
+    <p id="so-note" class="adds"></p>
+    <input id="so-q" type="search" spellcheck="false"
+           placeholder="United States, Sweden, China&hellip;"
+           aria-label="Filter the list of satellite owners">
+    <ol id="so-list"></ol>
+  </section>
+
+  <section class="block">
     <h2 data-section="radio-search">Find a radio station</h2>
     <form id="rq" autocomplete="off">
       <input id="rq-q" type="search" spellcheck="false"

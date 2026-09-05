@@ -3962,11 +3962,23 @@ const regimeOf = (km) => REGIMES.find((r) => km < r.max);
 
 LAYER_ON_DEMAND.satellites = () => loadSatellites();
 
+let satellitesLoaded = false;
+
 async function loadSatellites() {
   if (typeof satellite === 'undefined') {
     log('satellite.js missing — orbital layer disabled', 'warn');
     return;
   }
+  // Once, not once per switch.
+  //
+  // LAYER_ON_DEMAND fires every time a layer is turned on, and this function
+  // pushed into the array without clearing it. Switching the satellites off
+  // and on gave 32 064 objects where there are 16 032, then 48 096, each
+  // duplicate carrying its own point primitive and its own SGP4 propagation.
+  // Found while checking the owner filter: Sweden reported four satellites,
+  // and Sweden has two.
+  if (satellitesLoaded) return;
+  satellitesLoaded = true;
   try {
     const res = await fetch('/api/satellites');
     if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
@@ -4008,12 +4020,18 @@ async function loadSatellites() {
     }
     setCount('satellites', satellites.length);
     log(`orbit: ${satellites.length} tracked objects`);
+    // Ownership is a second request against a different CelesTrak product, so
+    // it follows rather than blocks: the objects fly whether or not anyone
+    // knows who put them there.
+    loadSatOwners();
     // No budget for this one: the sky should be populated before the first
     // frame, and measured, the whole catalogue costs about 23 ms once. Passing
     // satellites.length here used to mean a count; under a deadline it silently
     // became "you have sixteen seconds", which on a slow machine is a hang.
     propagate(new Date(), Infinity);
   } catch (err) {
+    // A load that failed left nothing behind, so the next switch may try again.
+    satellitesLoaded = false;
     log(`orbital elements unavailable (${err.message})`, 'warn');
   }
 }
@@ -4043,7 +4061,7 @@ function stepSatellite(sat, when, gmst) {
     geo.longitude, geo.latitude, geo.height * 1000, undefined, satScratch
   );
   sat.point.color = regimeOf(sat.alt).color;
-  sat.point.show = true;
+  sat.point.show = !satOwners.size || satOwners.has(sat.owner);
 }
 
 let satSweptLast = 0;
@@ -4062,6 +4080,112 @@ function propagate(when, budgetMs = SAT_BUDGET_MS) {
   }
   satSweptLast = swept;
 }
+
+
+/* ---------------------------------------------------- satellites by owner */
+
+/*
+ * A two-line element carries a name and an orbit and nothing else - no country,
+ * no operator. Asked for a way to pick out American, Swedish and Russian
+ * satellites, which the layer had no means to answer.
+ *
+ * CelesTrak publish ownership separately, in the satellite catalogue, and the
+ * server turns the active set into a lookup table once a day. This joins it on
+ * to the objects already propagating.
+ *
+ * An empty selection means everything, not nothing. Choosing no owner is what
+ * the panel looks like before you have chosen one, and hiding sixteen thousand
+ * satellites at that moment would read as the layer breaking.
+ */
+
+const satOwners = new Set();      // owner codes currently chosen; empty = all
+let satOwnerRows = [];            // [code, name, count], commonest first
+
+function applySatOwners() {
+  for (const sat of satellites) {
+    if (sat.point) sat.point.show = !satOwners.size || satOwners.has(sat.owner);
+  }
+  scene.requestRender();
+  const note = $('#so-note');
+  if (!satOwnerRows.length) return;
+  if (!satOwners.size) {
+    note.textContent = `${satellites.length.toLocaleString('en-US')} objects, `
+      + `${satOwnerRows.length} owners. Pick one or more to show only theirs.`;
+    return;
+  }
+  // Counted off the objects on the globe, not summed from the catalogue.
+  //
+  // The first version added up CelesTrak's figures and said "13 236 of 16 032
+  // shown" while 12 418 dots were drawn. The catalogue lists 16 954 active
+  // objects and the element set carries 16 032, so several hundred have an
+  // owner and no orbit to fly. A count beside a picture has to be a count of
+  // what is in the picture.
+  const shown = satellites.reduce(
+    (n, sat) => n + (satOwners.has(sat.owner) ? 1 : 0), 0);
+  const who = satOwnerRows.filter((r) => satOwners.has(r[0])).map((r) => r[1]);
+  note.textContent = `${shown.toLocaleString('en-US')} of `
+    + `${satellites.length.toLocaleString('en-US')} shown \u00b7 ${who.join(', ')}`;
+}
+
+function renderSatOwners() {
+  const list = $('#so-list');
+  const want = ($('#so-q').value || '').trim().toLowerCase();
+  list.innerHTML = '';
+  const rows = satOwnerRows.filter(
+    ([code, name]) => !want || name.toLowerCase().includes(want)
+      || code.toLowerCase().includes(want));
+  if (!rows.length) {
+    const li = document.createElement('li');
+    li.className = 'so-none';
+    li.textContent = `no owner matching "${want}"`;
+    list.append(li);
+    return;
+  }
+  for (const [code, name, n] of rows) {
+    const li = document.createElement('li');
+    li.className = 'so-row' + (satOwners.has(code) ? ' on' : '');
+    li.innerHTML = `<span>${name}</span><span class="so-n">${n.toLocaleString('en-US')}</span>`;
+    li.title = `CelesTrak owner code ${code}`;
+    li.onclick = () => {
+      if (satOwners.has(code)) satOwners.delete(code);
+      else satOwners.add(code);
+      renderSatOwners();
+      applySatOwners();
+      log(satOwners.size
+        ? `satellites: showing ${[...satOwners].join(', ')}`
+        : 'satellites: showing every owner');
+    };
+    list.append(li);
+  }
+}
+
+async function loadSatOwners() {
+  let d;
+  try {
+    d = await getJSON('/api/satellite-owners');
+  } catch (err) {
+    $('#so-note').textContent = `owner list unavailable (${err.message})`;
+    return;
+  }
+  if (d.error || !d.counts) {
+    $('#so-note').textContent = 'CelesTrak did not answer, so ownership is '
+      + 'unknown for this session. The satellites still fly.';
+    return;
+  }
+  satOwnerRows = d.counts;
+  let matched = 0;
+  for (const sat of satellites) {
+    sat.owner = d.owners[sat.norad] || '';
+    if (sat.owner) matched += 1;
+  }
+  renderSatOwners();
+  applySatOwners();
+  log(`satellite owners: ${matched.toLocaleString('en-US')} of `
+    + `${satellites.length.toLocaleString('en-US')} matched \u00b7 `
+    + `${d.counts.length} owners \u00b7 CelesTrak`);
+}
+
+$('#so-q').addEventListener('input', renderSatOwners);
 
 /** One full revolution of the selected object, drawn ahead of and behind it. */
 function drawOrbit(sat) {

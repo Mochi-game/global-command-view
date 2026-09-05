@@ -1692,3 +1692,23 @@ audio.stream-player {
   background: rgba(255, 179, 71, 0.12);
   padding: 1px 4px;
 }
+
+/* Satellites by owner. Ninety-nine rows, so the list scrolls and the chosen
+   ones are marked rather than merely highlighted - a filter you have forgotten
+   you set looks like a broken layer. */
+#so-q {
+  width: 100%; margin: 6px 0; padding: 6px 8px;
+  background: var(--panel); color: var(--ink);
+  border: 1px solid var(--line); font: inherit; font-size: 11.5px;
+}
+#so-list { list-style: none; margin: 6px 0 0; padding: 0; max-height: 240px; overflow-y: auto; }
+.so-row {
+  display: flex; justify-content: space-between; gap: 8px;
+  padding: 4px 7px; cursor: pointer; font-size: 11.5px; color: var(--dim);
+  border-left: 2px solid transparent;
+}
+.so-row:hover { background: var(--panel); color: var(--ink); }
+.so-row.on { color: #7dffab; border-left-color: #7dffab; background: rgba(125, 255, 171, 0.08); }
+.so-n { font-variant-numeric: tabular-nums; color: var(--dim); }
+.so-row.on .so-n { color: #7dffab; }
+.so-none { padding: 6px 7px; font-size: 11.5px; color: var(--dim); font-style: italic; }

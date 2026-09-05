@@ -6,6 +6,49 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.7.7 - satellites by owner, and two counting bugs found on the way
+
+### Pick out whose satellites you are looking at
+
+Asked for a way to see American, Swedish and Russian satellites separately. A
+two-line element carries a name and an orbit and nothing else &mdash; no
+country, no operator &mdash; so the layer had no means to answer.
+
+CelesTrak publish ownership in the satellite catalogue, and the active set is
+1.5 MB as CSV against 5.6 MB as JSON. The server parses it once a day and hands
+the page a lookup table.
+
+**Satellites by owner** in the left panel: ninety-nine owners, commonest first,
+with a filter box because the interesting ones are not at the top. Click one or
+several. An empty selection means everything, because choosing nothing is what
+the panel looks like before you have chosen, and hiding sixteen thousand
+satellites at that moment would read as the layer breaking.
+
+Measured 5 September 2026: 16 954 active objects, 99 owners. United States
+12 850, China 1 489, United Kingdom 698, Russia 386 &mdash; and **Sweden 2**,
+`MATS` and `OVZON-3`. That last figure is why the whole list ships rather than a
+convenient top ten.
+
+### The satellite layer doubled every time you switched it off and on
+
+Found while checking the filter: Sweden reported four satellites, and Sweden has
+two.
+
+`LAYER_ON_DEMAND` fires each time a layer is turned on, and `loadSatellites`
+pushed into the array without clearing it. Off and on gave **32 064** objects
+where there are 16 032, then 48 096 &mdash; each duplicate carrying its own
+point primitive and its own SGP4 propagation every frame. Somebody switching the
+layer while filming was quietly halving their own frame rate.
+
+It loads once now, and a load that failed can still be retried.
+
+### A count beside a picture has to count what is in the picture
+
+The owner note first added up CelesTrak's figures and said *13 236 of 16 032
+shown* while 12 418 dots were drawn. The catalogue lists 16 954 active objects
+and the element set carries 16 032, so several hundred have an owner and no
+orbit to fly. It counts the objects on the globe now.
+
 ## 1.7.6 - a source that did not answer is not a count of zero
 
 Reported mid-recording: **Fishing & AIS gaps** showing 0 when it had worked

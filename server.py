@@ -39,7 +39,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.7.6"
+VERSION = "1.7.7"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -3295,6 +3295,84 @@ def radio_stats():
 
     data = json.dumps(record).encode()
     _mem_put(key, data)
+    return data, "network"
+
+
+
+# ---------------------------------------------------------- who owns what
+
+# Who each satellite belongs to.
+#
+# The orbital layer draws sixteen thousand objects from two-line elements, and a
+# TLE carries a name and an orbit and nothing else - no country, no operator.
+# Asked for the ability to pick out American, Swedish and Russian satellites,
+# which the layer had no way to answer.
+#
+# CelesTrak publish it separately in the satellite catalogue, and the whole
+# active set is 1.5 MB as CSV against 5.6 MB as JSON - so CSV, parsed here once
+# a day, and the page gets a lookup table rather than seventeen thousand rows.
+#
+# Measured on 5 September 2026: 16 954 active objects, 99 distinct owners.
+# United States 12 850, China 1 489, United Kingdom 698, Russia 386, and
+# Sweden 2. That last one is why the list shows every owner rather than a
+# convenient top ten.
+
+SATCAT_ACTIVE = "https://celestrak.org/satcat/records.php?GROUP=active&FORMAT=csv"
+SAT_OWNER_TTL = 86400
+
+
+def satellite_owners():
+    """A NORAD-to-owner table, and how many each one has up."""
+    key = "satowners"
+    hit = _mem_get(key)
+    if hit and time.time() - hit[0] < SAT_OWNER_TTL:
+        return hit[1], "memory"
+    path = _disk_path(key)
+    if os.path.exists(path) and time.time() - os.path.getmtime(path) < SAT_OWNER_TTL:
+        with open(path, "rb") as fh:
+            data = fh.read()
+        _mem_put(key, data)
+        return data, "disk"
+
+    owners = {}
+    counts = {}
+    error = ""
+    try:
+        raw = fetch(SATCAT_ACTIVE).decode("utf-8", "replace")
+        for row in csv.DictReader(io.StringIO(raw)):
+            norad = (row.get("NORAD_CAT_ID") or "").strip()
+            code = (row.get("OWNER") or "").strip()
+            if not norad or not code:
+                continue
+            owners[norad] = code
+            counts[code] = counts.get(code, 0) + 1
+    except Exception as exc:  # noqa: BLE001 - the layer works without owners
+        error = str(exc)[:90]
+        log("satellite owners unavailable: %s" % error)
+
+    # Sorted by how many each has up, because that is the order somebody scans
+    # in - and the tail is where Sweden lives, so the whole tail ships.
+    table = sorted(
+        ([code, SAT_OWNERS.get(code, code), n] for code, n in counts.items()),
+        key=lambda row: (-row[2], row[1]))
+
+    record = {
+        "owners": owners,
+        "counts": table,
+        "total": len(owners),
+        "source": "CelesTrak satellite catalogue",
+    }
+    if error:
+        record["error"] = error
+    data = json.dumps(record).encode()
+    _mem_put(key, data)
+    if not error:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        with open(path, "wb") as fh:
+            fh.write(data)
+        _sweep_disk()
+    log("satellite owners: %d objects, %d owners \u00b7 CelesTrak"
+        % (len(owners), len(table)))
     return data, "network"
 
 
@@ -7760,6 +7838,8 @@ class Handler(SimpleHTTPRequestHandler):
                     return self._send(400, b'{"error":"country required"}')
                 data = json.dumps(head_of_state(who)).encode()
                 source = "memory"
+            elif name == "satellite-owners":
+                data, source = satellite_owners()
             elif name == "radio-stats":
                 data, source = radio_stats()
             elif name == "broadcast":
