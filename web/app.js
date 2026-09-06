@@ -11016,6 +11016,30 @@ function showWatchedPlan(spot) {
       : 'no — one direction only, so up-down stays mixed with sideways'],
     ['Nothing to wait for', 'these pictures already exist. The archive runs back '
       + 'a decade; you are reading history, not starting a recording'],
+
+    /*
+     * Europe has already been measured, so say so before offering the work.
+     *
+     * The European Ground Motion Service runs exactly this calculation -
+     * persistent scatterer interferometry on Sentinel-1 - over every
+     * participating country, from 2015, updated yearly, free. For anywhere it
+     * covers, ordering a stack and processing it is redoing something finished.
+     * Offering the long way first would waste somebody's fortnight.
+     *
+     * No constructed deep link. The explorer encodes a whole camera basis in
+     * its hash - llh, look, right, up - and a link carrying only a position
+     * loads to a blank screen; tried, and it does. A link that lands nowhere is
+     * worse than a link plus the coordinates to paste, so it is the latter.
+     */
+    ['Already measured?', 'if this is in Europe, yes. The European Ground Motion '
+      + 'Service has run this on Sentinel-1 since 2015 for every participating '
+      + 'country, updated yearly, free — Sweden and Denmark included'],
+    ['Read it there', 'https://egms.land.copernicus.eu/'],
+    ['Search for', `${spot.lat.toFixed(4)}, ${spot.lon.toFixed(4)} — paste it into `
+      + 'the explorer, then click a measurement point for its millimetres over time'],
+    ['If nothing covers it', 'outside Europe, or if you want a period of your own, '
+      + 'the rest of this card is the long way round'],
+
     ['The work', `${pairs} pairs to process`],
     ['Where it runs', 'ASF HyP3, in their cloud — you never download the 8 GB '
       + 'source scenes. The free allowance is 8 000 credits a month and a burst '
