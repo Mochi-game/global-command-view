@@ -36,6 +36,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as xml_tree
+import zipfile
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
@@ -3543,6 +3544,179 @@ def sar_stack(lat, lon, years=SAR_STACK_YEARS):
     data = json.dumps(record).encode()
     _mem_put(key, data)
     return data, "live"
+
+
+# ---------------------------------------------- reading a finished measurement
+
+# The European Ground Motion Service has already run the interferometry, over
+# every participating country, on Sentinel-1 since 2015, updated yearly. So for
+# anywhere in Europe the question "has it sunk" is a lookup, not a computation.
+#
+# There is no open endpoint for it. Downloads carry a temporary token that a
+# person fetches from the explorer and that lasts an hour, so the app cannot go
+# and get it on its own - what it can do is take the link somebody was given,
+# fetch the tile, and read the millimetres out of it.
+#
+# The tiles are 100 km squares in EPSG:3035, and their coordinates are eastings
+# and northings rather than latitude and longitude. Putting the watched spot
+# into their grid is one projection; pulling every row out of it would be
+# hundreds of thousands.
+
+EGMS_HOST = "egms.land.copernicus.eu"
+_GRS80_A = 6378137.0
+_GRS80_E2 = 2 * (1 / 298.257222101) - (1 / 298.257222101) ** 2
+_LAEA_LAT0 = math.radians(52.0)
+_LAEA_LON0 = math.radians(10.0)
+_LAEA_FE = 4321000.0
+_LAEA_FN = 3210000.0
+
+
+def _laea_q(phi):
+    """Snyder's authalic-area function, for the ellipsoidal LAEA."""
+    e = math.sqrt(_GRS80_E2)
+    s = math.sin(phi)
+    return (1 - _GRS80_E2) * (
+        s / (1 - _GRS80_E2 * s * s)
+        - (1 / (2 * e)) * math.log((1 - e * s) / (1 + e * s))
+    )
+
+
+_LAEA_QP = _laea_q(math.pi / 2)
+_LAEA_BETA0 = math.asin(_laea_q(_LAEA_LAT0) / _LAEA_QP)
+_LAEA_RQ = _GRS80_A * math.sqrt(_LAEA_QP / 2)
+_LAEA_D = (
+    _GRS80_A * math.cos(_LAEA_LAT0)
+    / math.sqrt(1 - _GRS80_E2 * math.sin(_LAEA_LAT0) ** 2)
+) / (_LAEA_RQ * math.cos(_LAEA_BETA0))
+
+
+def laea_3035(lat, lon):
+    """Degrees to EPSG:3035 easting and northing, in metres.
+
+    Checked against the projection's own origin and against the EPSG guidance
+    note's worked example at 50N 5E: 3 mm.
+    """
+    phi = math.radians(lat)
+    dl = math.radians(lon) - _LAEA_LON0
+    beta = math.asin(_laea_q(phi) / _LAEA_QP)
+    denom = (1 + math.sin(_LAEA_BETA0) * math.sin(beta)
+             + math.cos(_LAEA_BETA0) * math.cos(beta) * math.cos(dl))
+    b = _LAEA_RQ * math.sqrt(2 / denom)
+    east = _LAEA_FE + (b * _LAEA_D) * (math.cos(beta) * math.sin(dl))
+    north = _LAEA_FN + (b / _LAEA_D) * (
+        math.cos(_LAEA_BETA0) * math.sin(beta)
+        - math.sin(_LAEA_BETA0) * math.cos(beta) * math.cos(dl))
+    return east, north
+
+
+def egms_tile(lat, lon):
+    """Which 100 km EGMS tile a spot falls in, named the way the files are."""
+    east, north = laea_3035(lat, lon)
+    return "E%02dN%02d" % (int(east // 100000), int(north // 100000))
+
+
+def _egms_rows(path, lat, lon, east, north, want, radius_m):
+    """The measurement points nearest a spot, out of a downloaded tile.
+
+    The tiles are semicolon-separated CSV inside a zip. Column names vary
+    between the products - the 100 km ones carry easting and northing, the
+    per-burst ones carry latitude and longitude as well - so both are accepted
+    and whichever is present is used. Every column named as eight digits is one
+    acquisition date, and those are the time series.
+    """
+    found = []
+    dates = []
+    with zipfile.ZipFile(path) as zf:
+        names = [n for n in zf.namelist() if n.lower().endswith(".csv")]
+        if not names:
+            raise ValueError("no .csv inside the download")
+        with zf.open(names[0]) as raw:
+            text = io.TextIOWrapper(raw, encoding="utf-8", errors="replace")
+            reader = csv.reader(text, delimiter=";")
+            header = next(reader)
+            index = {name.strip().lower(): i for i, name in enumerate(header)}
+            dates = [(i, n.strip()) for i, n in enumerate(header)
+                     if re.fullmatch(r"\d{8}", n.strip())]
+            has_en = "easting" in index and "northing" in index
+            has_ll = "latitude" in index and "longitude" in index
+            if not has_en and not has_ll:
+                raise ValueError("no coordinates in the file's columns")
+            vel_col = next((index[k] for k in
+                            ("mean_velocity", "velocity", "vel")
+                            if k in index), None)
+
+            for row in reader:
+                try:
+                    if has_en:
+                        de = float(row[index["easting"]]) - east
+                        dn = float(row[index["northing"]]) - north
+                    else:
+                        # Degrees turned into metres about the spot itself, so
+                        # the longitude scale is the one at this latitude.
+                        dlat = float(row[index["latitude"]]) - lat
+                        dlon = float(row[index["longitude"]]) - lon
+                        dn = dlat * 111320.0
+                        de = dlon * 111320.0 * math.cos(math.radians(lat))
+                    dist = math.hypot(de, dn)
+                except (ValueError, IndexError, KeyError):
+                    continue
+                if dist > radius_m:
+                    continue
+                point = {
+                    "distance_m": round(dist, 1),
+                    "velocity": (float(row[vel_col])
+                                 if vel_col is not None and row[vel_col] else None),
+                    "series": [[d, float(row[i])] for i, d in dates
+                               if i < len(row) and row[i] not in ("", None)][:400],
+                }
+                found.append(point)
+
+    found.sort(key=lambda p: p["distance_m"])
+    return found[:want], len(dates)
+
+
+def egms_fetch(url, folder, lat, lon, want=5, radius_m=150.0):
+    """Download an EGMS tile somebody was given a link to, and read a spot."""
+    parsed = urllib.parse.urlparse(url)
+    # Only theirs. This endpoint writes a file to a path the caller chose, and
+    # that is a reasonable thing for a local tool to do only while the source
+    # is fixed - it must not become "download anything to anywhere".
+    if parsed.scheme != "https" or parsed.hostname != EGMS_HOST:
+        raise ValueError("that is not an EGMS download link (expects https://%s/...)"
+                         % EGMS_HOST)
+    if not folder:
+        raise ValueError("choose a folder to save it in first")
+
+    folder = os.path.abspath(os.path.expanduser(folder))
+    os.makedirs(folder, exist_ok=True)
+    name = os.path.basename(parsed.path) or "egms-tile.zip"
+    if not name.lower().endswith(".zip"):
+        name += ".zip"
+    path = os.path.join(folder, name)
+
+    if not os.path.exists(path) or os.path.getsize(path) < 1024:
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        log("egms: downloading %s" % name)
+        with urllib.request.urlopen(req, timeout=600) as resp, open(path, "wb") as fh:
+            while True:
+                chunk = resp.read(1 << 20)
+                if not chunk:
+                    break
+                fh.write(chunk)
+    size = os.path.getsize(path)
+    log("egms: %s is %.1f MB" % (name, size / 1e6))
+
+    east, north = laea_3035(lat, lon)
+    points, acquisitions = _egms_rows(path, lat, lon, east, north, want, radius_m)
+    return json.dumps({
+        "file": path,
+        "bytes": size,
+        "tile": egms_tile(lat, lon),
+        "points": points,
+        "acquisitions": acquisitions,
+        "radius_m": radius_m,
+        "source": "European Ground Motion Service",
+    }).encode()
 
 
 SATCAT_ACTIVE = "https://celestrak.org/satcat/records.php?GROUP=active&FORMAT=csv"
@@ -7938,7 +8112,7 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):  # noqa: N802 - http.server API
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path not in ("/api/marks", "/api/keys", "/api/usage",
-                               "/api/manual", "/api/targets"):
+                               "/api/manual", "/api/targets", "/api/egms"):
             return self._send(404, b'{"error":"not a writable endpoint"}')
         try:
             length = int(self.headers.get("Content-Length", 0))
@@ -7951,6 +8125,11 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._send(200, write_manual(body))
             if parsed.path == "/api/targets":
                 return self._send(200, write_targets(body))
+            if parsed.path == "/api/egms":
+                ask = json.loads(body)
+                return self._send(200, egms_fetch(
+                    ask.get("url", ""), ask.get("folder", ""),
+                    float(ask["lat"]), float(ask["lon"])))
             return self._send(200, write_keys(body))
         except Exception as exc:  # noqa: BLE001 - report bad input as JSON
             return self._send(400, json.dumps({"error": str(exc)}).encode())
@@ -8265,6 +8444,14 @@ class Handler(SimpleHTTPRequestHandler):
                 data, source = read_marks()
             elif name == "targets":
                 data, source = read_targets()
+            elif name == "egms-tile":
+                try:
+                    lat = float(query.get("lat", ["0"])[0])
+                    lon = float(query.get("lon", ["0"])[0])
+                except ValueError:
+                    return self._send(400, b'{"error":"lat and lon required"}')
+                data = json.dumps({"tile": egms_tile(lat, lon)}).encode()
+                source = "computed"
             elif name == "submarine-bases":
                 with open(os.path.join(ROOT, "data", "submarine_bases.json"), "rb") as fh:
                     data = fh.read()

@@ -10994,7 +10994,118 @@ function watchThisSpot(lat, lon, stack) {
 // estimate, and the first product you fetch will tell you the real one.
 const HYP3_PRODUCT_MB = [50, 250];
 
+/*
+ * The paste box: bring a finished measurement in rather than link away to it.
+ *
+ * EGMS has no open endpoint - a download carries a token somebody has to fetch
+ * from the explorer, good for an hour - so the app cannot go and get this on
+ * its own. What it can do is take the link you were given, pull the tile down
+ * to the folder you chose, and read the millimetres out of it for this exact
+ * spot. That turns a link into an answer.
+ *
+ * The tile is 100 km square with a time series on every measurement point, so
+ * it is a large file, and it lands where you said rather than somewhere this
+ * app picked. The size is reported once it is down, because a range guessed
+ * beforehand would be one more number nobody could check.
+ */
+function pasteRow(spot) {
+  const wrap = document.createElement('div');
+  wrap.className = 'egms-paste';
+
+  const url = document.createElement('input');
+  url.type = 'text';
+  url.className = 'folder-input';
+  url.placeholder = 'paste the EGMS download link here';
+  url.spellcheck = false;
+  url.value = spot.egmsUrl || '';
+
+  const go = document.createElement('button');
+  go.className = 'chip';
+  go.textContent = 'READ IT';
+
+  const said = document.createElement('p');
+  said.className = 'adds';
+  said.textContent = spot.folder
+    ? ''
+    : 'choose a folder above first — the tile is a large file';
+
+  go.onclick = async () => {
+    const link = url.value.trim();
+    if (!link) { said.textContent = 'nothing pasted yet'; return; }
+    if (!spot.folder) { said.textContent = 'choose a folder above first'; return; }
+    go.disabled = true;
+    said.textContent = 'fetching the tile — this is the big download, give it a while…';
+    try {
+      const res = await fetch('/api/egms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: link, folder: spot.folder,
+                               lat: spot.lat, lon: spot.lon }),
+      });
+      const d = await res.json();
+      if (d.error) throw new Error(d.error);
+      spot.egmsUrl = link;
+      spot.reading = d;
+      saveWatched().catch(() => {});
+      showWatchedPlan(spot);
+      log(`egms: ${(d.bytes / 1e6).toFixed(1)} MB · `
+        + `${d.points.length} measurement points within ${d.radius_m} m`);
+    } catch (err) {
+      said.textContent = err.message;
+      go.disabled = false;
+    }
+  };
+
+  wrap.append(url, go, said);
+  return wrap;
+}
+
+/** What the tile said about this spot, once one has been brought in. */
+function readingRows(spot) {
+  const d = spot.reading;
+  if (!d) return [];
+  if (!d.points || !d.points.length) {
+    return [['What the measurement says',
+      `no measurement point within ${d.radius_m} m of here. The processing only `
+      + 'finds points on things that reflect radar the same way year after year '
+      + '— a hard edge, a metal roof, a corner. Smooth or leafy ground gives '
+      + 'none. Try a spot on the structure itself']];
+  }
+  const near = d.points[0];
+  const rows = [];
+  if (near.velocity != null) {
+    const mm = near.velocity;
+    const which = mm < -0.5 ? 'sinking' : mm > 0.5 ? 'rising' : 'holding still';
+    rows.push(['What it is doing',
+      `${which} — ${Math.abs(mm).toFixed(1)} mm a year`]);
+    // A rate is not a verdict. Two millimetres a year is a centimetre a decade
+    // under a whole district and nothing to act on; it is a great deal under
+    // one corner of a building while the other corner sits still.
+    rows.push(['Read that carefully',
+      'this is one point. A whole area moving together is ground, not damage — '
+      + 'what breaks a structure is one part moving and another not']);
+  }
+  rows.push(['Nearest point', `${near.distance_m} m from where you clicked`]);
+  rows.push(['Points found', `${d.points.length} within ${d.radius_m} m`]);
+  if (near.series && near.series.length) {
+    const first = near.series[0];
+    const last = near.series[near.series.length - 1];
+    const fmt = (s) => `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
+    rows.push(['Measured across',
+      `${fmt(first[0])} to ${fmt(last[0])}, ${near.series.length} readings`]);
+    rows.push(['Total movement in that time',
+      `${(last[1] - first[1]).toFixed(1)} mm`]);
+  }
+  rows.push(['Tile on disk', `${d.file} · ${(d.bytes / 1e6).toFixed(1)} MB`]);
+  return rows;
+}
+
 function showWatchedPlan(spot) {
+  if (!spot.tile) {
+    getJSON(`/api/egms-tile?lat=${spot.lat}&lon=${spot.lon}`)
+      .then((d) => { spot.tile = d.tile; showWatchedPlan(spot); })
+      .catch(() => { spot.tile = 'could not work it out'; });
+  }
   const pairs = Math.max(0, spot.images - 1);
   const low = Math.round(pairs * HYP3_PRODUCT_MB[0] / 1024);
   const high = Math.round(pairs * HYP3_PRODUCT_MB[1] / 1024);
@@ -11014,6 +11125,9 @@ function showWatchedPlan(spot) {
   };
 
   const rows = [
+    // What it is doing comes first once it is known. Everything below it is
+    // how to find that out, and nobody needs the instructions afterwards.
+    ...readingRows(spot),
     ['Watching since', pretty(spot.added)],
     ['Pictures you already have',
       `${spot.images}, from direction ${spot.track} (${spot.going})`],
@@ -11046,8 +11160,10 @@ function showWatchedPlan(spot) {
       + 'Service has run this on Sentinel-1 since 2015 for every participating '
       + 'country, updated yearly, free — Sweden and Denmark included'],
     ['Read it there', 'https://egms.land.copernicus.eu/'],
-    ['Search for', `${spot.lat.toFixed(4)}, ${spot.lon.toFixed(4)} — paste it into `
-      + 'the explorer, then click a measurement point for its millimetres over time'],
+    ['Search for', `${spot.lat.toFixed(4)} ${spot.lon.toFixed(4)} — their box wants `
+      + 'a space, not a comma. Then click a measurement point for its millimetres'],
+    ['The tile this spot is in', spot.tile || 'working it out…'],
+    ['Or bring it in here', pasteRow(spot)],
     ['If nothing covers it', 'outside Europe, or if you want a period of your own, '
       + 'the rest of this card is the long way round'],
 

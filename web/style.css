@@ -732,6 +732,10 @@ h2 .tally {
 }
 .folder-input:focus { outline: none; border-color: var(--cyan); }
 
+.egms-paste { display: flex; flex-direction: column; gap: 4px; }
+.egms-paste .chip { align-self: flex-start; }
+.egms-paste .adds { margin: 0; }
+
 #brief-list {
   list-style: none;
   margin: 0;
