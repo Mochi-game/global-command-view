@@ -11162,7 +11162,19 @@ function showWatchedPlan(spot) {
     ['Read it there', 'https://egms.land.copernicus.eu/'],
     ['Search for', `${spot.lat.toFixed(4)} ${spot.lon.toFixed(4)} — their box wants `
       + 'a space, not a comma. Then click a measurement point for its millimetres'],
-    ['The tile this spot is in', spot.tile || 'working it out…'],
+    /*
+     * Which of the two files, as well as which tile.
+     *
+     * EGMS splits the motion into components and ships them separately: a "U"
+     * file for up and down, an "E" file for east and west. Sinking is the
+     * vertical question, so the U file is the one - and somebody who downloads
+     * a 100 km tile of the wrong component finds that out slowly.
+     */
+    ['The tile this spot is in', spot.tile
+      ? `${spot.tile} — ask for the vertical one, named EGMS_L3_${spot.tile}`
+        + '_100km_U_… .zip. The U is up-and-down; the E file beside it is '
+        + 'east-and-west, which is not the sinking question'
+      : 'working it out…'],
     ['Or bring it in here', pasteRow(spot)],
     ['If nothing covers it', 'outside Europe, or if you want a period of your own, '
       + 'the rest of this card is the long way round'],
