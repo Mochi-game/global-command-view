@@ -1260,6 +1260,25 @@ async function pollVessels() {
 LAYER_ON_DEMAND.cables = () => loadCables();
 
 async function loadCables() {
+  /*
+   * Off and on used to leave a copy nothing could switch off again.
+   *
+   * LAYER_ON_DEMAND fires on every switch-on, and this added a fresh ground
+   * polyline to the scene each time while overwriting the only reference to
+   * the last one. applyVisibility can hide the primitive it knows about; the
+   * orphan it no longer has a handle on stays drawn for the rest of the
+   * session. Reported as the cables refusing to go out.
+   *
+   * The landing points had the same shape - added, never cleared, so they
+   * doubled with each switch. Exactly the fault found in the satellite layer
+   * in 1.7.7, in a layer nobody thought to check afterwards.
+   */
+  if (cablePrimitive) {
+    scene.primitives.remove(cablePrimitive);
+    cablePrimitive = null;
+  }
+  collections.landings.removeAll();
+
   try {
     const geo = await getJSON('/api/cables');
     const instances = [];
@@ -1376,6 +1395,9 @@ GLYPHS.base = (() => {
 LAYER_ON_DEMAND.bases = () => loadSubmarineBases();
 
 async function loadSubmarineBases() {
+  // Cleared first: this runs on every switch-on, and adding without removing
+  // is what left a second set of everything behind. See loadCables.
+  subBases.removeAll();
   try {
     const data = await getJSON('/api/submarine-bases');
     for (const base of data.bases) {
@@ -1440,6 +1462,10 @@ function ringPositions(lat, lon, radiusKm, steps = 72) {
 LAYER_ON_DEMAND.capital = () => loadCarriers();
 
 async function loadCarriers() {
+  // Same again: switching the layer off and on used to double the fleet, and
+  // the ring drawn round each estimated position with it.
+  capitalShips.removeAll();
+  capitalRings.removeAll();
   try {
     const data = await getJSON('/api/carriers');
     for (const ship of data.ships) {
