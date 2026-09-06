@@ -39,7 +39,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.7.7"
+VERSION = "1.7.8"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -3344,7 +3344,11 @@ def satellite_owners():
             code = (row.get("OWNER") or "").strip()
             if not norad or not code:
                 continue
-            owners[norad] = code
+            # Keyed as a plain number, which is what this file already writes
+            # and what the page normalises its element sets to. An element set
+            # pads the same field to five digits - "08820" for LAGEOS 1 - and
+            # matched as written that lost every active object below 10000.
+            owners[norad.lstrip("0") or "0"] = code
             counts[code] = counts.get(code, 0) + 1
     except Exception as exc:  # noqa: BLE001 - the layer works without owners
         error = str(exc)[:90]

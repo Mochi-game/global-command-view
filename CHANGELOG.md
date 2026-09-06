@@ -6,6 +6,120 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.7.8 - thirteen satellites nobody could pick, and a panel six screens tall
+
+Asked how we would know whether satellites were missing from the globe. The
+answer was that we would not: nothing counted them. Measuring it found two
+faults, and looking at the panel while it was open found four more.
+
+### Thirteen satellites had no owner, and it was the leading zeros
+
+An element set has five columns for the catalogue number and pads with them, so
+LAGEOS 1 is `08820`. CelesTrak's satellite catalogue writes the same object as
+`8820`. The owner join matched the two as strings.
+
+Every active object numbered below 10 000 fell out &mdash; **exactly thirteen**,
+and none of them had an owner at all: the calibration spheres and geodetic
+targets from the sixties and seventies. `CALSPHERE 1` and `2` and `4A`, `LCS 1`,
+`TEMPSAT 1`, two `OPS 5712` payloads, `LES-5`, `SURCAL 159`, `RIGIDSPHERE 2`,
+`OSCAR 7`, `LAGEOS 1` &mdash; twelve American &mdash; and `STARLETTE`, French.
+They flew while no owner was chosen and vanished the moment you picked the
+country that owns them.
+
+Both sides are a plain number now. Measured after: **0 of 16 032 without an
+owner**, against thirteen before.
+
+The same field runs out of digits above 99 999, where CelesTrak switch to
+Alpha-5 &mdash; a letter for the leading two digits, `A0000` being 100 000, with
+I and O left out because they read as 1 and 0. None are in the active set today.
+The day one arrives it would have lost its owner in silence, which is the
+failure this just fixed, so the decoder went in with it.
+
+### A count of satellites that counts the satellites
+
+`satellites.length` is how many element sets are held in memory. It is not how
+many are on the globe, and the layer counter reported the first while the
+picture showed the second.
+
+An object SGP4 cannot place &mdash; decayed, or an element set it cannot
+integrate &mdash; used to have its dot switched off and nothing else. It stayed
+in the count. The same shape as the zero that meant *the source never answered*
+in 1.7.6: a figure that looks like an observation and is really a placeholder.
+
+Measured today: **16 030 of 16 032**. The two are `STARLINK-1595` and
+`STARLINK-2159`, both on the way down. The layer says 16 030, the feed log names
+what it could not place, and choosing an owner cannot conjure a dot back that
+has no position to be drawn at.
+
+### The owner list was quoting the catalogue, not the globe
+
+A row said **United States 12 850** beside 12 061 dots. The catalogue lists
+16 954 active objects; the active element set carries 16 032, so 922 are on the
+books with no orbit published yet &mdash; 546 of them launched this year &mdash;
+and two more cannot be propagated.
+
+A row is a promise about what clicking it will show you, and that one was over
+by seven hundred and eighty-nine. Every row now counts the objects this app
+actually has aloft for that owner, and the catalogue's own total is said once,
+under the list, because *no orbit published yet* is a different thing from
+*missing*. Checked against what is drawn, for United States, Sweden, France,
+China and Russia: **all five agree exactly**.
+
+### Forty labels printed on top of each other
+
+The detection overlay kept one contact per screen cell, which guarantees each
+one a cell and not one of them any room: two contacts either side of a shared
+edge can be four pixels apart. With the satellite layer on, the globe filled
+with two-line designators stacked over each other. Readable text under a stack
+of other text is not a label, and forty of them is worse than twelve.
+
+The cell winners are laid out for real now, nearest the crosshair first, and one
+that would land on a label already placed is dropped. The box is the label's own
+&mdash; text runs up and to the right of the contact, and its width is the text
+it is about to hold, measured at 6.05 pixels a character.
+
+Measured with 9 274 candidate contacts on screen: **0 overlapping pairs**, and
+still all 40 labels. The declutter did not cost a single one; it picked
+better-spaced contacts to spend them on.
+
+### The panel index cost a sixth of the panel to say nothing
+
+Seventeen section names laid out flat wrapped to eight rows and **147 pixels**,
+held there by `position: sticky` whether or not anybody was navigating. It never
+said which section you were in &mdash; the one thing a person scrolling a
+six-screen column wants to know.
+
+**32 pixels now.** One line that names where you are and drops the full list on
+a click, over the panel rather than in it, so opening it moves nothing. The
+current section is marked in the list and the label follows the scroll.
+
+### The briefing pushed everything else off the bottom
+
+Twenty-three events measured **3 071 pixels**, more than half the panel, sitting
+above Satellites by owner, the radio search, Jump to and the feed log. Reaching
+any of those meant scrolling past every earthquake on Earth.
+
+A briefing is a feed, and a feed is the one thing that has always been allowed
+its own scrollbar. **398 pixels now**, scrolling inside itself.
+
+Between the two, the panel went from **6 172 pixels to 3 465** in an 885 pixel
+window: from seven screens to four and a half. Layers is left alone at 1 643 &mdash;
+it is the control surface you scroll on purpose, not a feed you scroll past.
+
+### The top strip ran off the right-hand edge
+
+Nine readouts and 18 pixels of gap measure 1 202 pixels and start 477 in. On a
+1100 pixel window **579 pixels of them were outside it**: the eye altitude, the
+imagery source and the place under the cursor, gone, with nothing to say they
+had ever been there. Clipping picks what to lose by what happens to be last in
+the markup, which is not a decision anybody made.
+
+The ambient readouts go first now &mdash; the moon, then space weather, then the
+detection telemetry &mdash; and what survives to the narrowest window is what
+you navigate by: the clock, the coordinates under the cursor, where that is, and
+how high you are. Measured at 1100, 1400 and 1920 pixels: **fits at every one**,
+with the fuller set returning as the window grows.
+
 ## 1.7.7 - satellites by owner, and two counting bugs found on the way
 
 ### Pick out whose satellites you are looking at

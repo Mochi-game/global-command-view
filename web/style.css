@@ -463,10 +463,29 @@ h2 .tally {
 
 @keyframes pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
 
+/*
+ * The top strip drops readouts in a chosen order rather than off the edge.
+ *
+ * Nine readouts and 18px of gap measure 1 202 pixels, and they start 477 in,
+ * so on a 1100 pixel window 579 pixels of them were outside the window - the
+ * eye altitude, the imagery source and the place under the cursor, gone with
+ * no sign that they existed. Clipping picks what to lose by what happens to be
+ * last in the markup, which is not a decision anybody made.
+ *
+ * So the ambient ones go first: the moon, then space weather, then the
+ * detection telemetry. What stays to the end is what you navigate by - the
+ * clock, the coordinates under the cursor, where that is, and how high you
+ * are. Each threshold is the width at which the row above it stops fitting.
+ */
+@media (max-width: 1700px) { #moon-readout { display: none; } }
+@media (max-width: 1500px) { #kp-readout { display: none; } }
+@media (max-width: 1300px) { #telemetry { display: none; } }
+
 @media (max-width: 900px) {
   #panel { width: 210px; }
   #detail { width: 220px; }
   .brand .sub { display: none; }
+  #cursor { display: none; }
 }
 
 
@@ -658,7 +677,24 @@ h2 .tally {
 }
 #brief-when { font-size: 10px; color: var(--dim); letter-spacing: 0.05em; }
 
-#brief-list { list-style: none; margin: 0; padding: 0; }
+/*
+ * The feed scrolls inside itself rather than pushing the panel out of shape.
+ *
+ * Twenty-three events measured 3 071 pixels - over half the whole panel, and
+ * it sits above Satellites by owner, the radio search, Jump to and the feed
+ * log. Reaching any of those meant scrolling past every earthquake on Earth.
+ * A briefing is a feed, and a feed is the one thing that has always been
+ * allowed its own scrollbar.
+ */
+#brief-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 42vh;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(79, 214, 255, 0.35) transparent;
+}
 #brief-list li {
   padding: 5px 7px;
   margin-bottom: 3px;
@@ -1178,30 +1214,88 @@ audio.stream-player {
 
 /* Sticky, because its whole job is being reachable from anywhere in a panel
    that is now several screens tall. */
+/*
+ * One line that says where you are, and opens the rest on a click.
+ *
+ * Laid out flat this was seventeen chips over eight wrapped rows: 147 pixels,
+ * a sixth of the panel, held there by position:sticky whether or not anybody
+ * was navigating. The list is unchanged - it is just not permanently on screen.
+ */
 #section-index {
   position: sticky;
   top: -12px;
-  z-index: 5;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px;
+  z-index: 7;
   margin: -12px -12px 0;
-  padding: 8px 12px;
+  padding: 6px 12px;
   background: rgba(4, 7, 12, 0.96);
   border-bottom: 1px solid var(--line);
 }
-#section-index button {
-  padding: 2px 6px;
+#section-index .si-current {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 3px 6px;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  background: none;
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+#section-index .si-current:hover { color: var(--ink); background: rgba(79, 214, 255, 0.08); }
+#section-index .si-current::after {
+  content: '\25BE';                      /* pointing down: the list drops */
+  font-size: 9px;
+  color: var(--dim);
+}
+#section-index .si-current.open::after { content: '\25B4'; }
+#section-index .si-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Over the panel rather than in it, so opening the list moves nothing. */
+/* Before display:none, because a class selector outranks the browser's own
+   [hidden] rule and the list would otherwise sit permanently open. */
+#section-index .si-list[hidden] { display: none; }
+#section-index .si-list {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px;
+  padding: 6px;
+  background: rgba(4, 7, 12, 0.98);
+  border: 1px solid var(--line);
+  border-top: none;
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.5);
+}
+#section-index .si-list button {
+  padding: 3px 5px;
   font: inherit;
   font-size: 9px;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
+  text-align: left;
   color: var(--dim);
   background: none;
   border: 1px solid transparent;
   cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-#section-index button:hover { color: var(--ink); border-color: var(--line); }
-#section-index button.folded { opacity: 0.5; }
+#section-index .si-list button:hover { color: var(--ink); border-color: var(--line); }
+#section-index .si-list button.folded { opacity: 0.5; }
+#section-index .si-list button.here {
+  color: var(--cyan);
+  border-color: rgba(79, 214, 255, 0.35);
+}
 
 /* ------------------------------------------------------ google 3d maps */
 

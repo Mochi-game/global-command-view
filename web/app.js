@@ -3951,6 +3951,41 @@ async function loadBorders() {
 const satellites = [];
 const SAT_BUDGET_MS = 2;
 let satCursor = 0;
+// How many of them SGP4 could actually place on the last sweep. Not the same
+// as satellites.length, and the difference is the whole point - see satLost().
+let satAloft = 0;
+
+/*
+ * The two sides of the owner join do not write a catalogue number the same way.
+ *
+ * An element set has five columns for it and pads with zeros, so LAGEOS 1 is
+ * "08820". CelesTrak's satellite catalogue writes the same object as "8820".
+ * Matched as strings, every active object numbered below 10000 fell out of the
+ * join - measured at exactly thirteen, twelve of them American and one French,
+ * the calibration spheres and geodetic targets from the sixties and seventies.
+ * They flew while no owner was chosen and vanished the moment you picked the
+ * country that owns them.
+ *
+ * Above 99999 the same field runs out of digits and CelesTrak switch to
+ * Alpha-5: a letter for the leading two digits, I and O left out because they
+ * read as 1 and 0. "A0000" is 100000. None are in the active set today, but
+ * the catalogue passed that mark long ago and the day one arrives it would
+ * lose its owner in silence, which is the failure this just fixed.
+ *
+ * Both sides become a plain number, which is what the catalogue already is.
+ */
+const ALPHA5 = 'ABCDEFGHJKLMNPQRSTUVWXYZ';   // no I, no O
+
+function noradKey(raw) {
+  const id = String(raw || '').trim();
+  if (!id) return '';
+  const first = id[0].toUpperCase();
+  const rest = id.slice(1);
+  if (ALPHA5.includes(first) && /^\d+$/.test(rest)) {
+    return String((ALPHA5.indexOf(first) + 10) * 10000 + Number(rest));
+  }
+  return /^\d+$/.test(id) ? String(Number(id)) : id;
+}
 
 const REGIMES = [
   { name: 'LEO', max: 2000, color: Cesium.Color.fromCssColorString('#7fe8ff') },
@@ -3997,12 +4032,13 @@ async function loadSatellites() {
       if (!satrec || satrec.error) continue;
       satellites.push({
         name,
-        norad: l1.slice(2, 7).trim(),
+        norad: noradKey(l1.slice(2, 7)),
         satrec,
         // mean motion is revolutions per day in the TLE; satrec keeps rad/min
         period: (2 * Math.PI) / satrec.no,
         inclination: Cesium.Math.toDegrees(satrec.inclo),
         point: null,
+        aloft: false,
         alt: 0,
         speed: 0,
         lat: 0,
@@ -4018,8 +4054,6 @@ async function loadSatellites() {
         show: false,
       });
     }
-    setCount('satellites', satellites.length);
-    log(`orbit: ${satellites.length} tracked objects`);
     // Ownership is a second request against a different CelesTrak product, so
     // it follows rather than blocks: the objects fly whether or not anyone
     // knows who put them there.
@@ -4028,7 +4062,14 @@ async function loadSatellites() {
     // frame, and measured, the whole catalogue costs about 23 ms once. Passing
     // satellites.length here used to mean a count; under a deadline it silently
     // became "you have sixteen seconds", which on a slow machine is a hang.
+    // Counted after the sweep, not before it: until every element set has been
+    // through SGP4 once, nobody knows how many of them have a position. The
+    // sweep sets the layer's count itself.
     propagate(new Date(), Infinity);
+    log(`orbit: ${satAloft} of ${satellites.length} element sets placed`);
+    if (satAloft < satellites.length) {
+      log(`orbit: ${satellites.length - satAloft} could not be propagated`, 'warn');
+    }
   } catch (err) {
     // A load that failed left nothing behind, so the next switch may try again.
     satellitesLoaded = false;
@@ -4038,19 +4079,37 @@ async function loadSatellites() {
 
 const satScratch = new Cesium.Cartesian3();
 
+/*
+ * An object SGP4 cannot place: decayed, or an element set it cannot integrate.
+ *
+ * This used to be two bare `point.show = false` lines and a return. The dot
+ * went out, the object stayed in satellites.length, and the counter beside the
+ * layer went on reporting it - so the panel counted objects held in memory
+ * while the globe showed objects with a position, and nothing anywhere said
+ * the two were different numbers. The same shape as the zero that meant "the
+ * source never answered" in 1.7.6: a figure that looks like an observation and
+ * is really a placeholder.
+ *
+ * Every object is born not aloft and earns its way in, so the tally is right
+ * from the first sweep rather than after a correction.
+ */
+function satLost(sat) {
+  if (sat.aloft) { sat.aloft = false; satAloft -= 1; }
+  sat.point.show = false;
+}
+
 /** One object, moved to where it is now. Split out so the sweep can stop. */
 function stepSatellite(sat, when, gmst) {
   let eci;
   try {
     eci = satellite.propagate(sat.satrec, when);
   } catch (_) {
-    sat.point.show = false;
-    return;
+    return satLost(sat);
   }
   if (!eci || !eci.position || Number.isNaN(eci.position.x)) {
-    sat.point.show = false; // decayed or numerically unstable element set
-    return;
+    return satLost(sat);
   }
+  if (!sat.aloft) { sat.aloft = true; satAloft += 1; }
   const geo = satellite.eciToGeodetic(eci.position, gmst);
   const v = eci.velocity;
   sat.lat = Cesium.Math.toDegrees(geo.latitude);
@@ -4065,6 +4124,7 @@ function stepSatellite(sat, when, gmst) {
 }
 
 let satSweptLast = 0;
+let satAloftShown = -1;
 
 function propagate(when, budgetMs = SAT_BUDGET_MS) {
   if (!satellites.length) return;
@@ -4079,6 +4139,13 @@ function propagate(when, budgetMs = SAT_BUDGET_MS) {
     if ((swept & 127) === 0 && performance.now() >= deadline) break;
   }
   satSweptLast = swept;
+  // An object can fall out of the sky mid-session - an element set goes stale
+  // and SGP4 stops converging - so the figure is not settled at load time. One
+  // integer compare a frame, and the panel only touches the DOM when it moved.
+  if (satAloft !== satAloftShown) {
+    satAloftShown = satAloft;
+    setCount('satellites', satAloft);
+  }
 }
 
 
@@ -4100,36 +4167,77 @@ function propagate(when, budgetMs = SAT_BUDGET_MS) {
 
 const satOwners = new Set();      // owner codes currently chosen; empty = all
 let satOwnerRows = [];            // [code, name, count], commonest first
+let satOwnerNames = new Map();    // CelesTrak owner code -> readable name
+let satCatalogued = 0;            // what CelesTrak's catalogue lists as active
+
+/*
+ * The number beside an owner is how many of theirs are on the globe, not how
+ * many the catalogue lists.
+ *
+ * Those are different figures and the gap is not small. The catalogue holds
+ * 16 954 active objects; the active element set carries 16 032, so 922 are
+ * catalogued with no orbit to fly - 546 of them launched this year, on the
+ * books before their elements are published. Two more are held and cannot be
+ * propagated. Listing the catalogue's count meant the row read United States
+ * 12 850 beside 12 061 dots. A row is a promise about what clicking it will
+ * show you, and that one was over by seven hundred and eighty-nine.
+ *
+ * Counted fresh at render, because an element set can go stale mid-session and
+ * an object drop out of the sky - and a row that disagrees with the note above
+ * it by two is the same bug in miniature. Sixteen thousand objects is a
+ * fraction of a millisecond, and this runs on a click, not on a frame.
+ *
+ * The catalogue's own total is still worth saying once, under the list,
+ * because "no orbit published yet" is a different thing from "missing".
+ */
+function satOwnerTally() {
+  const held = new Map();
+  for (const sat of satellites) {
+    if (sat.aloft && sat.owner) held.set(sat.owner, (held.get(sat.owner) || 0) + 1);
+  }
+  satOwnerRows = [...held.entries()]
+    .map(([code, n]) => [code, satOwnerNames.get(code) || code, n])
+    .sort((a, b) => b[2] - a[2] || a[1].localeCompare(b[1]));
+}
 
 function applySatOwners() {
   for (const sat of satellites) {
-    if (sat.point) sat.point.show = !satOwners.size || satOwners.has(sat.owner);
+    // An object SGP4 could not place has no position to show it at, and
+    // choosing its owner must not conjure it back onto the globe.
+    if (sat.point) {
+      sat.point.show = sat.aloft && (!satOwners.size || satOwners.has(sat.owner));
+    }
   }
   scene.requestRender();
   const note = $('#so-note');
   if (!satOwnerRows.length) return;
-  if (!satOwners.size) {
-    note.textContent = `${satellites.length.toLocaleString('en-US')} objects, `
-      + `${satOwnerRows.length} owners. Pick one or more to show only theirs.`;
-    return;
-  }
   // Counted off the objects on the globe, not summed from the catalogue.
   //
   // The first version added up CelesTrak's figures and said "13 236 of 16 032
-  // shown" while 12 418 dots were drawn. The catalogue lists 16 954 active
-  // objects and the element set carries 16 032, so several hundred have an
-  // owner and no orbit to fly. A count beside a picture has to be a count of
-  // what is in the picture.
+  // shown" while 12 418 dots were drawn. A count beside a picture has to be a
+  // count of what is in the picture - which means the objects that have a
+  // position, not the element sets held in memory.
+  if (!satOwners.size) {
+    note.textContent = `${satAloft.toLocaleString('en-US')} objects, `
+      + `${satOwnerRows.length} owners. Pick one or more to show only theirs.`;
+    if (satCatalogued > satAloft) {
+      note.textContent += ` CelesTrak list `
+        + `${satCatalogued.toLocaleString('en-US')} active; the rest are `
+        + `catalogued with no orbit published yet.`;
+    }
+    return;
+  }
   const shown = satellites.reduce(
-    (n, sat) => n + (satOwners.has(sat.owner) ? 1 : 0), 0);
+    (n, sat) => n + (sat.aloft && satOwners.has(sat.owner) ? 1 : 0), 0);
   const who = satOwnerRows.filter((r) => satOwners.has(r[0])).map((r) => r[1]);
   note.textContent = `${shown.toLocaleString('en-US')} of `
-    + `${satellites.length.toLocaleString('en-US')} shown \u00b7 ${who.join(', ')}`;
+    + `${satAloft.toLocaleString('en-US')} shown \u00b7 ${who.join(', ')}`;
 }
 
 function renderSatOwners() {
   const list = $('#so-list');
   const want = ($('#so-q').value || '').trim().toLowerCase();
+  if (satOwnerNames.size) satOwnerTally();
   list.innerHTML = '';
   const rows = satOwnerRows.filter(
     ([code, name]) => !want || name.toLowerCase().includes(want)
@@ -4172,17 +4280,20 @@ async function loadSatOwners() {
       + 'unknown for this session. The satellites still fly.';
     return;
   }
-  satOwnerRows = d.counts;
   let matched = 0;
   for (const sat of satellites) {
     sat.owner = d.owners[sat.norad] || '';
     if (sat.owner) matched += 1;
   }
+  satOwnerNames = new Map(d.counts.map(([code, name]) => [code, name]));
+  satCatalogued = d.counts.reduce((n, row) => n + row[2], 0);
+  satOwnerTally();
+
   renderSatOwners();
   applySatOwners();
   log(`satellite owners: ${matched.toLocaleString('en-US')} of `
     + `${satellites.length.toLocaleString('en-US')} matched \u00b7 `
-    + `${d.counts.length} owners \u00b7 CelesTrak`);
+    + `${satOwnerRows.length} owners \u00b7 CelesTrak`);
 }
 
 $('#so-q').addEventListener('input', renderSatOwners);
@@ -5506,6 +5617,22 @@ function collectTargets() {
  * texture atlas, and that grinds GPU memory until the renderer gives up.
  */
 const POOL = 120;
+/*
+ * What one label occupies on screen, so the declutter can ask whether two of
+ * them would collide.
+ *
+ * These mirror the label primitives built below: 11px JetBrains Mono measured
+ * at 6.05 pixels a character, drawn from the contact's bottom-left with a
+ * (16, -14) offset and (5, 3) of background padding. If the label style below
+ * changes, these change with it - they are one description of one thing.
+ */
+const LABEL_CHAR_W = 6.05;
+const LABEL_LINE_H = 13;
+const LABEL_DX = 16;
+const LABEL_DY = -14;
+const LABEL_PAD_X = 10;
+const LABEL_PAD_Y = 3;
+
 let poolBuilt = false;
 
 function buildPool() {
@@ -5565,13 +5692,46 @@ function updateDetection() {
     // A military contact always wins its cell: it is the one worth naming.
     if (!held || rank(target) < rank(held)) cells.set(key, target);
   }
-  const shown = [...cells.values()]
-    .sort((a, b) => a.d - b.d)
-    .slice(0, Math.min(detection.density, POOL));
+
+  /*
+   * A cell each is not the same as room each.
+   *
+   * The grid guarantees one contact per 110x89 box, and two contacts either
+   * side of a shared edge can still be four pixels apart - so with the
+   * satellite layer on, the globe filled with two-line designators printed
+   * over each other. Readable text under a stack of other text is not a label,
+   * and forty of them is worse than twelve.
+   *
+   * So the cell winners are laid out for real, nearest the crosshair first,
+   * and one that would land on top of a label already placed is dropped. The
+   * box is the label's own: text runs up and to the right of the contact, not
+   * centred on it, and its width is the text it is about to hold.
+   */
+  const shown = [];
+  const placed = [];
+  const cap = Math.min(detection.density, POOL);
+  for (const target of [...cells.values()].sort((a, b) => a.d - b.d)) {
+    if (shown.length >= cap) break;
+    const [designator, name] = DESIGNATORS[target.type](target.ref);
+    const cols = Math.max(designator.length, name ? name.length : 0);
+    const box = {
+      x0: target.x + LABEL_DX - 4,
+      x1: target.x + LABEL_DX + cols * LABEL_CHAR_W + LABEL_PAD_X,
+      y0: target.y + LABEL_DY - (name ? 2 : 1) * LABEL_LINE_H - LABEL_PAD_Y,
+      y1: target.y + LABEL_DY + LABEL_PAD_Y,
+    };
+    if (placed.some((p) => p.x0 < box.x1 && box.x0 < p.x1
+                        && p.y0 < box.y1 && box.y0 < p.y1)) continue;
+    placed.push(box);
+    target.designator = designator;
+    target.label = name;
+    shown.push(target);
+  }
   detection.visible = shown.length;
 
   shown.forEach((target, i) => {
-    const [designator, name] = DESIGNATORS[target.type](target.ref);
+    const designator = target.designator;
+    const name = target.label;
     const key = target.type === 'flight' && target.ref.military ? 'military' : target.type;
     const color = Cesium.Color.fromCssColorString(TRACK_COLORS[key]);
     const identity = { type: target.type, ref: target.ref };
@@ -9177,42 +9337,130 @@ for (const h2 of document.querySelectorAll('h2[data-section]')) {
   };
 }
 
+// The index is drawn at the end of the block below, which is where the state
+// it reads is declared. Folding first, so it has something true to report.
 applyFolds(foldedSections());
-renderSectionIndex();
 
 /* --------------------------------------------------------- section index */
 
 /*
- * The panel started with six sections and has fourteen. Unfolded it is some
- * 6 800 pixels of content in a 650 pixel window, which is how a switch somebody
- * used yesterday becomes one they cannot find today - it is not hidden, it is
- * eight hundred pixels below the edge.
+ * The panel started with six sections and has seventeen. Unfolded it is some
+ * 5 900 pixels of content in an 885 pixel window, which is how a switch
+ * somebody used yesterday becomes one they cannot find today - it is not
+ * hidden, it is eight hundred pixels below the edge.
  *
  * The index is built from the sections themselves rather than a list kept
  * alongside them, so adding a section cannot leave it unreachable. Clicking a
  * name unfolds that section and scrolls to it, because half the time the reason
  * you cannot see something is that its section is collapsed.
+ *
+ * It used to lay all seventeen names out at once. Measured, that wrapped to
+ * eight rows and 147 pixels - a sixth of the panel, permanently, spent on a
+ * list of places you are not. And it never said which one you were in: the
+ * thing a person scrolling a six-screen column actually wants to know.
+ *
+ * One line now. It names where you are and opens the full list on a click.
+ * The list is the same list; what changed is that it is not always on screen.
  */
+
+let sectionIndexOpen = false;
+
+function panelSections() {
+  return [...document.querySelectorAll('#panel h2[data-section]')];
+}
+
+function sectionTitle(h2) {
+  const tally = h2.querySelector('.tally');
+  const text = tally ? h2.textContent.replace(tally.textContent, '') : h2.textContent;
+  return (text || h2.dataset.section).trim();
+}
 
 function renderSectionIndex() {
   const nav = $('#section-index');
   if (!nav) return;
   const folded = foldedSections();
   nav.innerHTML = '';
-  for (const h2 of document.querySelectorAll('#panel h2[data-section]')) {
+
+  const current = document.createElement('button');
+  current.className = 'si-current' + (sectionIndexOpen ? ' open' : '');
+  current.title = 'jump to a section';
+  current.setAttribute('aria-expanded', String(sectionIndexOpen));
+  const label = document.createElement('span');
+  label.className = 'si-label';
+  label.textContent = 'PANEL';
+  current.append(label);
+  current.onclick = () => {
+    sectionIndexOpen = !sectionIndexOpen;
+    renderSectionIndex();
+    if (sectionIndexOpen) markCurrentSection();
+  };
+  nav.append(current);
+
+  const list = document.createElement('div');
+  list.className = 'si-list';
+  list.hidden = !sectionIndexOpen;
+  for (const h2 of panelSections()) {
     const key = h2.dataset.section;
     const button = document.createElement('button');
-    button.textContent = (h2.textContent || key).replace(/\d+\/\d+$/, '').trim();
+    button.textContent = sectionTitle(h2);
+    button.dataset.section = key;
     button.className = folded.includes(key) ? 'folded' : '';
     button.title = folded.includes(key) ? 'folded \u2014 click to open' : 'go to';
     button.onclick = () => {
       applyFolds(foldedSections().filter((k) => k !== key));
-      h2.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      sectionIndexOpen = false;
       renderSectionIndex();
+      h2.scrollIntoView({ block: 'start', behavior: 'smooth' });
     };
-    nav.append(button);
+    list.append(button);
+  }
+  nav.append(list);
+  markCurrentSection();
+}
+
+/*
+ * Which section the panel is looking at, named on the one line the index costs.
+ *
+ * The heading nearest the top of the visible area, not the first one wholly
+ * inside it: a section you are halfway down is still the section you are in,
+ * and by the strict reading the panel would claim to be in the next one while
+ * you were still reading the last.
+ */
+function markCurrentSection() {
+  const panel = $('#panel');
+  const nav = $('#section-index');
+  if (!panel || !nav) return;
+  const label = nav.querySelector('.si-label');
+  if (!label) return;
+  const top = panel.scrollTop + nav.offsetHeight + 8;
+  let here = null;
+  for (const h2 of panelSections()) {
+    if (h2.offsetTop <= top) here = h2;
+  }
+  label.textContent = here ? sectionTitle(here) : 'PANEL';
+  for (const button of nav.querySelectorAll('.si-list button')) {
+    button.classList.toggle('here', !!here && button.dataset.section === here.dataset.section);
   }
 }
+
+// One read per frame at most: the panel scrolls with the wheel and a listener
+// that measures on every event measures far more often than it can paint.
+let sectionSpyQueued = false;
+$('#panel')?.addEventListener('scroll', () => {
+  if (sectionSpyQueued) return;
+  sectionSpyQueued = true;
+  requestAnimationFrame(() => { sectionSpyQueued = false; markCurrentSection(); });
+}, { passive: true });
+
+// Clicking the globe should not leave a dropdown standing open over the panel.
+document.addEventListener('click', (e) => {
+  if (sectionIndexOpen && !e.target.closest('#section-index')) {
+    sectionIndexOpen = false;
+    renderSectionIndex();
+  }
+}, true);
+
+renderSectionIndex();
 
 /** A folded section still says how much is inside it. */
 function updateFoldTallies() {
