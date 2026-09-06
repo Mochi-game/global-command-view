@@ -686,6 +686,52 @@ h2 .tally {
  * A briefing is a feed, and a feed is the one thing that has always been
  * allowed its own scrollbar.
  */
+/* ---------- watched for movement ---------- */
+
+#watched { list-style: none; margin: 0; padding: 0; display: flex;
+  flex-direction: column; gap: 3px; }
+.watched-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px;
+  border: 1px solid transparent;
+  border-left: 2px solid var(--cyan);
+  cursor: pointer;
+  font-size: 11px;
+}
+.watched-row:hover { border-color: var(--line); background: rgba(79, 214, 255, 0.08); }
+.watched-row .w-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* How many pictures already exist for it - the number that decides whether a
+   measurement is possible at all, so it is the one that rides on the row. */
+.watched-row .w-n { font-size: 10px; color: var(--cyan); }
+.watched-row .w-drop {
+  font: inherit;
+  font-size: 12px;
+  line-height: 1;
+  padding: 0 2px;
+  color: var(--dim);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.watched-row .w-drop:hover { color: var(--amber); }
+
+/* Typed, not picked: the page cannot see the filesystem, and a browser's own
+   folder picker hands back a sandboxed handle rather than a path anything else
+   on this machine could use. */
+.folder-input {
+  width: 100%;
+  padding: 3px 5px;
+  font: inherit;
+  font-size: 11px;
+  color: var(--ink);
+  background: rgba(4, 7, 12, 0.6);
+  border: 1px solid var(--line);
+}
+.folder-input:focus { outline: none; border-color: var(--cyan); }
+
 #brief-list {
   list-style: none;
   margin: 0;

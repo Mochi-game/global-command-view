@@ -6,6 +6,71 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.8.0 - watching a bridge for movement
+
+Asked for a way to point at a structure - a bridge, a building - and find out
+whether it is sinking. And asked, reasonably, to be warned before it filled a
+disk.
+
+### The question is answerable, and the answer is already on the shelf
+
+Measuring millimetres needs interferometry, and interferometry needs a stack:
+many pictures of the same place from the same point in the sky. The literature
+puts the working minimum at 15 to 20 and calls 25 or more reliable.
+
+The trap is the calendar rather than the count. **A bridge expands and contracts
+with temperature** - centimetres across a long span between summer and winter -
+so a stack covering four months of spring measures thermal expansion and calls
+it subsidence. A year is the floor for telling season from settlement.
+
+And **nothing has to be recorded going forward.** The archive runs back a
+decade. Over the Oresund bridge, measured: **110 pictures on track 73 between
+11 September 2024 and 2 September 2026**, and 94 to 110 on four other tracks.
+The answer to "is it sinking" is history, not a two-year wait.
+
+### What the app does with that
+
+Click any ground with **Radar backscatter** lit and the card now finishes with
+whether the spot can be watched, why, which run of pictures is the best one, and
+whether up-down can be separated from sideways - which needs the spot covered
+from both an ascending and a descending pass, since one direction alone measures
+along its own line of sight and mixes the two.
+
+`GET /api/sar-stack` is the new endpoint behind it: a two-year search of the
+Copernicus catalogue for the phase-carrying products, grouped per track, with a
+verdict per stack. Measured at about seven seconds for two years, so the card
+shows the pass dates first and fills the verdict in when it arrives.
+
+**Watch this spot for movement** saves it. A new panel section, **Watched for
+movement**, lists them; clicking one flies there and shows the plan.
+
+### Where the size warning actually belongs
+
+Asked for the warning when Ground change is switched on. That is the wrong
+place: switching a layer on streams map tiles and stores nothing, and a warning
+there would be attached to the wrong thing.
+
+The real numbers are on the plan card, where they are about to be true:
+
+| | |
+|---|---|
+| one raw scene | 8 GB |
+| a two-year stack of them | about 1 TB |
+| what this app ever stores | a name and a point, a few hundred bytes |
+| what comes back from processing | 50-250 MB a pair, **5-27 GB for a full stack** |
+
+That last figure gets the folder box and the warning. The processing runs in
+ASF's HyP3 rather than on this machine - the free allowance is 8 000 credits a
+month and a burst pair starts at one credit, so a 109-pair stack fits inside a
+month of it. Submitting needs a NASA Earthdata login, which is free and yours to
+create; this app prepares the list and never holds a password.
+
+### And the watch list is personal
+
+`data/targets.json` is git-ignored, the same as `marks.json` and for the same
+reason: a list of structures you are worried about is nobody else's business,
+and it should not travel in a release. An example ships instead.
+
 ## 1.7.11 - the radar layer explains itself now
 
 Reported by the person who owns this app, about the layer fixed one version ago:

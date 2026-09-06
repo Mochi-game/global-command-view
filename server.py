@@ -39,7 +39,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.7.11"
+VERSION = "1.8.0"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -429,12 +429,17 @@ def _lock_for(key):
         return lock
 
 
-def fetch(url):
-    """GET url and return decoded bytes. Digitraffic requires gzip."""
+def fetch(url, timeout=None):
+    """GET url and return decoded bytes. Digitraffic requires gzip.
+
+    The timeout is the shared one unless a caller has measured its own. A
+    two-year catalogue search takes about seven seconds against a service that
+    is free and sometimes busy, and thirty is too tight a leash for that.
+    """
     req = urllib.request.Request(
         url, headers={"User-Agent": USER_AGENT, "Accept-Encoding": "gzip"}
     )
-    with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+    with urllib.request.urlopen(req, timeout=timeout or TIMEOUT) as resp:
         raw = resp.read()
         if resp.headers.get("Content-Encoding") == "gzip":
             raw = gzip.GzipFile(fileobj=io.BytesIO(raw)).read()
@@ -835,6 +840,13 @@ ESRI_IDENTIFY = (
 
 MARKS_PATH = os.path.join(ROOT, "data", "marks.json")
 _marks_lock = threading.Lock()
+
+# Places being watched for movement. A target is a name, a point, and which
+# run of pictures answers for it - a few hundred bytes each. The pictures
+# themselves are never stored here; a single one is eight gigabytes and the
+# processing that turns a stack of them into millimetres happens elsewhere.
+TARGETS_PATH = os.path.join(ROOT, "data", "targets.json")
+_targets_lock = threading.Lock()
 
 
 USAGE_PATH = os.path.join(ROOT, "data", "usage.json")
@@ -3407,6 +3419,132 @@ def sar_passes(lat, lon):
     return data, "live"
 
 
+# ------------------------------------------------- can this spot be measured
+
+# Whether a bridge, a building or a hillside can be watched for movement, and
+# what it would take.
+#
+# Measuring millimetres needs interferometry, and interferometry needs a stack:
+# many images of the same place from the same point in the sky. Two are not
+# enough - a single pair is one moment, dominated by whatever the atmosphere was
+# doing that day. The literature puts the working minimum at 15 to 20 images and
+# calls 25 or more reliable.
+#
+# The trap is the calendar rather than the count. A bridge expands and contracts
+# with temperature, centimetres across a long span between summer and winter, so
+# a stack that covers four months of spring measures thermal expansion and calls
+# it subsidence. A full year is the floor for telling season from settlement,
+# and two years is what gives velocities that hold up against ground survey.
+#
+# And nothing has to be recorded going forward. The archive already runs back a
+# decade; the answer to "is it sinking" is on the shelf, not two years away.
+SAR_STACK_TTL = 21600
+SAR_STACK_YEARS = 2
+SAR_STACK_MIN = 15         # below this, no measurement of any kind
+SAR_STACK_GOOD = 25        # what the literature calls reliable
+
+
+def _stack_verdict(dates, span_days):
+    """What this stack can honestly support, said in one line."""
+    n = len(dates)
+    if n < SAR_STACK_MIN:
+        return ("no", "%d images is below the %d a measurement needs"
+                % (n, SAR_STACK_MIN))
+    if span_days < 365:
+        return ("seasonal", "%d images, but only %d days of them. A structure "
+                "expands and contracts with the seasons, so anything shorter "
+                "than a year will show that and look like sinking"
+                % (n, span_days))
+    if n < SAR_STACK_GOOD:
+        return ("thin", "%d images over %d days - enough to try, thinner than "
+                "the %d usually called reliable" % (n, span_days, SAR_STACK_GOOD))
+    return ("yes", "%d images over %d days, which is a stack that can carry a "
+            "millimetre-per-year rate" % (n, span_days))
+
+
+def sar_stack(lat, lon, years=SAR_STACK_YEARS):
+    """Every phase-carrying pass over a point, grouped into per-track stacks."""
+    key = "sarstack_%.3f_%.3f_%g" % (lat, lon, years)
+    hit = _mem_get(key)
+    if hit and time.time() - hit[0] < SAR_STACK_TTL:
+        return hit[1], "memory"
+
+    since = (datetime.datetime.now(datetime.timezone.utc)
+             - datetime.timedelta(days=int(365 * years)))
+    flt = (
+        "Collection/Name eq 'SENTINEL-1' and "
+        "OData.CSC.Intersects(area=geography'SRID=4326;POINT(%.4f %.4f)') and "
+        "ContentDate/Start gt %s and contains(Name,'SLC')"
+        % (lon, lat, since.strftime("%Y-%m-%dT%H:%M:%S.000Z"))
+    )
+    url = SAR_CATALOGUE + "?" + urllib.parse.urlencode({
+        "$filter": flt,
+        "$expand": "Attributes",
+        "$orderby": "ContentDate/Start desc",
+        "$top": 1000,
+    })
+
+    record = {"years": years, "source": "Copernicus Data Space",
+              "min_images": SAR_STACK_MIN, "good_images": SAR_STACK_GOOD}
+    try:
+        rows = json.loads(fetch(url, timeout=180).decode("utf-8", "replace")).get("value", [])
+    except Exception as exc:  # noqa: BLE001 - the app is fine without this
+        record["error"] = str(exc)[:90]
+        data = json.dumps(record).encode()
+        _mem_put(key, data)
+        return data, "live"
+
+    tracks = {}
+    for prod in rows:
+        a = {x["Name"]: x.get("Value") for x in prod.get("Attributes", [])}
+        day = (a.get("beginningDateTime") or "")[:10]
+        track = a.get("relativeOrbitNumber")
+        if not day or track is None:
+            continue
+        entry = tracks.setdefault(track, {
+            "track": track,
+            "going": (a.get("orbitDirection") or "").lower(),
+            "dates": set(),
+        })
+        entry["dates"].add(day)
+
+    stacks = []
+    for entry in tracks.values():
+        dates = sorted(entry["dates"])
+        span = ((datetime.date.fromisoformat(dates[-1])
+                 - datetime.date.fromisoformat(dates[0])).days) if len(dates) > 1 else 0
+        verdict, why = _stack_verdict(dates, span)
+        stacks.append({
+            "track": entry["track"],
+            "going": entry["going"],
+            "images": len(dates),
+            "first": dates[0],
+            "last": dates[-1],
+            "span_days": span,
+            "every_days": round(span / (len(dates) - 1), 1) if len(dates) > 1 else 0,
+            "verdict": verdict,
+            "why": why,
+        })
+    stacks.sort(key=lambda s: -s["images"])
+    record["stacks"] = stacks
+
+    # One track measures movement along its own line of sight, which is a mix of
+    # up-down and east-west. Two tracks looking from opposite sides separate the
+    # two - and "is it sinking" is a question about the vertical, so whether
+    # both exist is worth saying rather than leaving to be discovered later.
+    up = next((s for s in stacks if s["going"].startswith("asc")
+               and s["verdict"] in ("yes", "thin")), None)
+    down = next((s for s in stacks if s["going"].startswith("desc")
+                 and s["verdict"] in ("yes", "thin")), None)
+    record["best_ascending"] = up["track"] if up else None
+    record["best_descending"] = down["track"] if down else None
+    record["can_separate_vertical"] = bool(up and down)
+
+    data = json.dumps(record).encode()
+    _mem_put(key, data)
+    return data, "live"
+
+
 SATCAT_ACTIVE = "https://celestrak.org/satcat/records.php?GROUP=active&FORMAT=csv"
 SAT_OWNER_TTL = 86400
 
@@ -5847,6 +5985,27 @@ def write_marks(raw):
     return json.dumps({"ok": True, "count": len(marks)}).encode()
 
 
+def read_targets():
+    """Places being watched for movement."""
+    if not os.path.exists(TARGETS_PATH):
+        return b'{"targets": []}', "empty"
+    with open(TARGETS_PATH, "rb") as fh:
+        return fh.read(), "disk"
+
+
+def write_targets(raw):
+    payload = json.loads(raw)
+    targets = payload.get("targets")
+    if not isinstance(targets, list):
+        raise ValueError("expected a targets array")
+    with _targets_lock:
+        os.makedirs(os.path.dirname(TARGETS_PATH), exist_ok=True)
+        with open(TARGETS_PATH, "w", encoding="utf-8") as fh:
+            json.dump({"targets": targets}, fh, indent=2, ensure_ascii=False)
+    log(f"watched spots: {len(targets)} saved")
+    return json.dumps({"ok": True, "count": len(targets)}).encode()
+
+
 def imagery_date(lat, lon):
     """When the satellite image under this point was actually taken.
 
@@ -7779,7 +7938,7 @@ class Handler(SimpleHTTPRequestHandler):
     def do_POST(self):  # noqa: N802 - http.server API
         parsed = urllib.parse.urlparse(self.path)
         if parsed.path not in ("/api/marks", "/api/keys", "/api/usage",
-                               "/api/manual"):
+                               "/api/manual", "/api/targets"):
             return self._send(404, b'{"error":"not a writable endpoint"}')
         try:
             length = int(self.headers.get("Content-Length", 0))
@@ -7790,6 +7949,8 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._send(200, bump_usage(body))
             if parsed.path == "/api/manual":
                 return self._send(200, write_manual(body))
+            if parsed.path == "/api/targets":
+                return self._send(200, write_targets(body))
             return self._send(200, write_keys(body))
         except Exception as exc:  # noqa: BLE001 - report bad input as JSON
             return self._send(400, json.dumps({"error": str(exc)}).encode())
@@ -7939,6 +8100,14 @@ class Handler(SimpleHTTPRequestHandler):
                 except ValueError:
                     return self._send(400, b'{"error":"lat and lon required"}')
                 data, source = sar_passes(lat, lon)
+            elif name == "sar-stack":
+                try:
+                    lat = float(query.get("lat", ["0"])[0])
+                    lon = float(query.get("lon", ["0"])[0])
+                    years = float(query.get("years", [SAR_STACK_YEARS])[0])
+                except ValueError:
+                    return self._send(400, b'{"error":"lat and lon required"}')
+                data, source = sar_stack(lat, lon, max(0.25, min(6.0, years)))
             elif name == "satellite-owners":
                 data, source = satellite_owners()
             elif name == "radio-stats":
@@ -8094,6 +8263,8 @@ class Handler(SimpleHTTPRequestHandler):
                 data, source = read_manual()
             elif name == "marks":
                 data, source = read_marks()
+            elif name == "targets":
+                data, source = read_targets()
             elif name == "submarine-bases":
                 with open(os.path.join(ROOT, "data", "submarine_bases.json"), "rb") as fh:
                     data = fh.read()

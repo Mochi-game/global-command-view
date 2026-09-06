@@ -1,0 +1,20 @@
+{
+  "note": "Places watched for movement. The app writes data/targets.json, which git ignores because a watch list is personal - it is the structures you are worried about. Copy this to targets.json to start, or just click a spot with Radar backscatter on.",
+  "targets": [
+    {
+      "name": "A bridge worth watching",
+      "lat": 55.5714,
+      "lon": 12.8244,
+      "added": "2026-09-06",
+      "track": 73,
+      "going": "ascending",
+      "images": 110,
+      "first": "2024-09-11",
+      "last": "2026-09-02",
+      "span_days": 721,
+      "both_directions": true,
+      "ascending": 73,
+      "descending": 66
+    }
+  ]
+}

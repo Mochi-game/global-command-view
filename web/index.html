@@ -193,6 +193,15 @@
   </section>
 
   <section class="block">
+    <h2 data-section="watched">Watched for movement</h2>
+    <p id="watched-note" class="adds">Places being checked for sinking. Switch on
+      <b>Radar backscatter</b> under Ground change, click a bridge or a building,
+      and the card offers to watch it. Nothing large is stored here &mdash; a
+      watched spot is a name and a point.</p>
+    <ul id="watched"></ul>
+  </section>
+
+  <section class="block">
     <h2 data-section="marks">Marks</h2>
     <div class="mark-add">
       <input type="text" id="mark-name" placeholder="name this view" maxlength="40">
@@ -363,6 +372,7 @@
   <img id="detail-image" alt="" hidden title="Click to enlarge">
   <button id="follow" class="mode-btn" hidden>FOLLOW</button>
   <button id="project" class="mode-btn" hidden>PROJECT ONTO GROUND</button>
+  <button id="watch-spot" class="mode-btn" hidden>WATCH THIS SPOT FOR MOVEMENT</button>
 
   <div id="calibration" hidden>
     <h4>Calibration</h4>

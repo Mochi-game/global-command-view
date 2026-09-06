@@ -4538,6 +4538,8 @@ function showDetail(title, kind, fields, imageUrl, follow, views) {
   clearRoute();
   delete detail.dataset.camera;
   $('#project').hidden = true;
+  // Belongs to the radar card and nothing else, so every other card clears it.
+  $('#watch-spot').hidden = true;
   if (follow) {
     detail.dataset.target = follow;
     $('#follow').hidden = false;
@@ -4733,6 +4735,12 @@ async function loadDossier(aircraft) {
  * value that is an http address becomes an anchor instead, everywhere at once.
  */
 function fieldValue(dd, value) {
+  // A card is mostly facts, but one of them is a folder you have to type into.
+  // A caller that has built its own element gets to hand it over whole.
+  if (value instanceof Node) {
+    dd.append(value);
+    return;
+  }
   const text = String(value);
   if (/^https?:\/\/\S+$/.test(text)) {
     const a = document.createElement('a');
@@ -9556,7 +9564,7 @@ const FOLD_STORE = 'gcv.folded';
 // the rest one click away, which is better than scrolling past them.
 const FOLD_DEFAULT = [
   'optics', 'detection', 'descent', 'tools', 'jump-to', 'recon', 'own',
-  'marks', 'costs', 'broadcast', 'tracks',
+  'marks', 'costs', 'broadcast', 'tracks', 'watched',
 ];
 
 function foldedSections() {
@@ -10778,10 +10786,271 @@ async function showSarPasses(lat, lon) {
       : 'no — only the picture kind was recorded here']);
   rows.push(['Last few passes', passes.slice(0, 5)
     .map((p) => `${pretty(p.date)} (${p.going})`).join(', ')]);
+
+  /*
+   * Whether this spot can be watched for movement, worked out after the card
+   * is already up.
+   *
+   * The question takes a two-year search of the catalogue and about seven
+   * seconds, which is far too long to hold the card back for - the pass dates
+   * above are useful on their own and arrive immediately. So the row goes in
+   * saying it is thinking, and is replaced when the answer comes.
+   */
+  sarCardAt = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+  const mine = sarCardAt;
+  rows.push(['Can it be watched for sinking', 'working that out — a moment…']);
+  showDetail(where, `radar · ${d.source}`, rows);
+
+  let stack;
+  try {
+    stack = await getJSON(
+      `/api/sar-stack?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`);
+  } catch (err) {
+    if (sarCardAt !== mine) return;
+    rows.pop();
+    rows.push(['Can it be watched for sinking', `could not ask (${err.message})`]);
+    showDetail(where, `radar · ${d.source}`, rows);
+    return;
+  }
+  // Clicked somewhere else while the catalogue was thinking.
+  if (sarCardAt !== mine) return;
+
+  rows.pop();
+  const best = (stack.stacks || [])[0];
+  if (stack.error || !best) {
+    rows.push(['Can it be watched for sinking',
+      stack.error || 'nothing with the phase recorded here']);
+  } else {
+    const ok = best.verdict === 'yes' || best.verdict === 'thin';
+    rows.push(['Can it be watched for sinking', ok ? 'yes' : 'no']);
+    rows.push(['Why', best.why]);
+    // With the year, because this span is two years wide and "11 September to
+    // 2 September" reads as nonsense without it.
+    const withYear = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString(
+      'en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    rows.push(['Best run of pictures',
+      `${best.images} from direction ${best.track}, ${withYear(best.first)} `
+      + `to ${withYear(best.last)}`]);
+    // One direction measures along its own line of sight, which mixes up-down
+    // with sideways. Two opposite directions separate them, and sinking is a
+    // question about the vertical.
+    rows.push(['Up-down separately from sideways', stack.can_separate_vertical
+      ? 'yes — this spot is covered from both directions'
+      : 'no — only one direction covers it, so up-down and sideways stay mixed']);
+    if (ok) {
+      $('#watch-spot').hidden = false;
+      $('#watch-spot').onclick = () => watchThisSpot(lat, lon, stack);
+    }
+  }
   rows.push(['To go further', 'the pictures themselves are free at '
     + 'browser.dataspace.copernicus.eu — HELP explains how to read one']);
-
   showDetail(where, `radar · ${d.source}`, rows);
+  if (best && (best.verdict === 'yes' || best.verdict === 'thin')) {
+    $('#watch-spot').hidden = false;
+    $('#watch-spot').onclick = () => watchThisSpot(lat, lon, stack);
+  }
+}
+
+// Which spot the open radar card belongs to, so a slow answer for one place
+// cannot land in a card that has since moved to another.
+let sarCardAt = '';
+
+/* ------------------------------------------------ watched for movement */
+
+/*
+ * Places being checked for sinking.
+ *
+ * A watched spot is a name, a point, and which run of pictures answers for it.
+ * That is a few hundred bytes. The pictures are not kept here and should not
+ * be: one is eight gigabytes, a two-year stack is about a terabyte, and the
+ * processing that turns a stack into millimetres runs in ASF's cloud rather
+ * than on this machine. What comes back from that is small, and where it lands
+ * is asked at the moment it is fetched - which is the only moment the size is
+ * real.
+ *
+ * Kept on the server beside the marks, for the same reason: localStorage is
+ * scoped to a port, and a spot you are watching for two years should outlive
+ * the port you happened to start on.
+ */
+
+let watchedSpots = [];
+
+async function loadWatched() {
+  try {
+    const d = await getJSON('/api/targets');
+    watchedSpots = d.targets || [];
+  } catch (_) {
+    watchedSpots = [];
+  }
+  renderWatched();
+}
+
+async function saveWatched() {
+  const res = await fetch('/api/targets', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ targets: watchedSpots }),
+  });
+  if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+  renderWatched();
+}
+
+function watchThisSpot(lat, lon, stack) {
+  const best = (stack.stacks || [])[0];
+  if (!best) return;
+  const suggestion = ($('#place')?.textContent || '').trim();
+  const name = (prompt('Name this spot — what are you watching?',
+    suggestion && suggestion !== 'open water' ? suggestion : '') || '').trim();
+  if (!name) return;
+
+  /*
+   * The same point twice is a mistake; a point nearby is usually not.
+   *
+   * Watching both ends of a bridge, or a pier and the abutment it sits on, is
+   * a reasonable thing to want - they can be settling at different rates, and
+   * telling them apart is half the question. So only an all-but-identical
+   * point is refused, and a neighbour is mentioned rather than blocked.
+   */
+  const near = (a, b) => Math.hypot(a.lat - b.lat, (a.lon - b.lon) * 0.56) * 111_000;
+  const here = { lat, lon };
+  const same = watchedSpots.find((s) => near(s, here) < 15);
+  if (same) {
+    log(`already watching this exact point as "${same.name}"`, 'warn');
+    return;
+  }
+  const neighbour = watchedSpots.find((s) => near(s, here) < 500);
+
+  watchedSpots.push({
+    name,
+    lat: Number(lat.toFixed(5)),
+    lon: Number(lon.toFixed(5)),
+    added: new Date().toISOString().slice(0, 10),
+    track: best.track,
+    going: best.going,
+    images: best.images,
+    first: best.first,
+    last: best.last,
+    span_days: best.span_days,
+    both_directions: !!stack.can_separate_vertical,
+    ascending: stack.best_ascending,
+    descending: stack.best_descending,
+  });
+  saveWatched()
+    .then(() => {
+      log(`watching "${name}" · ${best.images} pictures back to ${best.first}`);
+      if (neighbour) {
+        log(`note: "${neighbour.name}" is already watched ${Math.round(
+          near(neighbour, { lat, lon }))} m away — keep both only if you meant `
+          + 'two different parts of the structure', 'warn');
+      }
+    })
+    .catch((err) => log(`could not save the watched spot (${err.message})`, 'warn'));
+}
+
+/*
+ * What it would take to turn a watched spot into a measurement.
+ *
+ * Two numbers matter and they are wildly different, which is the whole reason
+ * this card exists. The raw pictures are eight gigabytes each and a two-year
+ * stack of them is about a terabyte - nobody downloads that, and this app never
+ * offers to. The processing happens in ASF's cloud, and what comes back is the
+ * interferograms: tens to a couple of hundred megabytes apiece.
+ *
+ * That second number is still five to thirty gigabytes across a full stack, so
+ * it is the one that gets a folder and a warning. Asked here rather than when
+ * the layer is switched on, because switching a layer on downloads map tiles
+ * and stores nothing - a warning there would be attached to the wrong thing.
+ */
+
+// Measured range for a burst interferogram package, which varies with the
+// resolution asked for: the finer 10x2 looks run about four times the coarser
+// 20x4. Stated as a range rather than a single figure because it is an
+// estimate, and the first product you fetch will tell you the real one.
+const HYP3_PRODUCT_MB = [50, 250];
+
+function showWatchedPlan(spot) {
+  const pairs = Math.max(0, spot.images - 1);
+  const low = Math.round(pairs * HYP3_PRODUCT_MB[0] / 1024);
+  const high = Math.round(pairs * HYP3_PRODUCT_MB[1] / 1024);
+  const pretty = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB',
+    { day: 'numeric', month: 'long', year: 'numeric' });
+
+  const folder = document.createElement('input');
+  folder.type = 'text';
+  folder.className = 'folder-input';
+  folder.placeholder = 'e.g. D:\\insar\\oresund';
+  folder.value = spot.folder || '';
+  folder.spellcheck = false;
+  folder.onchange = () => {
+    spot.folder = folder.value.trim();
+    saveWatched().catch((err) => log(`could not save (${err.message})`, 'warn'));
+    if (spot.folder) log(`"${spot.name}": results will go to ${spot.folder}`);
+  };
+
+  const rows = [
+    ['Watching since', pretty(spot.added)],
+    ['Pictures you already have',
+      `${spot.images}, from direction ${spot.track} (${spot.going})`],
+    ['Going back to', `${pretty(spot.first)} — ${spot.span_days} days of them`],
+    ['Long enough?', spot.span_days >= 365
+      ? 'yes — over a year, so the seasonal swing can be told from a real trend'
+      : 'no — under a year, and a structure moves with the seasons. '
+        + 'Anything you measure now will be mostly summer and winter'],
+    ['Up-down separately', spot.both_directions
+      ? 'yes — covered from both directions'
+      : 'no — one direction only, so up-down stays mixed with sideways'],
+    ['Nothing to wait for', 'these pictures already exist. The archive runs back '
+      + 'a decade; you are reading history, not starting a recording'],
+    ['The work', `${pairs} pairs to process`],
+    ['Where it runs', 'ASF HyP3, in their cloud — you never download the 8 GB '
+      + 'source scenes. The free allowance is 8 000 credits a month and a burst '
+      + 'pair starts at 1 credit, so this stack fits inside one month of it'],
+    ['What comes back', `roughly ${HYP3_PRODUCT_MB[0]}–${HYP3_PRODUCT_MB[1]} MB `
+      + `per pair — about ${low}–${high} GB for all ${pairs}. This is the big `
+      + 'number, and the only one worth choosing a disk for'],
+    ['Save results in', folder],
+    ['Then', 'submit the stack at search.asf.alaska.edu with a NASA Earthdata '
+      + 'login — free, and yours to create. This app prepares the list; it does '
+      + 'not hold your password'],
+    ['Order the scenes', 'https://search.asf.alaska.edu/'],
+  ];
+  showDetail(spot.name, `watched spot · ${spot.lat.toFixed(4)}, ${spot.lon.toFixed(4)}`,
+    rows);
+}
+
+function renderWatched() {
+  const list = $('#watched');
+  if (!list) return;
+  list.innerHTML = '';
+  if (!watchedSpots.length) return;
+  for (const spot of watchedSpots) {
+    const li = document.createElement('li');
+    li.className = 'watched-row';
+    li.innerHTML = `<span class="w-name">${spot.name}</span>`
+      + `<span class="w-n">${spot.images}</span>`;
+    li.title = `${spot.images} pictures from direction ${spot.track} `
+      + `(${spot.going}), ${spot.first} to ${spot.last}`
+      + (spot.both_directions ? '' : ' · one direction only');
+    li.onclick = () => {
+      viewer.camera.flyTo({
+        destination: Cesium.Cartesian3.fromDegrees(spot.lon, spot.lat, 12000),
+        duration: 1.2,
+      });
+      showWatchedPlan(spot);
+    };
+    const drop = document.createElement('button');
+    drop.className = 'w-drop';
+    drop.textContent = '×';
+    drop.title = 'stop watching this spot';
+    drop.onclick = (e) => {
+      e.stopPropagation();
+      watchedSpots = watchedSpots.filter((s) => s !== spot);
+      saveWatched().catch((err) => log(`could not save (${err.message})`, 'warn'));
+      log(`stopped watching "${spot.name}"`);
+    };
+    li.append(drop);
+    list.append(li);
+  }
 }
 
 async function showNaming(lat, lon) {
@@ -11713,6 +11982,10 @@ setInterval(whileOn('smhi', loadSmhi), 10 * 60_000);
   setInterval(whileOn('vessels', pollVessels), 20_000);
 
   scene.camera.moveEnd.addEventListener(whileOn(['flights', 'services'], pollFlights));
+
+  // Watched spots are a handful of lines on disk and belong on screen from the
+  // start, not once somebody switches a layer on.
+  loadWatched();
 
   setTimeout(() => $('#boot').classList.add('gone'), 1200);
 })();
