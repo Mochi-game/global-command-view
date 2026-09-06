@@ -11159,6 +11159,23 @@ function showWatchedPlan(spot) {
     ['Already measured?', 'if this is in Europe, yes. The European Ground Motion '
       + 'Service has run this on Sentinel-1 since 2015 for every participating '
       + 'country, updated yearly, free — Sweden and Denmark included'],
+    /*
+     * The account, said before the instructions rather than inside them.
+     *
+     * Their archive refuses a search outright when you are not signed in, and
+     * somebody who has drawn the box and set the filters before finding that
+     * out has done the work twice. It is also not the Copernicus account this
+     * app already asks for under Setup - EU Login is a different one - and
+     * assuming they are the same is the obvious mistake to make.
+     *
+     * Nothing here logs in. The app never sees the account, and never asks for
+     * it: what it takes is the download link the site hands you afterwards.
+     */
+    ['You will need an account', 'free, and you have to make it yourself. It is '
+      + '"EU Login", which is NOT the Copernicus account under Setup — a '
+      + 'different sign-in for a different service. Their archive refuses to '
+      + 'search at all until you are signed in, so do it first. This app never '
+      + 'sees it and never asks for it'],
     ['Read it there', 'https://egms.land.copernicus.eu/'],
     ['Search for', `${spot.lat.toFixed(4)} ${spot.lon.toFixed(4)} — their box wants `
       + 'a space, not a comma. Then click a measurement point for its millimetres'],
