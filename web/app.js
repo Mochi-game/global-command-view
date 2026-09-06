@@ -7031,6 +7031,22 @@ function operaProbeTile() {
  */
 const OPERA_MAX_BACK = 12;
 
+/*
+ * A 200 is not the same as a picture.
+ *
+ * GIBS answers days it has nothing for with a blank tile and status 200, not
+ * with a 404 - measured over the Oresund on 4 September 2026, a day no
+ * satellite flew: 334 bytes, image/png, perfectly valid and perfectly empty.
+ * Days that do have data measured 72 kB and 124 kB.
+ *
+ * Taking the status at its word meant the search could stop on a blank day,
+ * draw nothing, and print that date in the feed as though it were showing it.
+ * A date beside an empty map is worse than an empty map, because it is a claim.
+ * So the tile has to have something in it, and the threshold sits an order of
+ * magnitude clear of both measurements.
+ */
+const OPERA_BLANK_MAX = 4000;
+
 async function findOperaDay(spec, tile) {
   const cacheKey = `${spec.id}:${tile.key}:${dayOffset}`;
   if (operaDayFound.has(cacheKey)) return operaDayFound.get(cacheKey);
@@ -7039,15 +7055,17 @@ async function findOperaDay(spec, tile) {
     const url = `${OPERA_BASE}${spec.product}/default/${day}/`
       + `GoogleMapsCompatible_Level12/${OPERA_PROBE_LEVEL}/${tile.y}/${tile.x}.png`;
     let res;
+    let size = 0;
     try {
       res = await fetch(url);
+      if (res.ok) size = (await res.blob()).size;
     } catch (_) {
       // A host that is down is not the same as a satellite that was elsewhere,
       // and asking it a fortnight of questions helps nobody. Left uncached, so
       // the next attempt is a fresh one.
       return '';
     }
-    if (res.ok) {
+    if (res.ok && size > OPERA_BLANK_MAX) {
       operaDayFound.set(cacheKey, day);
       return day;
     }

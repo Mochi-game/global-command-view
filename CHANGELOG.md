@@ -65,6 +65,28 @@ Turning the layer on now says what to do next: the key is bottom right, and
 clicking the ground answers when the radar was last here. The HELP section
 leads with three steps rather than with what band the instrument is.
 
+### A 200 is not the same as a picture
+
+Asked how the picture could be finished a day before it was taken. It could
+not, and the answer is that the two dates on screen are both dates a satellite
+flew - one is the pass the picture came from, the other a later pass with no
+picture yet. But checking it turned up something worse in the search added one
+version ago.
+
+GIBS answers a day it has nothing for with **status 200 and a blank tile**, not
+with a 404. Measured over the Oresund on 4 September 2026, a day nothing flew:
+**334 bytes**, `image/png`, perfectly valid and perfectly empty. Days that do
+have data measured 72 kB and 124 kB.
+
+The day search took the status at its word, so it could stop on a blank day,
+draw nothing, and print that date in the feed as though it were showing it. A
+date beside an empty map is worse than an empty map, because it is a claim. The
+tile has to have something in it now, with the threshold an order of magnitude
+clear of both measurements.
+
+Latent rather than active - today's arithmetic starts the search a day past the
+blank one - which is exactly the kind of fault that waits for a release.
+
 ### The key and the card were sitting on top of each other
 
 Found while checking it. The legend had no width limit, and the radar rows are
