@@ -39,7 +39,7 @@ import xml.etree.ElementTree as xml_tree
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.7.10"
+VERSION = "1.7.11"
 BUILT = "2026-08-19"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
@@ -3316,6 +3316,96 @@ def radio_stats():
 # United States 12 850, China 1 489, United Kingdom 698, Russia 386, and
 # Sweden 2. That last one is why the list shows every owner rather than a
 # convenient top ten.
+
+# ------------------------------------------------------- radar passes here
+
+# When the radar last flew over a spot, and when it is due back.
+#
+# The picture on the globe is one day's imagery, and the question it always
+# raises is "how old is this, and when do I get a new one". That answer is in
+# the Copernicus catalogue, which is open: searching needs no account, only
+# downloading does. Asked from the server so the page is not making a
+# cross-origin request to a service that need not allow one.
+#
+# The reply is deliberately plain. The catalogue speaks of relative orbits and
+# product types; what a person standing over a bridge wants to know is when the
+# satellite was here, when it comes back, and whether the pictures are the kind
+# you can measure movement with.
+SAR_CATALOGUE = "https://catalogue.dataspace.copernicus.eu/odata/v1/Products"
+SAR_PASSES_TTL = 3600
+SAR_WINDOW_DAYS = 30
+
+
+def sar_passes(lat, lon):
+    """Sentinel-1 overflights of a point in the last month, in plain terms."""
+    key = "sarpass_%.2f_%.2f" % (lat, lon)
+    hit = _mem_get(key)
+    if hit and time.time() - hit[0] < SAR_PASSES_TTL:
+        return hit[1], "memory"
+
+    since = (datetime.datetime.now(datetime.timezone.utc)
+             - datetime.timedelta(days=SAR_WINDOW_DAYS))
+    flt = (
+        "Collection/Name eq 'SENTINEL-1' and "
+        "OData.CSC.Intersects(area=geography'SRID=4326;POINT(%.4f %.4f)') and "
+        "ContentDate/Start gt %s"
+        % (lon, lat, since.strftime("%Y-%m-%dT%H:%M:%S.000Z"))
+    )
+    url = SAR_CATALOGUE + "?" + urllib.parse.urlencode({
+        "$filter": flt,
+        "$expand": "Attributes",
+        "$orderby": "ContentDate/Start desc",
+        "$top": 80,
+    })
+
+    record = {"window_days": SAR_WINDOW_DAYS, "source": "Copernicus Data Space"}
+    try:
+        raw = json.loads(fetch(url).decode("utf-8", "replace")).get("value", [])
+    except Exception as exc:  # noqa: BLE001 - the layer is fine without this
+        record["error"] = str(exc)[:90]
+        data = json.dumps(record).encode()
+        _mem_put(key, data)
+        return data, "live"
+
+    # One overflight makes several products. Collapsed to one pass per day per
+    # track, because that is what "the satellite came over" means.
+    passes = {}
+    for prod in raw:
+        a = {x["Name"]: x.get("Value") for x in prod.get("Attributes", [])}
+        when = (a.get("beginningDateTime") or "")[:10]
+        track = a.get("relativeOrbitNumber")
+        if not when or track is None:
+            continue
+        row = passes.setdefault((when, track), {
+            "date": when,
+            "track": track,
+            "going": (a.get("orbitDirection") or "").lower(),
+            "satellite": "Sentinel-1" + str(a.get("platformSerialIdentifier", "")),
+            "measurable": False,
+        })
+        # SLC is the one that keeps the phase, so it is the one that can be
+        # turned into a measurement of movement rather than a picture.
+        if str(a.get("productType", "")).find("SLC") >= 0:
+            row["measurable"] = True
+
+    rows = sorted(passes.values(), key=lambda r: r["date"], reverse=True)
+    record["passes"] = rows
+    record["tracks"] = len({r["track"] for r in rows})
+
+    # The repeat is measured rather than asserted. The constellation's nominal
+    # figure is six days, but what matters here is the gap this place actually
+    # gets, which depends on how many tracks happen to cover it.
+    days = sorted({r["date"] for r in rows}, reverse=True)
+    if len(days) > 1:
+        first = datetime.date.fromisoformat(days[0])
+        last = datetime.date.fromisoformat(days[-1])
+        record["every_days"] = round((first - last).days / (len(days) - 1), 1)
+    record["latest"] = days[0] if days else ""
+
+    data = json.dumps(record).encode()
+    _mem_put(key, data)
+    return data, "live"
+
 
 SATCAT_ACTIVE = "https://celestrak.org/satcat/records.php?GROUP=active&FORMAT=csv"
 SAT_OWNER_TTL = 86400
@@ -7842,6 +7932,13 @@ class Handler(SimpleHTTPRequestHandler):
                     return self._send(400, b'{"error":"country required"}')
                 data = json.dumps(head_of_state(who)).encode()
                 source = "memory"
+            elif name == "sar-passes":
+                try:
+                    lat = float(query.get("lat", ["0"])[0])
+                    lon = float(query.get("lon", ["0"])[0])
+                except ValueError:
+                    return self._send(400, b'{"error":"lat and lon required"}')
+                data, source = sar_passes(lat, lon)
             elif name == "satellite-owners":
                 data, source = satellite_owners()
             elif name == "radio-stats":

@@ -588,6 +588,10 @@ const LAYER_HINTS = {
   runways: () => 'tip: the green line off each runway end is 10 NM of arithmetic '
      + 'from the published heading — where a straight-in would be, not a '
      + 'procedure.',
+  // A radar picture explains itself to nobody. The key is on screen bottom
+  // right; this says the part the key cannot, which is what to do next.
+  sar: () => 'tip: the key bottom right says what the colours mean. Click any '
+     + 'ground for when the radar last flew over that spot and when it is back.',
 };
 
 function hintFor(id) {
@@ -808,6 +812,8 @@ function applyVisibility() {
   capitalShips.show = on('capital');
   capitalRings.show = on('capital');
   if (cablePrimitive) cablePrimitive.show = on('cables');
+  // The radar layer carries a colour key, so switching it takes the key with it.
+  renderLegend();
 }
 
 /*
@@ -5507,14 +5513,19 @@ viewer.screenSpaceEventHandler.setInputAction((click) => {
     // because it is the more specific question and the layer note says so -
     // silently picking one and leaving the other to look broken is the failure
     // to avoid here.
-    if (layerOn('naming') || layerOn('forecast')) {
+    if (layerOn('naming') || layerOn('forecast') || layerOn('sar')) {
       const ground = surfacePoint(click.position);
       if (ground) {
         const c = Cesium.Cartographic.fromCartesian(ground);
         const lat = Cesium.Math.toDegrees(c.latitude);
         const lon = Cesium.Math.toDegrees(c.longitude);
+        // Naming and forecast are asked for by switching a layer on, and both
+        // predate this. Radar takes the click only when neither of them wants
+        // it, so turning the radar on does not quietly take over a click that
+        // already meant something else.
         if (layerOn('naming')) showNaming(lat, lon);
-        else showForecast(lat, lon);
+        else if (layerOn('forecast')) showForecast(lat, lon);
+        else showSarPasses(lat, lon);
       }
     }
     return;
@@ -7108,6 +7119,8 @@ async function showOpera(spec, on) {
     }
     addOperaLayer(spec, day);
     operaTileAt.set(spec.id, tile.key);
+    // The key says which day is on screen, and the day is only known now.
+    if (spec.id === 'sar') renderLegend();
     const age = Math.round((Date.now() - Date.parse(`${day}T00:00:00Z`)) / 86400000);
     log(`${operaName(spec)}: NASA OPERA, ${day} \u00b7 ${age} day`
       + `${age === 1 ? '' : 's'} old \u00b7 30 m, radar sees through cloud and night`);
@@ -7893,9 +7906,64 @@ const IR_LEGEND = [
 const IR_FLOOR = 'NASA caps this at 300 m/pixel \u2014 one-for-one at about '
   + '340 km, enlarged below that';
 
+/*
+ * What the radar layer's colours mean, in the words somebody uses who has never
+ * met a radar image.
+ *
+ * Reported by the person who owns this app: switch Radar backscatter on, the
+ * globe turns purple and grey, and nothing on screen says what any of it is.
+ * The layer note explains it, but a note you have to hunt for is not an
+ * explanation of the picture you are looking at right now.
+ *
+ * These are the values the OPERA tiles actually render, measured off them:
+ * open water comes out rgb(64,0,64) and rgb(32,0,32), land as greyscale.
+ * The words are deliberately not the technical ones. Nobody needs to know what
+ * backscatter is to read the picture; they need to know that dark is smooth.
+ */
+const SAR_LEGEND = [
+  ['#200020', 'water, or anything very smooth'],
+  ['#8a8a8a', 'ordinary ground - fields, forest, bare land'],
+  ['#e8e8e8', 'towns, buildings, ships, bridges - anything with a hard edge'],
+];
+
+const SAR_WHY = 'Radar makes its own light and looks sideways, so smooth things '
+  + 'bounce it away and go dark, and hard edges throw it back and go bright. '
+  + 'It works at night and through cloud.';
+
+function sarLegendRows() {
+  const rows = SAR_LEGEND.map(([colour, what]) => [colour, what]);
+  const when = operaTileAt.get('sar') ? operaDayFound.get(
+    `sar:${operaTileAt.get('sar')}:${dayOffset}`) : '';
+  let floor = SAR_WHY;
+  if (when) {
+    const age = Math.round((Date.now() - Date.parse(`${when}T00:00:00Z`)) / 86400000);
+    const day = new Date(`${when}T00:00:00Z`).toLocaleDateString('en-GB',
+      { day: 'numeric', month: 'long' });
+    floor = `Taken ${day}, ${age} day${age === 1 ? '' : 's'} ago. ` + floor;
+  }
+  return { rows, floor };
+}
+
 function renderLegend() {
   const box = $('#legend');
   box.innerHTML = '';
+
+  // The radar overlay sits on top of whatever optic is underneath, so when it
+  // is lit it is what you are looking at, and it gets the key.
+  if (layerOn('sar')) {
+    const { rows, floor } = sarLegendRows();
+    for (const [colour, what] of rows) {
+      const row = document.createElement('span');
+      row.innerHTML = `<i style="background:${colour}"></i>${what}`;
+      box.append(row);
+    }
+    const note = document.createElement('span');
+    note.className = 'floor';
+    note.textContent = floor;
+    box.append(note);
+    box.hidden = false;
+    return;
+  }
 
   // Handing over to the sharper mosaic used to take the key away with it and
   // say nothing, which reads as the legend breaking. The box stays; it just
@@ -10630,6 +10698,74 @@ const namingMark = scene.primitives.add(new Cesium.PointPrimitiveCollection());
  * It is not only politics: the same lake is Ganyadaiyo in Cayuga and
  * Ontariosjon in Swedish, and a map with room for one label drops both.
  */
+/*
+ * When the radar last came over this spot, and when it is due back.
+ *
+ * Written for somebody who has never used radar imagery, because the person who
+ * owns this app is one and said so: the layer drew a purple and grey picture
+ * and nothing on screen told them what to do with it. The catalogue's own words
+ * are relative orbit numbers and product types; none of that is in this card.
+ *
+ * Two different repeats matter and both are here. A new picture arrives from
+ * whichever track happens to fly next, which over Sweden is every day or two.
+ * The *same* view angle only comes back every six days, and two pictures only
+ * compare with each other if they were taken from the same angle - so the card
+ * says both rather than the tidier one.
+ */
+async function showSarPasses(lat, lon) {
+  const where = `${lat.toFixed(3)}, ${lon.toFixed(3)}`;
+  showDetail(where, 'radar · asking…', [['Radar', 'asking the catalogue…']]);
+
+  let d;
+  try {
+    d = await getJSON(`/api/sar-passes?lat=${lat.toFixed(4)}&lon=${lon.toFixed(4)}`);
+  } catch (err) {
+    showDetail(where, 'radar', [['Could not ask', err.message]]);
+    log(`radar passes unavailable (${err.message})`, 'warn');
+    return;
+  }
+  if (d.error) {
+    showDetail(where, 'radar', [['The catalogue did not answer', d.error]]);
+    return;
+  }
+
+  const passes = d.passes || [];
+  if (!passes.length) {
+    showDetail(where, 'radar', [
+      ['No radar here', `nothing flew over this spot in the last ${d.window_days} days`],
+      ['Why', 'Sentinel-1 covers land, and open ocean much less often'],
+    ]);
+    return;
+  }
+
+  const pretty = (iso) => new Date(`${iso}T00:00:00Z`).toLocaleDateString('en-GB',
+    { day: 'numeric', month: 'long' });
+  const ageDays = (iso) =>
+    Math.round((Date.now() - Date.parse(`${iso}T00:00:00Z`)) / 86400000);
+
+  const newest = passes[0];
+  const age = ageDays(newest.date);
+  const rows = [
+    ['Newest picture', `${pretty(newest.date)} — ${age} day${age === 1 ? '' : 's'} ago`],
+  ];
+  if (d.every_days) {
+    rows.push(['A new one arrives', `about every ${d.every_days} days`]);
+  }
+  rows.push(['Same angle again', 'every 6 days — and two pictures only '
+    + 'compare if they were taken from the same angle']);
+  rows.push(['Angles covering this spot', String(d.tracks)]);
+  rows.push(['Can it measure movement here',
+    passes.some((p) => p.measurable)
+      ? 'yes — the detailed kind was recorded, which is what measures millimetres'
+      : 'no — only the picture kind was recorded here']);
+  rows.push(['Last few passes', passes.slice(0, 5)
+    .map((p) => `${pretty(p.date)} (${p.going})`).join(', ')]);
+  rows.push(['To go further', 'the pictures themselves are free at '
+    + 'browser.dataspace.copernicus.eu — HELP explains how to read one']);
+
+  showDetail(where, `radar · ${d.source}`, rows);
+}
+
 async function showNaming(lat, lon) {
   namingMark.removeAll();
   namingMark.add({

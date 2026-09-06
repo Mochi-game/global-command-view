@@ -839,6 +839,16 @@ body.presenting #stage { display: block; }
   pointer-events: none;
 }
 #legend[hidden] { display: none; }
+
+/* The radar key carries sentences rather than two-word labels, and without a
+   ceiling it grew to 418 px and sat under the detail card. */
+#legend { max-width: 232px; }
+#legend span { line-height: 1.35; }
+
+/* Out from under an open card rather than behind it.
+   #detail is 300 px wide against the right edge; measured, the two overlapped
+   by 292 px across whenever a card was open with the radar key lit. */
+body:has(#detail:not([hidden])) #legend { right: 324px; }
 #legend i {
   display: inline-block;
   width: 9px;

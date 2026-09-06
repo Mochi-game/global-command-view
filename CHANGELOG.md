@@ -6,6 +6,71 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.7.11 - the radar layer explains itself now
+
+Reported by the person who owns this app, about the layer fixed one version ago:
+*&ldquo;jag kan ju inte detta ... som det är nu förstår jag inget alls&rdquo;*.
+Switch **Radar backscatter** on and the globe turns purple and grey, and nothing
+on screen says what any of it is or what to do next.
+
+That was fair, and it was a fault of the app rather than of the reader. A radar
+picture explains itself to nobody. Everything written about it so far &mdash;
+the layer note, the HELP section added in 1.7.10 &mdash; was written for
+somebody who already knew what backscatter was.
+
+### A key on screen, in words
+
+The legend box bottom right already existed for the false-colour optics. The
+radar layer takes it when it is lit:
+
+| | |
+|---|---|
+| dark purple | water, or anything very smooth |
+| grey | ordinary ground - fields, forest, bare land |
+| white | towns, buildings, ships, bridges - anything with a hard edge |
+
+Under it, in a sentence: *radar makes its own light and looks sideways, so
+smooth things bounce it away and go dark, and hard edges throw it back and go
+bright. It works at night and through cloud.* And the date of the picture on
+screen, with its age, because the layer now knows both.
+
+No jargon in any of it. Nobody needs the word *backscatter* to read the picture;
+they need to know that dark means smooth.
+
+### Click any ground and ask when the radar was here
+
+The question the picture always raises is how old it is and when a new one
+arrives. That answer is in the Copernicus catalogue, which is open &mdash;
+searching needs no account, only downloading does &mdash; and there is a new
+`/api/sar-passes` for it.
+
+Click the ground with the layer lit and the card says, in plain terms: the
+newest picture and how many days ago, how often a new one arrives, how many
+directions cover the spot, and whether the kind of data that can measure
+movement was recorded there. Over the Oresund bridge: newest 3 September, a new
+one about every 1.4 days, five directions, and yes.
+
+**Two repeats, and both are said.** A new picture arrives from whichever track
+flies next, which over Sweden is every day or two. The *same* view angle only
+comes back every six days &mdash; and two pictures only compare with each other
+if they were taken from the same angle. Saying only the tidier figure would
+leave somebody subtracting two images that cannot be subtracted.
+
+The card takes the click only when nothing else wants it, so switching the radar
+on cannot quietly take a click that already meant *what is this place called*.
+
+### And a note on switching it on
+
+Turning the layer on now says what to do next: the key is bottom right, and
+clicking the ground answers when the radar was last here. The HELP section
+leads with three steps rather than with what band the instrument is.
+
+### The key and the card were sitting on top of each other
+
+Found while checking it. The legend had no width limit, and the radar rows are
+sentences rather than two-word labels, so it grew to 418 pixels and overlapped
+the detail card by 292 of them. Capped, and it steps aside while a card is open.
+
 ## 1.7.10 - the radar layer was asking for a day the satellite was somewhere else
 
 Asked how to use Sentinel-1 to see vehicles on a bridge. The answer is that you
