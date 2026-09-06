@@ -6260,6 +6260,7 @@ async function loadAir(force) {
     }
     if (data.error) {
       log(`air quality unavailable: ${data.error}`, 'warn');
+      setCount('air', null);
       return;
     }
     airMarks.removeAll();
@@ -6430,6 +6431,7 @@ async function loadJams(force) {
     if (data.error) {
       jamAt = '';
       log(`traffic jams unavailable: ${data.error} · will retry`, 'warn');
+      setCount('jams', null);
       return;
     }
 
@@ -6508,6 +6510,7 @@ async function loadLaunches() {
     const data = await getJSON('/api/launches');
     if (data.error) {
       log(`launches unavailable: ${data.error}`, 'warn');
+      setCount('launches', null);
       return;
     }
     launchPads.removeAll();
@@ -6591,6 +6594,7 @@ async function loadInfrastructure(force) {
       // layer sitting empty for as long as you hold still.
       infraAt = '';
       log(`infrastructure unavailable: ${data.error} · will retry`, 'warn');
+      setCount('infra', null);
       return;
     }
     infraMarks.removeAll();
@@ -10271,7 +10275,8 @@ async function loadOpenWaters(force) {
     return;
   }
   if (data.error) {
-    setCount('openships', 0);
+    // Not zero, which here would read as an empty ocean.
+    setCount('openships', null);
     log(`open waters: ${data.error}`, 'warn');
     return;
   }
@@ -10661,7 +10666,7 @@ async function loadRadar() {
     return;
   }
   if (data.error || !(data.frames || []).length) {
-    setCount('radar', 0);
+    setCount('radar', null);
     log(`radar: ${data.error || 'no frames offered'}`, 'warn');
     return;
   }
@@ -10901,7 +10906,7 @@ async function loadAeroway(force) {
     return;
   }
   if (data.error) {
-    setCount('aeroway', 0);
+    setCount('aeroway', null);
     log(`taxiways: ${data.error}`, 'warn');
     return;
   }
@@ -11015,7 +11020,7 @@ async function loadSwedenRoad() {
       return;
     }
     if (data.error) {
-      setCount('swroad', 0);
+      setCount('swroad', null);
       log(`sweden road: ${data.error}`, 'warn');
       applyVisibility();
       return;

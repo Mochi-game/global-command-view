@@ -56,6 +56,22 @@ orbit published yet — 546 of them launched this year. Every row counts what is
 actually up there now, and the catalogue's total is said once, underneath,
 because *no orbit published yet* is a different thing from *missing*.
 
+## Eight more layers that reported a nought for a source that was down
+
+1.7.6 gave the layer counter a third state — an em dash in amber, for *asked and
+no reply* — and said the same shape was available to every other layer that
+swallowed a failure. One layer used it. Forty-four did not.
+
+Eight of them already had the error in hand and were throwing it away. Four
+wrote a plain zero when the source had failed — **open network vessels**, **rain
+radar**, **taxiways & aprons**, **Swedish road disruption** — a nought standing
+for an empty ocean, an empty sky, an airport with no taxiways. Four more left
+the last good figure on screen as though it had just been observed: **air
+quality**, **jams & roadworks**, **rocket launches**, **data centres & dams**.
+
+All eight say so now. Nine layers of forty-five can report a source that did not
+answer, against one before.
+
 ## Forty labels printed on top of each other
 
 The detection overlay gave each contact a screen cell, which guarantees a cell

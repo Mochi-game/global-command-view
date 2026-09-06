@@ -65,6 +65,25 @@ under the list, because *no orbit published yet* is a different thing from
 *missing*. Checked against what is drawn, for United States, Sweden, France,
 China and Russia: **all five agree exactly**.
 
+### Eight more layers that were reporting a nought for a source that was down
+
+1.7.6 gave the layer counter a third state &mdash; an em dash in amber, for
+*asked and no reply* &mdash; and said the same shape was available to every
+other layer that swallowed a failure. One layer used it. **Forty-four did not.**
+
+Eight of them had an error branch already written and were throwing the answer
+away. Four wrote an explicit zero when the source had failed: **open network
+vessels**, **rain radar**, **taxiways & aprons** and **Swedish road
+disruption** &mdash; a nought for an empty ocean, an empty sky, an airport with
+no taxiways. Four more returned without touching the count at all, leaving the
+last good figure standing as though it had just been observed: **air quality**,
+**jams & roadworks**, **rocket launches** and **data centres & dams**.
+
+All eight report it now. Nine layers of forty-five can say *the source did not
+answer*, against one before. The rest still cannot, and each is a separate
+loader with its own idea of what failure looks like &mdash; that is the next
+piece of this, not a line in this one.
+
 ### Forty labels printed on top of each other
 
 The detection overlay kept one contact per screen cell, which guarantees each
