@@ -10920,11 +10920,26 @@ function watchThisSpot(lat, lon, stack) {
   }
   const neighbour = watchedSpots.find((s) => near(s, here) < 500);
 
+  /*
+   * The view you were using when you saved it, kept with it.
+   *
+   * The first version flew back to a fixed twelve kilometres, which is the
+   * wrong height for every structure: reported straight away as having to zoom
+   * down every time. A bridge is picked out from two or three kilometres, a
+   * subsiding district from twenty, and only the person who saved the spot
+   * knows which they meant - they were looking at it at the time. Marks have
+   * worked this way since 0.19; this is the same idea for the same reason.
+   */
+  const cam = viewer.camera.positionCartographic;
+
   watchedSpots.push({
     name,
     lat: Number(lat.toFixed(5)),
     lon: Number(lon.toFixed(5)),
     added: new Date().toISOString().slice(0, 10),
+    height: Math.round(cam.height),
+    heading: viewer.camera.heading,
+    pitch: viewer.camera.pitch,
     track: best.track,
     going: best.going,
     images: best.images,
@@ -11032,8 +11047,16 @@ function renderWatched() {
       + `(${spot.going}), ${spot.first} to ${spot.last}`
       + (spot.both_directions ? '' : ' · one direction only');
     li.onclick = () => {
+      // Back to the view it was saved from. Spots saved before this was kept
+      // get three kilometres, which frames a bridge rather than a county.
+      const height = Number.isFinite(spot.height) && spot.height >= 50
+        ? spot.height : 3000;
       viewer.camera.flyTo({
-        destination: Cesium.Cartesian3.fromDegrees(spot.lon, spot.lat, 12000),
+        destination: Cesium.Cartesian3.fromDegrees(spot.lon, spot.lat, height),
+        orientation: {
+          heading: Number.isFinite(spot.heading) ? spot.heading : 0,
+          pitch: Number.isFinite(spot.pitch) ? spot.pitch : Cesium.Math.toRadians(-90),
+        },
         duration: 1.2,
       });
       showWatchedPlan(spot);
