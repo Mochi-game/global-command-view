@@ -3632,7 +3632,14 @@ def _egms_rows(path, lat, lon, east, north, want, radius_m):
             raise ValueError("no .csv inside the download")
         with zf.open(names[0]) as raw:
             text = io.TextIOWrapper(raw, encoding="utf-8", errors="replace")
-            reader = csv.reader(text, delimiter=";")
+            # Sniffed rather than assumed. The toolkit that documents these
+            # files says semicolon, and the 2020-2024 ORTHO release ships
+            # commas - so believing either one is how this breaks on the next
+            # release. Whichever splits the header into more columns is it.
+            first = text.readline()
+            delim = max(",;\t", key=first.count)
+            text.seek(0)
+            reader = csv.reader(text, delimiter=delim)
             header = next(reader)
             index = {name.strip().lower(): i for i, name in enumerate(header)}
             dates = [(i, n.strip()) for i, n in enumerate(header)
