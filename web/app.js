@@ -489,7 +489,7 @@ const LAYERS = [
   { id: 'cameras', name: 'Public cameras', color: '#7dffab', on: false, count: 0, note: 'Digitraffic, TfL, Trafikverket and Windy merged — a still from the camera, not a live stream' },
   { id: 'naming', name: 'What it is called', color: '#c4b5fd', on: false, count: 0, noCount: true, note: 'Click any spot and see what every mapmaker calls it \u2014 OpenStreetMap, Wikidata, and MapQuest if you have a key. Takes the click ahead of the weather layer when both are on' },
   { id: 'names', name: 'Names & borders', color: '#cbd5e1', on: false, count: 0, note: 'Natural Earth lines, and Esri place labels drawn for laying over imagery \u2014 towns, provinces, seas' },
-  { id: 'sar', name: 'Radar backscatter', color: '#8fbcd4', on: false, count: 0, note: 'NASA OPERA Sentinel-1 \u2014 sees through cloud and darkness. Open water reads dark purple, land grey, cities bright, and the hard-edged band is one satellite pass rather than a finding', noCount: true },
+  { id: 'sar', name: 'Radar backscatter', color: '#8fbcd4', on: false, count: 0, note: 'NASA OPERA Sentinel-1 \u2014 sees through cloud and darkness. Dark is smooth (water, asphalt), bright is anything with a corner in it (cities, hulls, bridges). 30 m, so no vehicles, ever \u2014 and a moving one is drawn about 2 km from where it is. Finds a day with a pass and prints the date; HELP explains how to read it', noCount: true },
   { id: 'disturb', name: 'Ground disturbance', color: '#e879a0', on: false, count: 0, note: 'NASA OPERA DIST-ALERT \u2014 vegetation lost since a baseline', noCount: true },
   { id: 'water', name: 'Surface water / flood', color: '#38bdf8', on: false, count: 0, note: 'NASA OPERA DSWx \u2014 radar, so cloud does not hide the flood', noCount: true },
   { id: 'satellites', name: 'Satellites', color: '#ffffff', on: false, count: 0, note: 'CelesTrak orbital elements, propagated here — 16 000 objects, and most of them are debris' },
@@ -6970,43 +6970,171 @@ const CDSE_HINT_M = 400_000;
 const OPERA_HINT_M = 1_200_000;
 
 const operaLayers = new Map();   // id -> Cesium.ImageryLayer
+const operaPending = new Set();  // ids with a day-search in flight
+const operaDayFound = new Map(); // `${id}:${tile}:${dayOffset}` -> day, or ''
+const operaTileAt = new Map();   // id -> the probe tile its layer was built for
 
 /** The date to ask an OPERA product for: the day slider, plus its own lag. */
-function operaDay(spec) {
-  const ms = Date.now() - (36 + (dayOffset + spec.lag) * 24) * 3600 * 1000;
+function operaDay(spec, extraDays = 0) {
+  const ms = Date.now()
+    - (36 + (dayOffset + spec.lag + extraDays) * 24) * 3600 * 1000;
   return new Date(ms).toISOString().slice(0, 10);
 }
 
-function showOpera(spec, on) {
-  let layer = operaLayers.get(spec.id);
-  if (on && !layer) {
-    const day = operaDay(spec);
-    layer = viewer.imageryLayers.addImageryProvider(
-      new Cesium.UrlTemplateImageryProvider({
-        url: `${OPERA_BASE}${spec.product}/default/${day}/`
-          + 'GoogleMapsCompatible_Level12/{z}/{y}/{x}.png',
-        maximumLevel: 12,
-        credit: new Cesium.Credit('NASA OPERA / GIBS \u2014 public domain'),
-      })
-    );
-    layer.alpha = spec.alpha;
-    // These are 30 m products. Seen from orbit height the swaths draw as broad
-    // diagonal bands across a continent - you are reading where the satellite
-    // flew, not what it measured, and it looks like damage to the map rather
-    // than information on it. Below this level the layer stays off and says so.
-    layer.minimumTerrainLevel = OPERA_MIN_LEVEL;
-    operaLayers.set(spec.id, layer);
-    const layerName = LAYERS.find((l) => l.id === spec.id);
-    log(`${layerName ? layerName.name.toLowerCase() : spec.id}: NASA OPERA, ${day} `
-      + `\u00b7 30 m, radar sees through cloud and night`);
-    // Turned on from too far out it draws nothing, and silence reads as broken.
-    if (scene.camera.positionCartographic.height > OPERA_HINT_M) {
-      log(`${layerName ? layerName.name.toLowerCase() : spec.id}: too far out to `
-        + `draw · zoom in to about a country and it appears`, 'warn');
+/*
+ * Which tile of the product covers what you are looking at.
+ *
+ * Probed at level 8 - about 150 km across at these latitudes - because the
+ * question is whether the satellite flew over this region, not this street.
+ */
+const OPERA_PROBE_LEVEL = 8;
+
+function operaProbeTile() {
+  const c = scene.camera.positionCartographic;
+  const lat = Math.max(-85, Math.min(85, Cesium.Math.toDegrees(c.latitude)));
+  const lon = Cesium.Math.toDegrees(c.longitude);
+  const n = 2 ** OPERA_PROBE_LEVEL;
+  const r = Cesium.Math.toRadians(lat);
+  const x = Math.floor(((lon + 180) / 360) * n);
+  const y = Math.floor(((1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2) * n);
+  return { x, y, key: `${x},${y}` };
+}
+
+/*
+ * Find a day the satellite actually flew over here.
+ *
+ * These products hold one day's acquisitions, not a mosaic of the world. Asking
+ * for a fixed two days ago was right about the processing lag and wrong about
+ * everything else: Sentinel-1 revisits a given place every six days, so on most
+ * days there is no pass over where you are looking and every tile answers 404.
+ *
+ * Measured over the Oresund bridge across fifteen days - seven had data, eight
+ * had none, and the day the layer asked for by default was one of the eight.
+ * Switching it on drew nothing, which reads as a broken layer rather than as a
+ * satellite that was somewhere else. That is the same fault this app keeps
+ * finding in other people's feeds, in its own.
+ *
+ * So it walks back a day at a time until a tile answers, and says which day it
+ * landed on and how old that is. Twelve days is two revisit cycles; past that
+ * the honest answer is that there is no recent pass here.
+ */
+const OPERA_MAX_BACK = 12;
+
+async function findOperaDay(spec, tile) {
+  const cacheKey = `${spec.id}:${tile.key}:${dayOffset}`;
+  if (operaDayFound.has(cacheKey)) return operaDayFound.get(cacheKey);
+  for (let back = 0; back <= OPERA_MAX_BACK; back++) {
+    const day = operaDay(spec, back);
+    const url = `${OPERA_BASE}${spec.product}/default/${day}/`
+      + `GoogleMapsCompatible_Level12/${OPERA_PROBE_LEVEL}/${tile.y}/${tile.x}.png`;
+    let res;
+    try {
+      res = await fetch(url);
+    } catch (_) {
+      // A host that is down is not the same as a satellite that was elsewhere,
+      // and asking it a fortnight of questions helps nobody. Left uncached, so
+      // the next attempt is a fresh one.
+      return '';
+    }
+    if (res.ok) {
+      operaDayFound.set(cacheKey, day);
+      return day;
     }
   }
-  if (layer) layer.show = on;
+  operaDayFound.set(cacheKey, '');
+  return '';
 }
+
+function operaName(spec) {
+  const layer = LAYERS.find((l) => l.id === spec.id);
+  return layer ? layer.name.toLowerCase() : spec.id;
+}
+
+function addOperaLayer(spec, day) {
+  const layer = viewer.imageryLayers.addImageryProvider(
+    new Cesium.UrlTemplateImageryProvider({
+      url: `${OPERA_BASE}${spec.product}/default/${day}/`
+        + 'GoogleMapsCompatible_Level12/{z}/{y}/{x}.png',
+      maximumLevel: 12,
+      credit: new Cesium.Credit('NASA OPERA / GIBS \u2014 public domain'),
+    })
+  );
+  layer.alpha = spec.alpha;
+  // These are 30 m products. Seen from orbit height the swaths draw as broad
+  // diagonal bands across a continent - you are reading where the satellite
+  // flew, not what it measured, and it looks like damage to the map rather
+  // than information on it. Below this level the layer stays off and says so.
+  layer.minimumTerrainLevel = OPERA_MIN_LEVEL;
+  operaLayers.set(spec.id, layer);
+  return layer;
+}
+
+function dropOperaLayer(id) {
+  const layer = operaLayers.get(id);
+  if (layer) viewer.imageryLayers.remove(layer, true);
+  operaLayers.delete(id);
+  operaTileAt.delete(id);
+}
+
+async function showOpera(spec, on) {
+  const existing = operaLayers.get(spec.id);
+  if (!on) {
+    if (existing) existing.show = false;
+    return;
+  }
+  const tile = operaProbeTile();
+  // Already drawn, and drawn for the region you are looking at.
+  if (existing && operaTileAt.get(spec.id) === tile.key) {
+    existing.show = true;
+    return;
+  }
+  if (operaPending.has(spec.id)) return;
+  operaPending.add(spec.id);
+  try {
+    const day = await findOperaDay(spec, tile);
+    // The layer can have been switched off while the search was running.
+    const wanted = LAYERS.find((l) => l.id === spec.id);
+    if (!wanted || !wanted.on) return;
+    dropOperaLayer(spec.id);
+    if (!day) {
+      // Two different reasons land here - no pass in the window, or a place
+      // the product never covers at all, since RTC is land only and stops at
+      // 60 degrees south. Saying which would need a land test this does not
+      // have, so it says what is true of both rather than guessing one.
+      log(`${operaName(spec)}: nothing for here in the last ${OPERA_MAX_BACK} days `
+        + `\u00b7 land only, and only where the satellite flew \u00b7 not an empty map`,
+        'warn');
+      return;
+    }
+    addOperaLayer(spec, day);
+    operaTileAt.set(spec.id, tile.key);
+    const age = Math.round((Date.now() - Date.parse(`${day}T00:00:00Z`)) / 86400000);
+    log(`${operaName(spec)}: NASA OPERA, ${day} \u00b7 ${age} day`
+      + `${age === 1 ? '' : 's'} old \u00b7 30 m, radar sees through cloud and night`);
+    // Turned on from too far out it draws nothing, and silence reads as broken.
+    if (scene.camera.positionCartographic.height > OPERA_HINT_M) {
+      log(`${operaName(spec)}: too far out to draw \u00b7 zoom in to about a `
+        + 'country and it appears', 'warn');
+    }
+  } finally {
+    operaPending.delete(spec.id);
+  }
+}
+
+/*
+ * Pan far enough and the day that had a pass over the last place has none over
+ * this one. Re-asked only when the centre of the view crosses into a different
+ * probe tile, so holding still or nudging the camera costs nothing.
+ */
+viewer.camera.moveEnd.addEventListener(() => {
+  const tile = operaProbeTile();
+  for (const spec of OPERA) {
+    const wanted = LAYERS.find((l) => l.id === spec.id);
+    if (!wanted || !wanted.on) continue;
+    if (operaTileAt.get(spec.id) === tile.key) continue;
+    showOpera(spec, true);
+  }
+});
 
 /** Rebuild any lit OPERA layer for a new date. Called when the day slider moves. */
 function refreshOpera() {

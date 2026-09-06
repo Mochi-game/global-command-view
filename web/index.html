@@ -481,6 +481,70 @@
         separate layers exactly for that.
       </p>
 
+      <h3>Radar: reading Sentinel-1</h3>
+      <p>
+        <b>Radar backscatter</b> under Ground change is Sentinel-1, ESA&rsquo;s
+        C-band radar, served as NASA&rsquo;s OPERA terrain-corrected product at
+        about 30&nbsp;m. It is the layer worth understanding properly, because it
+        is the only one that works at night and through cloud &mdash; and the
+        only one people routinely expect the wrong thing from.
+      </p>
+
+      <p><b>What the brightness means.</b> This is not a photograph. The
+        satellite sends its own pulse sideways and draws what comes back.</p>
+      <ul>
+        <li><b>Dark</b> &mdash; smooth surfaces, which mirror the pulse away from
+          the satellite instead of back to it. Calm water is nearly black. So is
+          new asphalt, and so is dry sand.</li>
+        <li><b>Mid grey</b> &mdash; rough ground, fields, forest canopy.</li>
+        <li><b>Bright</b> &mdash; anything with a corner in it. A wall meeting the
+          ground, a ship&rsquo;s hull, a bridge&rsquo;s railings and girders,
+          rows of buildings facing the satellite. Cities glare.</li>
+      </ul>
+      <p>Two useful consequences: a <b>flood</b> shows as new black where land
+        used to be grey, at night, through the storm that caused it &mdash; and a
+        <b>ship</b> on open water is a bright point on a black background, which
+        is why radar is how vessels with the transponder switched off get found.
+      </p>
+
+      <p><b>Which day you are looking at.</b> Sentinel-1 passes over a given
+        place about every six days, so most days there is no pass over where you
+        are. The layer searches back for a day that has one, draws that, and
+        prints the date and its age in the feed. If it finds nothing in twelve
+        days it says so rather than leaving a blank that reads as broken. The
+        product is land only, and stops at 60&deg; south.</p>
+
+      <p><b>What it cannot show you, whatever you do.</b> This comes up every
+        time, so here is the arithmetic. One pixel is 30&nbsp;m across, so it
+        covers 900&nbsp;m&sup2;. A car is about 8&nbsp;m&sup2; &mdash; under one
+        per cent of a single pixel. Even Sentinel-1&rsquo;s native resolution,
+        before this product grids it, is 5&nbsp;&times;&nbsp;20&nbsp;m: a dozen
+        cars fit in one cell. There is no zoom and no processing that recovers
+        detail that was never sampled.</p>
+
+      <p>And there is a second reason, which is stranger and worth knowing.
+        <b>Radar puts moving things in the wrong place.</b> The image is built
+        from Doppler shift, so a target moving towards or away from the satellite
+        is drawn displaced along the satellite&rsquo;s flight path. For a car at
+        90&nbsp;km/h on a road lying across the beam, that displacement is
+        roughly <b>two kilometres</b>. It is why trains appear out in the fields
+        beside their tracks in radar imagery. Even if a vehicle were bright
+        enough to see, it would not be drawn on the bridge it was crossing.</p>
+
+      <p>Seeing individual vehicles needs 25&nbsp;cm commercial radar &mdash;
+        ICEYE, Capella, Umbra &mdash; or ordinary optical imagery at 30&ndash;50
+        cm. All of it is tasked and paid for. Nothing free reaches it.</p>
+
+      <p><b>Where to go further.</b> This layer is a look, not a workbench. For
+        real work start at <b>ASF Vertex</b> (search.asf.alaska.edu), which is
+        the best way to find Sentinel-1 scenes and whose <b>HyP3</b> service will
+        process terrain-corrected imagery and interferograms on request without
+        installing anything. The full archive is free at the <b>Copernicus Data
+        Space Ecosystem</b>. If what you care about is a bridge, the thing radar
+        does superbly is not counting traffic on it but measuring whether the
+        structure itself is moving &mdash; interferometry over many passes
+        resolves millimetres.</p>
+
       <h3>Sweden: three layers off one key</h3>
       <p>
         A <b>Sweden</b> group sits at the bottom of the layer list. Two of its

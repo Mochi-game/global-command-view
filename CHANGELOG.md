@@ -6,6 +6,75 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.7.10 - the radar layer was asking for a day the satellite was somewhere else
+
+Asked how to use Sentinel-1 to see vehicles on a bridge. The answer is that you
+cannot, and finding out why turned up the reason the layer so often drew
+nothing at all.
+
+### Most days there is no pass over where you are looking
+
+The OPERA products hold one day's acquisitions, not a mosaic of the world. The
+layer asked for a fixed two days ago, which was right about the processing lag
+and wrong about everything else: **Sentinel-1 revisits a given place about every
+six days**, so on most days there is no swath over the place on screen and every
+tile answers 404.
+
+Measured over the Oresund bridge across fifteen days &mdash; seven had data,
+eight had none, and the day the layer asked for by default was one of the eight.
+Switching **Radar backscatter** on drew nothing whatsoever. Not an error, not a
+note: an empty map, which reads as a broken layer rather than as a satellite
+that was elsewhere. The same fault this app keeps finding in other people's
+feeds, sitting in its own.
+
+It searches back a day at a time now until a tile answers, up to twelve days,
+and prints the date it landed on and how old that is. Checked across four
+places:
+
+| | day found | |
+|---|---|---|
+| Gibraltar | 2026-09-03 | the default day happened to work |
+| Oresund bridge | 2026-09-02 | one day further back |
+| Stockholm | 2026-08-30 | four days further back |
+| mid-Pacific | none | says so, and says why |
+
+The search is per region and cached, and it is re-asked only when the centre of
+the view crosses into a different probe tile, so panning about costs nothing and
+holding still costs nothing at all.
+
+Where it finds nothing, it says *land only, and only where the satellite flew*
+rather than naming one cause. Two different things land there &mdash; no pass
+inside the window, or a place the product never covers, since RTC is land only
+and stops at 60&deg; south &mdash; and the layer cannot tell which without a land
+test it does not have. A wrong reason is worse than a general one.
+
+### Reading Sentinel-1, written down
+
+A section in **HELP**, because the layer is the one people expect the wrong
+thing from. What the brightness means &mdash; dark is smooth, which is why calm
+water is nearly black and new asphalt with it; bright is anything with a corner
+in it, which is why cities glare and a ship on open water is a white point on
+black. What that is good for: a flood is new black where land used to be grey,
+at night, through the storm that caused it.
+
+And what it cannot do, with the arithmetic, because the question keeps coming.
+One pixel is 30 m across and covers 900 m&sup2;. A car is about 8 m&sup2;
+&mdash; under one per cent of a single pixel. Sentinel-1's native resolution
+before this product grids it is 5 &times; 20 m, which is a dozen cars in one
+cell. No zoom recovers detail that was never sampled.
+
+There is a second reason, and it is the stranger one. **A radar image puts
+moving things in the wrong place.** The picture is built from Doppler shift, so
+a target moving towards or away from the satellite is drawn displaced along the
+satellite's flight path &mdash; for a car at 90 km/h on a road lying across the
+beam, roughly **two kilometres**. It is why trains appear out in the fields
+beside their tracks. Even a vehicle bright enough to see would not be drawn on
+the bridge it was crossing.
+
+Seeing individual vehicles needs 25 cm commercial radar, or optical at 30&ndash;
+50 cm. All of it is tasked and paid for, and the section says so rather than
+leaving somebody hunting through settings for a resolution that does not exist.
+
 ## 1.7.9 - every layer can now say that its source went quiet
 
 1.7.6 gave the layer counter a third state &mdash; an em dash in amber, for
