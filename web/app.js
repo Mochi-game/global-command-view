@@ -10821,8 +10821,19 @@ async function showSarPasses(lat, lon) {
     rows.push(['Can it be watched for sinking',
       stack.error || 'nothing with the phase recorded here']);
   } else {
+    /*
+     * "Yes" here has misled its first reader, so it no longer stands alone.
+     *
+     * It answers whether enough pictures exist for somebody to measure this
+     * spot - not whether this app has measured it. Read as the latter it
+     * promises a number the app does not have, and the next question was
+     * exactly that: where do I see how much it sank. The row says which
+     * question it is answering now.
+     */
     const ok = best.verdict === 'yes' || best.verdict === 'thin';
-    rows.push(['Can it be watched for sinking', ok ? 'yes' : 'no']);
+    rows.push(['Enough pictures to measure it', ok
+      ? 'yes — but the measuring happens elsewhere, not in this app. See below'
+      : 'no']);
     rows.push(['Why', best.why]);
     // With the year, because this span is two years wide and "11 September to
     // 2 September" reads as nonsense without it.
