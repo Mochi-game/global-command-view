@@ -504,7 +504,11 @@ const LAYERS = [
   { id: 'airports', name: 'Airports & ATC', color: '#fcd34d', on: false, count: 0, note: 'OurAirports — LiveATC for the tower, and that is mostly North America' },
   { id: 'weather', name: 'Severe weather (US)', color: '#f472b6', on: false, count: 0, note: 'NWS — United States only, no open feed covers the rest' },
   { id: 'radar', name: 'Rain radar (2 h)', color: '#5eead4', on: false, count: 0, note: 'RainViewer — national radar networks stitched together, the last two hours running. The past, not a forecast, and empty where no radar looks' },
-  { id: 'forecast', name: 'Weather where you click', color: '#7dd3fc', on: false, count: 0, note: 'Open-Meteo — click any ground and get the forecast there. A model’s opinion, not a measurement; free for non-commercial use only' },
+  // Nothing to tally: you click a spot and read one forecast. It carried a
+  // count of 0 that nothing ever set, so switching it on put a nought on the
+  // row that read as "no weather found". Same shape as What it is called,
+  // which is marked the same way.
+  { id: 'forecast', name: 'Weather where you click', color: '#7dd3fc', on: false, count: 0, noCount: true, note: 'Open-Meteo — click any ground and get the forecast there. A model’s opinion, not a measurement; free for non-commercial use only' },
   { id: 'plants', name: 'Power stations', color: '#a3e635', on: false, count: 0, note: 'WRI — 35 000 stations, sized by capacity' },
   { id: 'launches', name: 'Rocket launches', color: '#fb923c', on: false, count: 0, note: 'Launch Library — scheduled, and a schedule slips' },
   { id: 'infra', name: 'Data centres & dams', color: '#c084fc', on: false, count: 0, note: 'OpenStreetMap — queried live for the view, ODbL' },
@@ -939,6 +943,8 @@ async function pollFlights() {
   } catch (err) {
     flightBackoff = Date.now() + 60_000;
     log(`air feed unavailable (${err.message}) — retrying in 60s`, 'warn');
+    setCount('flights', null);
+    setCount('services', null);
   }
 }
 
@@ -1239,6 +1245,7 @@ async function pollVessels() {
     }
   } catch (err) {
     log(`ais feed unavailable (${err.message})`, 'warn');
+    setCount('vessels', null);
   }
 }
 
@@ -1289,6 +1296,7 @@ async function loadCables() {
     log(`cables: ${geo.features.length} systems, ${instances.length} segments`);
   } catch (err) {
     log(`cable map unavailable (${err.message})`, 'warn');
+    setCount('cables', null);
   }
 
   try {
@@ -1327,6 +1335,7 @@ async function loadCameras() {
     log(`cameras: ${data.stations.length} public stations · ${networks}`);
   } catch (err) {
     log(`camera index unavailable (${err.message})`, 'warn');
+    setCount('cameras', null);
   }
   applyVisibility();
 }
@@ -1378,6 +1387,7 @@ async function loadSubmarineBases() {
     log(`bases: ${data.bases.length} submarine bases`);
   } catch (err) {
     log(`submarine bases unavailable (${err.message})`, 'warn');
+    setCount('bases', null);
   }
   applyVisibility();
 }
@@ -1470,6 +1480,7 @@ async function loadCarriers() {
 
   } catch (err) {
     log(`fleet estimate unavailable (${err.message})`, 'warn');
+    setCount('capital', null);
   }
   applyVisibility();
 }
@@ -1515,6 +1526,7 @@ async function loadQuakes() {
     log(`seismic: ${geo.features.length} quakes M2.5+ in the last week`);
   } catch (err) {
     log(`seismic feed unavailable (${err.message})`, 'warn');
+    setCount('quakes', null);
   }
   applyVisibility();
 }
@@ -1598,6 +1610,7 @@ async function loadFires() {
       : `thermal: ${data.returned} detections in view \u00b7 FIRMS VIIRS 24 h`);
   } catch (err) {
     log(`thermal feed unavailable (${err.message})`, 'warn');
+    setCount('fires', null);
   }
   applyVisibility();
 }
@@ -2569,6 +2582,7 @@ async function loadTrains() {
     log(`trains: ${data.trains.length} Amtrak services running`);
   } catch (err) {
     log(`trains unavailable (${err.message})`, 'warn');
+    setCount('trains', null);
   }
   applyVisibility();
 }
@@ -2621,6 +2635,7 @@ async function loadMesh() {
       : `mesh: ${data.nodes.length} nodes in view \u00b7 Meshtastic`);
   } catch (err) {
     log(`mesh nodes unavailable (${err.message})`, 'warn');
+    setCount('mesh', null);
   }
   applyVisibility();
 }
@@ -2665,6 +2680,7 @@ async function loadNewsHeat() {
     log(`news: coverage from ${data.places.length} countries \u00b7 GDELT`);
   } catch (err) {
     log(`news attention unavailable (${err.message})`, 'warn');
+    setCount('news', null);
   }
   applyVisibility();
 }
@@ -2706,6 +2722,7 @@ async function loadNetOutages() {
     log(`internet: ${placed} regions with outage alerts \u00b7 IODA`);
   } catch (err) {
     log(`internet outages unavailable (${err.message})`, 'warn');
+    setCount('netout', null);
   }
   applyVisibility();
 }
@@ -2828,6 +2845,7 @@ async function loadWeatherAlerts() {
     log(`weather: ${data.alerts.length} severe or extreme alerts \u00b7 NWS, US only`);
   } catch (err) {
     log(`weather alerts unavailable (${err.message})`, 'warn');
+    setCount('weather', null);
   }
   applyVisibility();
 }
@@ -2881,6 +2899,7 @@ async function loadPlants() {
       : `power: ${data.plants.length} stations in view \u00b7 WRI`);
   } catch (err) {
     log(`power stations unavailable (${err.message})`, 'warn');
+    setCount('plants', null);
   }
   applyVisibility();
 }
@@ -3212,6 +3231,7 @@ async function loadBroadcast(force) {
       + `of this view \u00b7 move the camera to load elsewhere \u00b7 Radio Browser`);
   } catch (err) {
     log(`station list unavailable (${err.message})`, 'warn');
+    setCount('broadcast', null);
   }
   applyVisibility();
 }
@@ -3372,6 +3392,7 @@ async function loadAirports() {
     log(`airports: ${data.airports.length} in view${cut > 0 ? `, ${cut} not drawn` : ''} \u00b7 OurAirports`);
   } catch (err) {
     log(`airport list unavailable (${err.message})`, 'warn');
+    setCount('airports', null);
   }
   applyVisibility();
 }
@@ -3438,6 +3459,7 @@ async function loadAprs() {
       + `${data.connected ? 'connected' : 'reconnecting'} \u00b7 APRS-IS read-only`);
   } catch (err) {
     log(`aprs unavailable (${err.message})`, 'warn');
+    setCount('aprs', null);
   }
   applyVisibility();
 }
@@ -3478,6 +3500,7 @@ async function loadScanners() {
   } catch (err) {
     log('scanners: OpenMHZ will not serve this page directly '
       + `(${err.message}). Nothing to draw.`, 'warn');
+    setCount('scanners', null);
     scannersLoaded = true;
     return;
   }
@@ -3567,6 +3590,7 @@ async function loadRadios() {
     log(`radio: ${data.receivers.length} shortwave receivers, ${free} with a free slot \u00b7 KiwiSDR`);
   } catch (err) {
     log(`radio list unavailable (${err.message})`, 'warn');
+    setCount('radio', null);
   }
   applyVisibility();
 }
@@ -3615,6 +3639,7 @@ async function loadVolcanoes() {
     log(`volcanoes: ${data.volcanoes.length} continuing eruptions \u00b7 Smithsonian GVP`);
   } catch (err) {
     log(`volcano feed unavailable (${err.message})`, 'warn');
+    setCount('volcanoes', null);
   }
   applyVisibility();
 }
@@ -3686,6 +3711,7 @@ async function loadOwnEntries() {
     setCount('own', data.events.length);
   } catch (err) {
     log(`own entries unavailable (${err.message})`, 'warn');
+    setCount('own', null);
   }
   applyVisibility();
 }
@@ -3809,6 +3835,7 @@ async function loadOutbreaks() {
       + `${unplaced ? `, ${unplaced} naming no single location` : ''} \u00b7 WHO`);
   } catch (err) {
     log(`outbreak feed unavailable (${err.message})`, 'warn');
+    setCount('outbreaks', null);
   }
   applyVisibility();
 }
@@ -3925,6 +3952,7 @@ async function loadBorders() {
       + '\u00b7 Natural Earth, labels by Esri');
   } catch (err) {
     log(`borders unavailable (${err.message})`, 'warn');
+    setCount('names', null);
   }
   applyVisibility();
 }
@@ -4074,6 +4102,7 @@ async function loadSatellites() {
     // A load that failed left nothing behind, so the next switch may try again.
     satellitesLoaded = false;
     log(`orbital elements unavailable (${err.message})`, 'warn');
+    setCount('satellites', null);
   }
 }
 
@@ -9751,6 +9780,7 @@ async function loadRunways(force) {
       + `&north=${box.north.toFixed(3)}&east=${box.east.toFixed(3)}`);
   } catch (err) {
     log(`runways unavailable (${err.message})`, 'warn');
+    setCount('runways', null);
     return;
   }
 
@@ -9869,6 +9899,7 @@ async function loadMetar(force) {
       + `&north=${box.north.toFixed(3)}&east=${box.east.toFixed(3)}`);
   } catch (err) {
     log(`metar unavailable (${err.message})`, 'warn');
+    setCount('metar', null);
     return;
   }
 
@@ -10188,6 +10219,7 @@ async function loadNavaids(force) {
       + `&north=${box.north.toFixed(3)}&east=${box.east.toFixed(3)}`);
   } catch (err) {
     log(`navaids unavailable (${err.message})`, 'warn');
+    setCount('navaids', null);
     return;
   }
 
@@ -11062,7 +11094,7 @@ async function loadSwedenRail() {
       return;
     }
     if (data.error) {
-      setCount('swrail', 0);
+      setCount('swrail', null);
       log(`sweden rail: ${data.error}`, 'warn');
       applyVisibility();
       return;
@@ -11088,6 +11120,7 @@ async function loadSwedenRail() {
         : ''));
   } catch (err) {
     log(`sweden rail feed unavailable (${err.message})`, 'warn');
+    setCount('swrail', null);
   }
   applyVisibility();
 }
@@ -11107,7 +11140,7 @@ async function loadSmhi() {
       smhiPrimitive = null;
     }
     if (data.error) {
-      setCount('smhi', 0);
+      setCount('smhi', null);
       log(`smhi: ${data.error}`, 'warn');
       applyVisibility();
       return;
@@ -11150,6 +11183,7 @@ async function loadSmhi() {
     log(`smhi: ${data.warnings.length} warning areas in force · SMHI, CC BY 4.0`);
   } catch (err) {
     log(`smhi feed unavailable (${err.message})`, 'warn');
+    setCount('smhi', null);
   }
   applyVisibility();
 }

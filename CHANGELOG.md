@@ -6,6 +6,57 @@ active. Bump `VERSION` in `server.py` when something here changes.
 
 All of this was built on 2026-08-19, so the entries are in order rather than by date.
 
+## 1.7.9 - every layer can now say that its source went quiet
+
+1.7.6 gave the layer counter a third state &mdash; an em dash in amber, for
+*asked and no reply* &mdash; and said the same shape was available to every
+other layer that swallowed a failure. 1.7.8 wired eight more. This is the rest
+of them.
+
+### Thirty loaders that logged a failure and dropped it
+
+Every feed in this app ends the same way: a `catch` that writes the reason to
+the feed log and returns. The log is right, and the log scrolls. What stayed on
+screen was the row, holding whatever number it last managed to fetch, or a
+nought, or nothing at all &mdash; and a figure beside a layer is read as a count
+of what is out there.
+
+Thirty of them now report it: air traffic and police and state air, both vessel
+feeds, submarine cables, public cameras, names and borders, satellites, seismic,
+thermal, disease outbreaks, volcanoes, FM stations, shortwave receivers, police
+and fire radio, APRS, airports, severe weather, power stations, internet
+outages, mesh radio, news attention, both train layers, own entries, capital
+ships, navaids, METAR, runways, SMHI warnings and submarine bases.
+
+**39 of the 39 layers that carry a count can say their source went quiet**,
+against nine before this version and one before 1.7.8. Checked by driving each
+row through both states in the running app: all thirty-nine draw a figure when
+the feed answers and U+2014 in amber when it does not, with the tooltip saying
+*the source did not answer, so this is not a count of zero*.
+
+Two layers were also writing a plain nought when their source had failed rather
+than when it had answered with nothing &mdash; **Trains (Sweden)** and **SMHI
+warnings**. They report it now. The nought they write when a key is missing is
+left alone: that one is true, because nothing was asked.
+
+### A layer that counted to zero forever
+
+**Weather where you click** carried a count of 0 that nothing ever set. Switch
+it on and the row read 0, which in this app means the feed answered and there
+was nothing there. There is no feed and nothing to tally &mdash; you click a
+spot and read one forecast.
+
+It is marked as having no count now, the same as **What it is called**, which is
+the same shape and was already marked that way. The row shows a dot.
+
+### What is deliberately still a nought
+
+The three aviation layers answer `too_wide` when the view is bigger than the
+server will draw &mdash; runways, METAR and navaids. That is not a source going
+quiet and it is not an empty sky; it is the app declining to ask. Calling it *no
+reply* would put a wrong reason on a row for the sake of a tidy sweep, so it
+keeps its own log line and is left for a state of its own.
+
 ## 1.7.8 - thirteen satellites nobody could pick, and a panel six screens tall
 
 Asked how we would know whether satellites were missing from the globe. The
