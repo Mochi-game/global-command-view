@@ -11008,6 +11008,45 @@ const HYP3_PRODUCT_MB = [50, 250];
  * app picked. The size is reported once it is down, because a range guessed
  * beforehand would be one more number nobody could check.
  */
+/*
+ * EGMS hands you both components at once, so accept both and choose.
+ *
+ * Their archive returns the vertical and the east-west file for a tile as two
+ * links together, and copying the pair is the natural thing to do. The box took
+ * the text raw, newline and all, and the request failed with "URL can't contain
+ * control characters" - which is true, unhelpful, and entirely this app's
+ * fault: it asked for one thing while the source gives two.
+ *
+ * Sinking is the vertical question, so the _U_ file wins when both are there,
+ * and the card says which one it took rather than choosing in silence.
+ */
+function pickEgmsUrl(text) {
+  const urls = String(text || '').split(/\s+/).filter((s) => /^https?:\/\//i.test(s));
+  if (!urls.length) {
+    const dirty = String(text || '').trim();
+    return { url: '', why: dirty ? 'that does not look like a link' : 'nothing pasted yet' };
+  }
+  const up = urls.find((u) => /_U_|_100km_U/i.test(u));
+  const east = urls.find((u) => /_E_|_100km_E/i.test(u));
+  if (up) {
+    return {
+      url: up,
+      note: urls.length > 1
+        ? `${urls.length} links pasted — taking the vertical one, which is the `
+          + 'sinking question'
+        : '',
+    };
+  }
+  if (east && urls.length === 1) {
+    return {
+      url: east,
+      note: 'that is the east-west file. It will be read, but it measures '
+        + 'sideways movement, not sinking — the _U_ file is the one for that',
+    };
+  }
+  return { url: urls[0], note: urls.length > 1 ? 'taking the first link' : '' };
+}
+
 function pasteRow(spot) {
   const wrap = document.createElement('div');
   wrap.className = 'egms-paste';
@@ -11030,8 +11069,13 @@ function pasteRow(spot) {
     : 'choose a folder above first — the tile is a large file';
 
   go.onclick = async () => {
-    const link = url.value.trim();
-    if (!link) { said.textContent = 'nothing pasted yet'; return; }
+    const picked = pickEgmsUrl(url.value);
+    const link = picked.url;
+    if (!link) {
+      said.textContent = picked.why || 'nothing pasted yet';
+      return;
+    }
+    if (picked.note) said.textContent = picked.note;
     if (!spot.folder) { said.textContent = 'choose a folder above first'; return; }
     go.disabled = true;
     said.textContent = 'fetching the tile — this is the big download, give it a while…';
