@@ -11163,18 +11163,35 @@ function showWatchedPlan(spot) {
     ['Search for', `${spot.lat.toFixed(4)} ${spot.lon.toFixed(4)} — their box wants `
       + 'a space, not a comma. Then click a measurement point for its millimetres'],
     /*
-     * Which of the two files, as well as which tile.
+     * The tile to recognise, not a filename to type.
      *
-     * EGMS splits the motion into components and ships them separately: a "U"
-     * file for up and down, an "E" file for east and west. Sinking is the
-     * vertical question, so the U file is the one - and somebody who downloads
-     * a 100 km tile of the wrong component finds that out slowly.
+     * This row used to print EGMS_L3_<tile>_100km_U_….zip, with the release
+     * period left as an ellipsis - and was told, fairly, that a string with a
+     * hole in it is not something anybody can act on. It cannot be filled in
+     * either: the release suffix is _2019_2023_1, or _2018_2022_1, or empty
+     * for the oldest, and a new one lands every year. Hardcoding this year's
+     * would be a fact that quietly goes stale, which is the thing this app
+     * keeps finding in other people's software.
+     *
+     * You never type it anyway. EGMS hands you the link; the tile name is how
+     * you pick the right row out of their list.
      */
-    ['The tile this spot is in', spot.tile
-      ? `${spot.tile} — ask for the vertical one, named EGMS_L3_${spot.tile}`
-        + '_100km_U_… .zip. The U is up-and-down; the E file beside it is '
-        + 'east-and-west, which is not the sinking question'
-      : 'working it out…'],
+    ['The tile this spot is in', spot.tile || 'working it out…'],
+    /*
+     * Their own flow, read off their own panel, because guessing at it sent
+     * somebody hunting for a box to type a tile name into. There is no such
+     * box: you draw the area on the map and it finds the tiles for you.
+     */
+    ['What to do on their site', 'sign in first — the archive refuses a search '
+      + 'otherwise. Set Level to ORTHO (Level 3), which is the 100 km tiles, and '
+      + 'pick their newest Release. Then switch on geographic search and draw a '
+      + 'box on the map over this spot; double-click to close it and the tiles '
+      + 'come back as a list'],
+    ['Which result to take', spot.tile
+      ? `the one named ${spot.tile}, with _U_ in it — U is up-and-down, the `
+        + 'sinking question. The _E_ file beside it is east-and-west. You copy '
+        + 'their download link; there is nothing to type'
+      : ''],
     ['Or bring it in here', pasteRow(spot)],
     ['If nothing covers it', 'outside Europe, or if you want a period of your own, '
       + 'the rest of this card is the long way round'],
