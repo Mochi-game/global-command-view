@@ -11221,6 +11221,33 @@ function readingRows(spot) {
   } else if (diff && diff.why) {
     rows.push(['Compared with the ground around it', diff.why]);
   }
+
+  /*
+   * A thin reading is a wrong-product reading, and says so.
+   *
+   * Read at a bridge abutment: one point, 86 m away, nothing to compare
+   * against. That is not a fault and not an absence of movement - it is the
+   * 100 m grid meeting a narrow structure over water, where most cells hold no
+   * data and the one that does is the shore. The file cannot answer the
+   * question that was asked of it.
+   *
+   * Saying "not enough ground" and stopping leaves somebody thinking the
+   * measurement failed. What failed was the choice of product.
+   */
+  const thin = d.points.length < 3 || (d.points[0] && d.points[0].distance_m > 60);
+  if (thin) {
+    rows.push(['Why so little here', `this is the 100 m grid — ${d.points.length} `
+      + `cell${d.points.length === 1 ? '' : 's'} within ${d.radius_m} m and the `
+      + `nearest ${d.points[0] ? d.points[0].distance_m + ' m' : 'far'} off. A `
+      + 'bridge deck or a single building is narrower than one cell, and over '
+      + 'water most cells hold nothing at all']);
+    rows.push(['What to fetch instead', 'CALIBRATED (Level 2B) covers the same '
+      + 'place at 20×5 m with a point per reflector, so the girders and railings '
+      + 'get their own points instead of being averaged into the shore. Ask EGMS '
+      + 'for Level 2B over this spot, in both an ascending and a descending '
+      + 'pass — 2B is line-of-sight, and the two together separate up-down from '
+      + 'sideways']);
+  }
   rows.push(['Nearest point', `${near.distance_m} m from where you clicked`]);
   rows.push(['Points found', `${d.points.length} within ${d.radius_m} m`]);
   if (near.series && near.series.length) {
