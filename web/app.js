@@ -11173,6 +11173,57 @@ function pasteRow(spot) {
   return wrap;
 }
 
+/*
+ * One watched spot against another, which is the question about a bridge.
+ *
+ * Whether a pier is settling is nearly unanswerable on its own - everything
+ * here rises a millimetre or two a year - but whether one pier is settling
+ * faster than the pier at the other end is answerable, and it is the thing
+ * that cracks a deck. Two spots, two readings, one subtraction.
+ *
+ * Only spots read from the same file are compared. Two products, or two
+ * releases, carry their own reference models and their own processing, and
+ * subtracting across them would put that difference into the answer and call
+ * it settlement.
+ */
+function pairRows(spot) {
+  const mine = spot.reading;
+  if (!mine || !mine.points || !mine.points.length) return [];
+  const myVel = mine.points[0].velocity;
+  if (myVel == null) return [];
+
+  const others = watchedSpots.filter((s) => {
+    if (s === spot || !s.reading || !s.reading.points || !s.reading.points.length) return false;
+    return s.reading.points[0].velocity != null;
+  });
+  if (!others.length) return [];
+
+  const rows = [];
+  for (const other of others) {
+    const theirVel = other.reading.points[0].velocity;
+    const metres = Math.round(Math.hypot(
+      (spot.lat - other.lat) * 111320,
+      (spot.lon - other.lon) * 111320 * Math.cos(spot.lat * Math.PI / 180)));
+    const sameFile = mine.file === other.reading.file;
+    const diff = myVel - theirVel;
+    // Two cells of the same grid, read from the same file, are the same cell
+    // when they are closer together than the grid is wide - and then the
+    // difference is zero by construction rather than by measurement.
+    const sameCell = sameFile
+      && mine.points[0].distance_m + other.reading.points[0].distance_m > metres;
+    rows.push([`Against "${other.name}"`, !sameFile
+      ? `read from a different file, so not compared — subtracting across two `
+        + 'products or releases would put their own difference into the answer'
+      : sameCell
+        ? `${metres} m apart, and both are reading the same grid cell — the `
+          + 'difference is zero because the file cannot tell them apart, not '
+          + 'because they move together. This needs Level 2B'
+        : `${diff > 0 ? '+' : ''}${diff.toFixed(2)} mm a year, ${metres} m `
+          + `apart (${myVel} here against ${theirVel} there)`]);
+  }
+  return rows;
+}
+
 /** What the tile said about this spot, once one has been brought in. */
 function readingRows(spot) {
   const d = spot.reading;
@@ -11251,6 +11302,7 @@ function readingRows(spot) {
       + 'pass — 2B is line-of-sight, and the two together separate up-down from '
       + 'sideways']);
   }
+  rows.push(...pairRows(spot));
   rows.push(['Nearest point', `${near.distance_m} m from where you clicked`]);
   rows.push(['Points found', `${d.points.length} within ${d.radius_m} m`]);
   if (near.series && near.series.length) {
