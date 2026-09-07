@@ -3615,7 +3615,7 @@ def egms_tile(lat, lon):
     return "E%02dN%02d" % (int(east // 100000), int(north // 100000))
 
 
-def _egms_rows(path, lat, lon, east, north, want, radius_m):
+def _egms_rows(path, lat, lon, east, north, want, radius_m, ring_m):
     """The measurement points nearest a spot, out of a downloaded tile.
 
     The tiles are semicolon-separated CSV inside a zip. Column names vary
@@ -3626,6 +3626,7 @@ def _egms_rows(path, lat, lon, east, north, want, radius_m):
     """
     found = []
     dates = []
+    ring = []
     with zipfile.ZipFile(path) as zf:
         names = [n for n in zf.namelist() if n.lower().endswith(".csv")]
         if not names:
@@ -3667,19 +3668,65 @@ def _egms_rows(path, lat, lon, east, north, want, radius_m):
                     dist = math.hypot(de, dn)
                 except (ValueError, IndexError, KeyError):
                     continue
+                if dist > ring_m:
+                    continue
+                vel = (float(row[vel_col])
+                       if vel_col is not None and row[vel_col] else None)
                 if dist > radius_m:
+                    # Out in the ring: only the rate is wanted, not the series.
+                    if vel is not None:
+                        ring.append(vel)
                     continue
                 point = {
                     "distance_m": round(dist, 1),
-                    "velocity": (float(row[vel_col])
-                                 if vel_col is not None and row[vel_col] else None),
+                    "velocity": vel,
                     "series": [[d, float(row[i])] for i, d in dates
                                if i < len(row) and row[i] not in ("", None)][:400],
                 }
                 found.append(point)
 
     found.sort(key=lambda p: p["distance_m"])
-    return found[:want], len(dates)
+    return found[:want], len(dates), ring
+
+
+# How far out to look for "the ground around here".
+#
+# Close enough that it is the same ground - the same soil, the same water table,
+# the same ice-age rebound - and far enough that it is not the same structure.
+EGMS_RING_M = 700.0
+
+
+def _differential(points, ring):
+    """The spot against its own surroundings, which is the question that matters.
+
+    An absolute rate mostly measures the last ice age: everything in Sweden is
+    rising a millimetre or two a year and a lone figure cannot tell that from a
+    foundation failing. What damages a structure is moving differently from the
+    ground it stands on, so the number to report is the difference.
+
+    The spread of the surroundings is reported with it, because a difference
+    smaller than the neighbours disagree among themselves is not a finding.
+    """
+    here = next((p["velocity"] for p in points if p["velocity"] is not None), None)
+    if here is None or len(ring) < 5:
+        return {"enough": False,
+                "why": "not enough measured ground around this spot to compare against"}
+    mean = sum(ring) / len(ring)
+    spread = (sum((v - mean) ** 2 for v in ring) / len(ring)) ** 0.5
+    diff = here - mean
+    # Two standard deviations of the neighbours' own disagreement. Inside that,
+    # the spot is doing what its surroundings do.
+    tell = spread * 2 if spread > 0 else 0.5
+    return {
+        "enough": True,
+        "here": round(here, 2),
+        "around": round(mean, 2),
+        "spread": round(spread, 2),
+        "difference": round(diff, 2),
+        "ring_points": len(ring),
+        "stands_out": abs(diff) > tell,
+        "threshold": round(tell, 2),
+    }
 
 
 def egms_fetch(url, folder, lat, lon, want=5, radius_m=150.0):
@@ -3714,7 +3761,8 @@ def egms_fetch(url, folder, lat, lon, want=5, radius_m=150.0):
     log("egms: %s is %.1f MB" % (name, size / 1e6))
 
     east, north = laea_3035(lat, lon)
-    points, acquisitions = _egms_rows(path, lat, lon, east, north, want, radius_m)
+    points, acquisitions, ring = _egms_rows(
+        path, lat, lon, east, north, want, radius_m, EGMS_RING_M)
     return json.dumps({
         "file": path,
         "bytes": size,
@@ -3722,6 +3770,8 @@ def egms_fetch(url, folder, lat, lon, want=5, radius_m=150.0):
         "points": points,
         "acquisitions": acquisitions,
         "radius_m": radius_m,
+        "ring_m": EGMS_RING_M,
+        "differential": _differential(points, ring),
         "source": "European Ground Motion Service",
     }).encode()
 

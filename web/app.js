@@ -10874,16 +10874,43 @@ async function showSarPasses(lat, lon) {
     rows.push(['Up-down separately from sideways', stack.can_separate_vertical
       ? 'yes — this spot is covered from both directions'
       : 'no — only one direction covers it, so up-down and sideways stay mixed']);
-    if (ok) {
+    /*
+     * A spot already being watched needs a door onward, not the same offer.
+     *
+     * Reported from the bridge: clicked it, read "yes, this spot is covered",
+     * and then had nowhere to go - the watch had been saved half an hour
+     * earlier, and the card was still offering to save it. The plan lives on
+     * the watched spot in the panel, and nothing here said so.
+     */
+    const already = watchedSpots.find(
+      (s) => Math.hypot(s.lat - lat, (s.lon - lon) * 0.56) * 111000 < 300);
+    if (already) {
+      rows.push(['Already watched here', `"${already.name}" — the plan and the `
+        + 'paste box are on it, under Watched for movement in the panel']);
       $('#watch-spot').hidden = false;
+      $('#watch-spot').textContent = 'OPEN THE PLAN FOR THIS SPOT';
+      $('#watch-spot').onclick = () => showWatchedPlan(already);
+    } else if (ok) {
+      $('#watch-spot').hidden = false;
+      $('#watch-spot').textContent = 'WATCH THIS SPOT FOR MOVEMENT';
       $('#watch-spot').onclick = () => watchThisSpot(lat, lon, stack);
     }
   }
   rows.push(['To go further', 'the pictures themselves are free at '
     + 'browser.dataspace.copernicus.eu — HELP explains how to read one']);
+  // showDetail hides the button as part of clearing the card, so whatever the
+  // block above decided has to be put back after the final render rather than
+  // before it.
+  const near300 = watchedSpots.find(
+    (s) => Math.hypot(s.lat - lat, (s.lon - lon) * 0.56) * 111000 < 300);
   showDetail(where, `radar · ${d.source}`, rows);
-  if (best && (best.verdict === 'yes' || best.verdict === 'thin')) {
+  if (near300) {
     $('#watch-spot').hidden = false;
+    $('#watch-spot').textContent = 'OPEN THE PLAN FOR THIS SPOT';
+    $('#watch-spot').onclick = () => showWatchedPlan(near300);
+  } else if (best && (best.verdict === 'yes' || best.verdict === 'thin')) {
+    $('#watch-spot').hidden = false;
+    $('#watch-spot').textContent = 'WATCH THIS SPOT FOR MOVEMENT';
     $('#watch-spot').onclick = () => watchThisSpot(lat, lon, stack);
   }
 }
@@ -11148,12 +11175,38 @@ function readingRows(spot) {
     const which = mm < -0.5 ? 'sinking' : mm > 0.5 ? 'rising' : 'holding still';
     rows.push(['What it is doing',
       `${which} — ${Math.abs(mm).toFixed(1)} mm a year`]);
-    // A rate is not a verdict. Two millimetres a year is a centimetre a decade
-    // under a whole district and nothing to act on; it is a great deal under
-    // one corner of a building while the other corner sits still.
-    rows.push(['Read that carefully',
-      'this is one point. A whole area moving together is ground, not damage — '
-      + 'what breaks a structure is one part moving and another not']);
+  }
+
+  /*
+   * The spot against its own surroundings, which is the question underneath.
+   *
+   * Asked, rightly, how you tell that *this* garage is sinking rather than the
+   * county it stands in. An absolute rate cannot answer it: everything in
+   * Sweden is rising a millimetre or two a year, and a lone figure mostly
+   * measures the last ice age. What damages a structure is moving differently
+   * from the ground it stands on.
+   *
+   * So the difference is the headline, and the neighbours' own disagreement is
+   * printed beside it - because a difference smaller than the spread of the
+   * ground around it is not a finding, however precise it looks.
+   */
+  const diff = d.differential;
+  if (diff && diff.enough) {
+    rows.push(['Compared with the ground around it',
+      diff.stands_out
+        ? `it stands out — ${diff.difference > 0 ? '+' : ''}`
+          + `${diff.difference} mm a year against its surroundings, which is `
+          + 'more than they disagree among themselves. This one is worth a look'
+        : `no difference worth the name — ${diff.difference > 0 ? '+' : ''}`
+          + `${diff.difference} mm a year against its surroundings, and the `
+          + `ground around here varies by ${diff.spread} on its own. It is `
+          + 'riding the land, not moving on it']);
+    rows.push(['The arithmetic',
+      `here ${diff.here} · around ${diff.around} over ${diff.ring_points} `
+      + `points out to ${d.ring_m} m · difference ${diff.difference} · `
+      + `would need to beat ${diff.threshold} to mean anything`]);
+  } else if (diff && diff.why) {
+    rows.push(['Compared with the ground around it', diff.why]);
   }
   rows.push(['Nearest point', `${near.distance_m} m from where you clicked`]);
   rows.push(['Points found', `${d.points.length} within ${d.radius_m} m`]);
@@ -11269,11 +11322,29 @@ function showWatchedPlan(spot) {
      * somebody hunting for a box to type a tile name into. There is no such
      * box: you draw the area on the map and it finds the tiles for you.
      */
+    /*
+     * Which level, and why it decides what you can ask.
+     *
+     * ORTHO is resampled to a 100 x 100 m grid. A house is smaller than one
+     * cell, so ORTHO can never say anything about one building - it answers
+     * "is this neighbourhood moving". CALIBRATED keeps the full 20 x 5 m
+     * resolution with a point per scatterer, so a point can sit on a roof edge
+     * or a bridge girder and be about that thing.
+     *
+     * The trade is that CALIBRATED is line-of-sight rather than decomposed, so
+     * separating up-down from sideways needs an ascending and a descending
+     * pass of it - which the stack rows above already say whether you have.
+     */
+    ['Which level to ask for', 'ORTHO (Level 3) for the area — it is a 100 m '
+      + 'grid, so it answers "is this neighbourhood moving" and can never be '
+      + 'about one building. CALIBRATED (Level 2B) for the structure itself: '
+      + 'full 20×5 m resolution, a point per reflector, so a point can sit on '
+      + 'the thing you care about. Level 2B is line-of-sight, so it needs both '
+      + 'an ascending and a descending pass to separate up-down from sideways'],
     ['What to do on their site', 'sign in first — the archive refuses a search '
-      + 'otherwise. Set Level to ORTHO (Level 3), which is the 100 km tiles, and '
-      + 'pick their newest Release. Then switch on geographic search and draw a '
-      + 'box on the map over this spot; double-click to close it and the tiles '
-      + 'come back as a list'],
+      + 'otherwise. Choose the Level from above and their newest Release. Then '
+      + 'switch on geographic search and draw a box on the map over this spot; '
+      + 'double-click to close it and the results come back as a list'],
     ['Which result to take', spot.tile
       ? `the one named ${spot.tile}, with _U_ in it — U is up-and-down, the `
         + 'sinking question. The _E_ file beside it is east-and-west. You copy '
