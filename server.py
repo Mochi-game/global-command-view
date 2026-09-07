@@ -3609,6 +3609,31 @@ def laea_3035(lat, lon):
     return east, north
 
 
+def egms_product(name):
+    """Which EGMS product a downloaded file is, from its own filename.
+
+    EGMS_L3_E44N36_100km_U_...  vertical, already decomposed
+    EGMS_L3_E44N36_100km_E_...  east-west, already decomposed
+    EGMS_L2b_073_0123_IW2_VV_.. calibrated, line of sight, absolute
+    EGMS_L2a_073_0123_IW2_VV_.. basic, line of sight, relative to a local point
+    """
+    n = name.upper()
+    if "_L3_" in n and "_100KM_U" in n:
+        return {"level": "ORTHO", "axis": "vertical", "grid_m": 100,
+                "absolute": True}
+    if "_L3_" in n and "_100KM_E" in n:
+        return {"level": "ORTHO", "axis": "east-west", "grid_m": 100,
+                "absolute": True}
+    if "_L2B_" in n:
+        return {"level": "CALIBRATED", "axis": "line of sight", "grid_m": None,
+                "absolute": True}
+    if "_L2A_" in n:
+        return {"level": "BASIC", "axis": "line of sight", "grid_m": None,
+                "absolute": False}
+    return {"level": "unknown", "axis": "unknown", "grid_m": None,
+            "absolute": None}
+
+
 def egms_tile(lat, lon):
     """Which 100 km EGMS tile a spot falls in, named the way the files are."""
     east, north = laea_3035(lat, lon)
@@ -3771,6 +3796,7 @@ def egms_fetch(url, folder, lat, lon, want=5, radius_m=150.0):
         "acquisitions": acquisitions,
         "radius_m": radius_m,
         "ring_m": EGMS_RING_M,
+        "product": egms_product(name),
         "differential": _differential(points, ring),
         "source": "European Ground Motion Service",
     }).encode()

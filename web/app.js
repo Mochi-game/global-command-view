@@ -11237,11 +11237,38 @@ function readingRows(spot) {
   }
   const near = d.points[0];
   const rows = [];
+  const kind = d.product || {};
   if (near.velocity != null) {
     const mm = near.velocity;
-    const which = mm < -0.5 ? 'sinking' : mm > 0.5 ? 'rising' : 'holding still';
-    rows.push(['What it is doing',
-      `${which} — ${Math.abs(mm).toFixed(1)} mm a year`]);
+    /*
+     * Which axis the number is on, said with the number.
+     *
+     * ORTHO ships motion already decomposed - a U file is up-and-down and
+     * nothing else, so "sinking" is a fair word for a negative one. The Level 2
+     * products ship line-of-sight: one figure along whatever direction the
+     * radar was looking, which mixes vertical with horizontal. Calling that
+     * "sinking" would be a wrong reason attached to a right-looking number.
+     */
+    if (kind.axis === 'line of sight') {
+      const way = mm < -0.5 ? 'away from the satellite'
+        : mm > 0.5 ? 'towards the satellite' : 'not moving';
+      rows.push(['What it is doing',
+        `${Math.abs(mm).toFixed(1)} mm a year ${way} — this is `
+        + `${kind.level}, which measures along the radar's line of sight, not `
+        + 'up and down']);
+      rows.push(['To turn that into up and down',
+        'you need the same spot from an ascending and a descending pass. One '
+        + 'direction alone cannot separate sinking from sliding sideways']);
+      if (kind.absolute === false) {
+        rows.push(['And it is relative', `${kind.level} is referred to a local `
+          + 'reference point rather than to the ground itself, so the figure is '
+          + 'movement against that point. CALIBRATED (Level 2B) is the absolute one']);
+      }
+    } else {
+      const which = mm < -0.5 ? 'sinking' : mm > 0.5 ? 'rising' : 'holding still';
+      rows.push(['What it is doing',
+        `${which} — ${Math.abs(mm).toFixed(1)} mm a year`]);
+    }
   }
 
   /*
@@ -11288,7 +11315,13 @@ function readingRows(spot) {
    * Saying "not enough ground" and stopping leaves somebody thinking the
    * measurement failed. What failed was the choice of product.
    */
-  const thin = d.points.length < 3 || (d.points[0] && d.points[0].distance_m > 60);
+  // The axis is the real distinction, not the grid field: the decomposed
+  // products are the gridded ones and the line-of-sight products are the
+  // full-resolution ones. A reading saved before this field existed has no
+  // axis and was certainly ORTHO, so it keeps the old behaviour.
+  const gridded = kind.axis !== 'line of sight';
+  const thin = gridded
+    && (d.points.length < 3 || (d.points[0] && d.points[0].distance_m > 60));
   if (thin) {
     rows.push(['Why so little here', `this is the 100 m grid — ${d.points.length} `
       + `cell${d.points.length === 1 ? '' : 's'} within ${d.radius_m} m and the `
