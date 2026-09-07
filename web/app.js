@@ -11141,7 +11141,20 @@ function pasteRow(spot) {
       });
       const d = await res.json();
       if (d.error) throw new Error(d.error);
-      spot.egmsUrl = link;
+      /*
+       * The link is kept, the token in it is not.
+       *
+       * A download link carries ?id=<token>, good for an hour, and writing it
+       * to disk keeps a live one lying about for no gain: it is expired long
+       * before anybody looks at the file again. What is worth remembering is
+       * which file this spot was read from, so the address is kept without
+       * its query.
+       *
+       * And a token-less link still works. The server names the file from the
+       * path and only downloads when it is not already there, so re-reading a
+       * tile you have needs no token and no network at all.
+       */
+      spot.egmsUrl = link.split('?')[0];
       spot.reading = d;
       saveWatched().catch(() => {});
       showWatchedPlan(spot);
