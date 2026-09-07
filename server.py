@@ -3708,6 +3708,23 @@ def _egms_rows(path, lat, lon, east, north, want, radius_m, ring_m):
                     "series": [[d, float(row[i])] for i, d in dates
                                if i < len(row) and row[i] not in ("", None)][:400],
                 }
+                # Level 2B carries the geometry each measurement was made in.
+                # ORTHO does not, having already used it to decompose.
+                for key, col in (("los_up", "los_up"), ("los_east", "los_east"),
+                                 ("los_north", "los_north"),
+                                 ("incidence", "incidence_angle"),
+                                 ("heading", "track_angle"),
+                                 ("coherence", "temporal_coherence"),
+                                 ("seasonality", "seasonality"),
+                                 ("height_m", "height_ortho"),
+                                 ("std", "mean_velocity_std")):
+                    if col in index:
+                        raw_v = row[index[col]] if index[col] < len(row) else ""
+                        if raw_v not in ("", None):
+                            try:
+                                point[key] = float(raw_v)
+                            except ValueError:
+                                pass
                 found.append(point)
 
     found.sort(key=lambda p: p["distance_m"])
@@ -3751,6 +3768,47 @@ def _differential(points, ring):
         "ring_points": len(ring),
         "stands_out": abs(diff) > tell,
         "threshold": round(tell, 2),
+    }
+
+
+def egms_decompose(a, b):
+    """Vertical and east-west, out of two line-of-sight velocities.
+
+    A radar measures one number: motion along the direction it was looking. Two
+    passes looking from opposite sides give two numbers, and Level 2B hands over
+    the unit look vector for each - so
+
+        v_los = los_east * v_E + los_north * v_N + los_up * v_U
+
+    twice, which is two equations in three unknowns. The north component is
+    dropped, because a near-polar orbit is almost blind to it: los_north here is
+    -0.111 against los_up 0.747, so anything moving north hides in the noise.
+    That is the standard assumption and it is an assumption, not a measurement.
+
+    What is left is a two by two solve. A pair looking from the same side has
+    almost no determinant and is refused rather than amplified into nonsense.
+    """
+    e1, u1, v1 = a.get("los_east"), a.get("los_up"), a.get("velocity")
+    e2, u2, v2 = b.get("los_east"), b.get("los_up"), b.get("velocity")
+    if None in (e1, u1, v1, e2, u2, v2):
+        return {"ok": False, "why": "one of the two readings has no look vector - "
+                                    "ORTHO has already used it, so this needs two "
+                                    "Level 2 files"}
+    det = e1 * u2 - e2 * u1
+    # Two passes from the same side share a look direction; the system is then
+    # nearly singular and the answer is whatever the noise happened to be.
+    if abs(det) < 0.25:
+        return {"ok": False,
+                "why": "these two were taken from too similar a direction to "
+                       "separate up-down from sideways - one ascending and one "
+                       "descending is what it takes"}
+    return {
+        "ok": True,
+        "vertical": round((e1 * v2 - e2 * v1) / det, 2),
+        "east_west": round((v1 * u2 - v2 * u1) / det, 2),
+        "determinant": round(det, 3),
+        "assumed": "north-south movement taken as zero, which a near-polar "
+                   "orbit cannot see",
     }
 
 
