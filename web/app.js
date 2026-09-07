@@ -11119,7 +11119,7 @@ function pasteRow(spot) {
   said.className = 'adds';
   said.textContent = spot.folder
     ? ''
-    : 'choose a folder above first — the tile is a large file';
+    : 'fill in "Where downloads go" just above — the tile is a large file';
 
   go.onclick = async () => {
     const picked = pickEgmsUrl(url.value);
@@ -11129,7 +11129,10 @@ function pasteRow(spot) {
       return;
     }
     if (picked.note) said.textContent = picked.note;
-    if (!spot.folder) { said.textContent = 'choose a folder above first'; return; }
+    if (!spot.folder) {
+      said.textContent = 'fill in "Where downloads go" just above first';
+      return;
+    }
     go.disabled = true;
     said.textContent = 'fetching the tile — this is the big download, give it a while…';
     try {
@@ -11390,6 +11393,9 @@ function showWatchedPlan(spot) {
         + 'sinking question. The _E_ file beside it is east-and-west. You copy '
         + 'their download link; there is nothing to type'
       : ''],
+    // Above the paste box, because the paste box is what needs it and used to
+    // tell you to look for it "above" while it sat further down the card.
+    ['Where downloads go', folder],
     ['Or bring it in here', pasteRow(spot)],
     ['If nothing covers it', 'outside Europe, or if you want a period of your own, '
       + 'the rest of this card is the long way round'],
@@ -11399,9 +11405,9 @@ function showWatchedPlan(spot) {
       + 'source scenes. The free allowance is 8 000 credits a month and a burst '
       + 'pair starts at 1 credit, so this stack fits inside one month of it'],
     ['What comes back', `roughly ${HYP3_PRODUCT_MB[0]}–${HYP3_PRODUCT_MB[1]} MB `
-      + `per pair — about ${low}–${high} GB for all ${pairs}. This is the big `
-      + 'number, and the only one worth choosing a disk for'],
-    ['Save results in', folder],
+      + `per pair — about ${low}–${high} GB for all ${pairs}, into the same `
+      + 'folder named above. This is the big number, and the only one worth '
+      + 'choosing a disk for'],
     ['Then', 'submit the stack at search.asf.alaska.edu with a NASA Earthdata '
       + 'login — free, and yours to create. This app prepares the list; it does '
       + 'not hold your password'],
