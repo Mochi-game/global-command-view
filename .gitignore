@@ -24,3 +24,6 @@ server-error.log
 # Written when the launcher has asked Windows to fetch the certificate
 # authorities the app needs. Local to the machine it ran on.
 .certificates-warmed
+
+# Local workstation backup notes; not part of published releases.
+BEFORE-IMPROVEMENTS.md

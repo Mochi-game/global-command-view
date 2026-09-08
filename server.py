@@ -40,8 +40,8 @@ import zipfile
 import webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
-VERSION = "1.8.0"
-BUILT = "2026-08-19"
+VERSION = "6.0"
+BUILT = "2026-09-08"
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
 WEB = os.path.join(ROOT, "web")

@@ -57,8 +57,8 @@ function noteCertAdvice(body) {
   }
 }
 
-async function getJSON(url) {
-  const res = await fetch(url);
+async function getJSON(url, options) {
+  const res = await fetch(url, options);
   if (!res.ok) {
     let detail = res.statusText;
     try {
@@ -688,6 +688,7 @@ function restoreLayers() {
 
 function renderLayerList() {
   const ul = $('#layers');
+  const focusedLayer = document.activeElement?.dataset?.layerId;
   ul.innerHTML = '';
 
   // Anything a group forgot still gets drawn, at the end, rather than vanishing
@@ -698,10 +699,15 @@ function renderLayerList() {
     ? [...LAYER_GROUPS, { name: 'Other', ids: orphans }]
     : LAYER_GROUPS;
 
+  const filter = GCVCommands.normalize($('#layer-filter').value);
+  const activeOnly = $('#layers-active').checked;
+  let matches = 0;
   for (const group of groups) {
     const members = group.ids
       .map((id) => LAYERS.find((l) => l.id === id))
-      .filter(Boolean);
+      .filter(Boolean)
+      .filter(l => (!activeOnly || l.on) && (!filter || GCVCommands.normalize([l.name, l.note, group.name, ...(GCVCommands.aliases[l.id] || [])].join(' ')).includes(filter)));
+    matches += members.length;
     if (!members.length) continue;
 
     const head = document.createElement('li');
@@ -714,6 +720,12 @@ function renderLayerList() {
     for (const layer of members) {
     const li = document.createElement('li');
     li.className = 'layer' + (layer.on ? '' : ' off');
+    li.dataset.layerId = layer.id;
+    li.tabIndex = 0;
+    li.setAttribute('role', 'switch');
+    li.setAttribute('aria-checked', String(layer.on));
+    li.setAttribute('aria-label', layer.name);
+    li.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); li.click(); } };
     li.innerHTML =
       `<span class="dot" style="background:${layer.color};color:${layer.color}"></span>` +
       `<span class="name">${layer.name}</span>` +
@@ -758,6 +770,9 @@ function renderLayerList() {
       ul.append(li);
     }
   }
+  $('#layer-empty').hidden = matches > 0;
+  $('#active-total').textContent = `${LAYERS.filter(l => l.on).length} active`;
+  if (focusedLayer) ul.querySelector(`[data-layer-id="${focusedLayer}"]`)?.focus({ preventScroll: true });
 }
 
 function applyVisibility() {
@@ -8850,37 +8865,43 @@ async function flyToQuery(text) {
   said.textContent = 'looking\u2026';
 
   let found;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 20000);
   try {
-    found = await getJSON('/api/search?q=' + encodeURIComponent(query));
+    found = await getJSON('/api/search?q=' + encodeURIComponent(query), { signal: controller.signal });
   } catch (err) {
     said.className = 'note miss';
-    said.textContent = `could not look that up (${err.message})`;
-    return;
+    said.textContent = err.name === 'AbortError'
+      ? 'The place search took too long. Try again or enter coordinates.'
+      : `could not look that up (${err.message})`;
+    return { ok: false, message: said.textContent };
+  } finally {
+    clearTimeout(timeout);
   }
   if (found.error) {
     said.className = 'note miss';
     said.textContent = `nothing found. Tried ${found.tried || 'everything'}.`;
     log(`find: nothing matched "${query}"`, 'warn');
-    return;
+    return { ok: false, message: said.textContent };
   }
 
   const how = found.kind === 'coordinates'
     ? 'read as a position'
     : found.kind === 'airport' ? 'airport code or name' : 'geocoded name';
-  said.innerHTML = `<b>${found.label}</b> \u00b7 ${how}`
-    + (found.detail ? `<br>${found.detail}` : '')
-    + (found.others ? `<br>${found.others} other match(es) not shown` : '');
+  said.textContent = `${found.label} · ${how}` + (found.detail ? ` — ${found.detail}` : '')
+    + (found.others ? ` · ${found.others} other match(es) not shown` : '');
 
   viewer.camera.flyTo({
     destination: Cesium.Cartesian3.fromDegrees(found.lon, found.lat, found.height || 20000),
     orientation: { heading: 0, pitch: Cesium.Math.toRadians(-60), roll: 0 },
-    duration: 2.2,
+    duration: matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 2.2,
     // The globe is hidden while photoreal is on, so the flight has to be handed
     // over at the end or nothing visible happens at all.
     complete: carryCameraInto3D,
   });
   log(`find: ${found.label} · ${how} · `
     + `${found.lat.toFixed(4)}, ${found.lon.toFixed(4)}`);
+  return { ok: true, message: `Going to ${found.label}.` };
 }
 
 $('#find').onsubmit = (e) => {
@@ -9605,11 +9626,15 @@ function foldedSections() {
 function applyFolds(folded) {
   for (const h2 of document.querySelectorAll('h2[data-section]')) {
     h2.parentElement.classList.toggle('folded', folded.includes(h2.dataset.section));
+    h2.setAttribute('aria-expanded', String(!folded.includes(h2.dataset.section)));
   }
   localStorage.setItem(FOLD_STORE, JSON.stringify(folded));
 }
 
 for (const h2 of document.querySelectorAll('h2[data-section]')) {
+  h2.tabIndex = 0;
+  h2.setAttribute('role', 'button');
+  h2.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); h2.click(); } };
   h2.onclick = () => {
     const key = h2.dataset.section;
     const folded = foldedSections();

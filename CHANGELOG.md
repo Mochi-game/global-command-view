@@ -4,7 +4,17 @@ The running version is shown in the HUD panel footer and printed by the server o
 startup. `GET /api/version` returns it as JSON along with which optional keys are
 active. Bump `VERSION` in `server.py` when something here changes.
 
-All of this was built on 2026-08-19, so the entries are in order rather than by date.
+Older entries retain their original ordering; new releases include a build date.
+
+## 6.0 — 2026-09-08
+
+- Redesigned welcome screen and responsive explorer panel with four starting views.
+- Searchable layers, active-only filtering and keyboard-accessible controls.
+- Swedish and English map commands, optional browser speech input and spoken replies.
+- Local saved camera/layer views and undo for commands and starting views.
+- Bounded place-search requests and clearer feedback.
+
+See `README.md` for commands, browser speech requirements and upgrade instructions.
 
 ## 1.8.0 - watching a bridge for movement
 

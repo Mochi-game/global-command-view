@@ -3,7 +3,7 @@
 A live picture of the world built only from public feeds, on a 3D globe that runs
 on your own machine. Aircraft, ships, satellites, radar that sees through cloud,
 submarine cables, public road cameras, radio you can listen to, traffic, rocket
-launches. Thirty-seven layers.
+launches. Forty-five layers.
 
 **Every layer says where its data came from and how sure it is.** Nothing is
 simulated, nothing is smoothed, and when a feed has nothing to say the app says
@@ -12,6 +12,45 @@ that rather than drawing an empty map.
 **It opens empty.** No layer is on until you switch one on, so the first thing
 you turn on is the first thing you see. A welcome page says what to try first;
 tick the box and it stays gone, and **WELCOME** in the top bar brings it back.
+
+## Explore faster: commands, voice and saved views
+
+The welcome screen and sidebar now offer four starting views: **Aviation**, **Oceans**,
+**Our planet**, and **Sweden**. A starting view replaces the active layers and moves
+the camera; **Commands → Undo last change** restores the preceding camera and layers.
+The layer search understands layer names, sources and common Swedish/English aliases.
+Use **Active only** to see what you have enabled, or **Layers** in the top bar to
+make more room for the globe. Layer switches and section headings work with Enter/Space.
+
+Open **Commands** or press **Ctrl+K** (Command+K on Mac). Examples:
+
+- `visa flyg i Stockholm` / `show aircraft in Stockholm`
+- `go to London` / `gå till Göteborg` / `go to 59.33, 18.07`
+- `dölj flyg`, `show earthquakes`, `zoom in`, `globe`
+- `sammanfatta` / `status` for counts from active layers
+- `ångra` / `undo` to restore the last command or starting view
+
+These are local, deterministic map commands, not a general-purpose AI chatbot.
+Summaries report loaded records and source failures; they do not infer world events
+or pretend that every loaded record is currently visible. Existing Briefing remains
+available in the sidebar for event reports.
+
+**Speak** supports Swedish and English when the browser provides speech recognition.
+The mic is off until pressed, stops when the dialog closes or the tab is hidden,
+and never runs a transcript automatically. Review it and press **Run**. Optional
+**Read replies aloud** speaks English interface responses. Audio may be processed by
+the browser's speech provider; support and processing vary by browser
+([Web Speech API documentation](https://developer.mozilla.org/en-US/docs/Web/API/SpeechRecognition)).
+Typed commands require no microphone or AI API key. Actual speech input requires a
+compatible browser and microphone permission on localhost or HTTPS.
+
+**My saved views** stores up to eight named camera/layer combinations locally in your
+browser. Views survive reloads; clearing browser storage removes them. They are not
+uploaded or synced. A saved view uses current feeds when reopened, not historical data.
+
+Release history: [CHANGELOG.md](CHANGELOG.md). Before upgrading, keep a copy of your current installation so you can restore it if needed.
+Command regression tests: `node --test tests/commands.test.cjs` (Node.js is only needed
+for this test; running the app still requires only its existing Python setup).
 
 ## Watch it first
 

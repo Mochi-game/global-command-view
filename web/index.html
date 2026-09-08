@@ -6,6 +6,7 @@
 <title>Global Command View</title>
 <link rel="stylesheet" href="https://unpkg.com/cesium@1.132.0/Build/Cesium/Widgets/widgets.css">
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="experience.css">
 </head>
 <body>
 
@@ -20,6 +21,8 @@
     <span class="sub">open source spatial intelligence</span>
   </div>
   <div class="tabs">
+    <button id="command-open" class="tab command-launch" aria-haspopup="dialog">⌕ Commands <kbd>Ctrl K</kbd></button>
+    <button id="panel-toggle" class="tab" aria-controls="panel" aria-expanded="true">☰ Layers</button>
     <button id="tab-welcome" class="tab">WELCOME</button>
     <button id="tab-help" class="tab">HELP</button>
     <button id="tab-setup" class="tab">SETUP</button>
@@ -42,6 +45,13 @@
   <!-- Built from the sections themselves, so adding one cannot leave it
        unreachable at the bottom of a six-thousand-pixel column. -->
   <nav id="section-index"></nav>
+  <section class="explore-start" aria-label="Quick start">
+    <div class="explore-heading"><span class="eyebrow">YOUR WORLD, IN VIEW</span><span id="active-total">0 active</span></div>
+    <h1>What will you explore?</h1>
+    <p>Choose a starting point. Follow your curiosity.</p>
+    <div class="preset-grid" id="quick-presets"></div>
+    <button id="saved-open" class="subtle-button">☆ My saved views</button>
+  </section>
   <!--
     Performance mode sits on its own, above everything, because the person who
     needs it is the person for whom the globe is already stuttering - and asking
@@ -58,6 +68,11 @@
 
   <section class="block">
     <h2 data-section="layers">Layers</h2>
+    <div class="layer-tools">
+      <input id="layer-filter" type="search" aria-label="Filter layers" placeholder="Find a layer… flyg, ships, weather" autocomplete="off">
+      <label><input id="layers-active" type="checkbox"> Active only</label>
+      <p id="layer-empty" hidden>No matching layers. Try another word or turn off “Active only”.</p>
+    </div>
     <ul id="layers"></ul>
   </section>
 
@@ -1456,54 +1471,22 @@
     <button id="welcome-close" aria-label="Close">&times;</button>
 
     <p class="welcome-eyebrow">Global Command View</p>
-    <h2>The globe starts empty. That is on purpose.</h2>
+    <h2>A whole world. Your point of view.</h2>
     <p class="welcome-lead">
-      Nothing is switched on, so the first thing you turn on is the first thing
-      you see. Thirty-seven layers of live public data are waiting in the panel
-      on the left, and <b>most of them need no account at all</b>.
+      Explore aircraft, oceans and a changing planet through public data.
+      Pick a starting point below, or build your own view. <b>Most layers need no account.</b>
     </p>
 
-    <div class="welcome-steps">
-      <div class="welcome-step">
-        <span class="n">1</span>
-        <h4>Turn something on</h4>
-        <p>Open <b>Layers</b> and click a row. <b>Public cameras</b> gives you
-          about <b>sixteen hundred</b> with no account at all &mdash; Finnish and
-          London road cameras &mdash; and about four thousand once the free
-          Trafikverket and Windy keys are in. <b>Names &amp; borders</b> needs
-          nothing and tells you where you are.</p>
-      </div>
-      <div class="welcome-step">
-        <span class="n">2</span>
-        <h4>Go somewhere</h4>
-        <p>Under <b>Jump to</b> there is a box that takes a coordinate, an
-          airport code or a town. Type <b>Varberg</b>, or
-          <b>67.8548, 20.5236</b>, and press GO.</p>
-      </div>
-      <div class="welcome-step">
-        <span class="n">3</span>
-        <h4>Click what you find</h4>
-        <p>Every marker opens a card saying where the data came from and how
-          sure it is. A count of zero means the feed answered and had nothing —
-          never that nothing was asked.</p>
-      </div>
+    <div id="welcome-presets" class="welcome-presets"></div>
+    <div class="welcome-command"><b>Just say where you want to go.</b>
+      <p>Open <b>Commands</b> or press <kbd>Ctrl K</kbd>. Try “visa flyg i Stockholm”,
+      “go to London” or “sammanfatta”. Type, or use your microphone in a supported browser.</p>
     </div>
 
-    <p class="welcome-films">
-      <b>Rather be shown than read?</b>
-      <a href="https://youtu.be/DI1-QUQtPtI" target="_blank" rel="noopener">Getting
-      started</a> is eighteen minutes on installing it and what the layers mean.
-      <a href="https://youtu.be/YqUMbXMA2MI" target="_blank" rel="noopener">Orlando:
-      ATC and approach</a> is seven minutes of live traffic into an airfield with
-      the frequencies and approach lines up. More at
-      <a href="https://www.youtube.com/@Global-command" target="_blank" rel="noopener">youtube.com/@Global-command</a>.
-      They open in a new tab; this stays where it is.
-    </p>
-
-    <p class="welcome-note">
-      Everything runs on your own machine. Nothing is simulated and nothing is
-      smoothed. Optional keys under <b>Setup</b> add more, and the first two are
-      free and take about two minutes.
+    <p class="welcome-films">Watch a walkthrough:
+      <a href="https://youtu.be/DI1-QUQtPtI" target="_blank" rel="noopener">Getting started ↗</a>
+      · <a href="https://youtu.be/YqUMbXMA2MI" target="_blank" rel="noopener">Orlando: ATC &amp; approach ↗</a>
+      · Every layer includes its source and coverage limitations.
     </p>
 
     <div class="welcome-foot">
@@ -1521,6 +1504,22 @@
   </div>
 </div>
 
+<dialog id="command-dialog" aria-labelledby="command-title">
+  <div class="command-heading"><div><span class="eyebrow">GLOBAL COMMAND VIEW</span><h2 id="command-title">Where next?</h2></div><button id="command-close" aria-label="Close commands">×</button></div>
+  <p class="command-intro">Navigate, control layers and get a summary of your active feeds.</p>
+  <form id="command-form">
+    <label class="sr-only" for="command-input">Command in Swedish or English</label>
+    <div class="command-input-row"><input id="command-input" autocomplete="off" maxlength="180" placeholder="Try: visa flyg i Stockholm"><button id="command-submit" type="submit">Run ↗</button></div>
+    <div class="voice-tools"><button id="voice-start" type="button" aria-pressed="false" aria-describedby="voice-note">◉ Speak</button><label class="sr-only" for="voice-language">Speech language</label><select id="voice-language"><option value="sv-SE">Svenska</option><option value="en-US">English</option></select><label><input id="voice-reply" type="checkbox"> Read replies aloud</label></div>
+  </form>
+  <p id="voice-note">Mic starts only when you press Speak. Your browser may send audio to its speech provider. Review the transcript, then press Run.</p>
+  <div id="command-reply" role="status" aria-live="polite">Type in Swedish or English. Try one of these:</div>
+  <div id="command-suggestions" class="suggestion-list"></div>
+  <details class="saved-views"><summary>☆ My saved views <span id="saved-count"></span></summary><p>Save this camera position and its active layers in this browser.</p><form id="save-view-form"><label class="sr-only" for="save-view-name">View name</label><input id="save-view-name" maxlength="60" placeholder="Name this view" required><button type="submit">Save view</button></form><div id="saved-views-list"></div></details>
+  <div class="command-footer"><span>Local commands · no AI account needed</span><button id="command-undo">Undo last change</button></div>
+</dialog>
+<div id="experience-toast" role="status" aria-live="polite" hidden></div>
+
 <div id="boot">
   <div class="boot-inner">
     <span class="mark">◎</span>
@@ -1531,6 +1530,8 @@
 <script>window.CESIUM_BASE_URL = 'https://unpkg.com/cesium@1.132.0/Build/Cesium/';</script>
 <script src="https://unpkg.com/cesium@1.132.0/Build/Cesium/Cesium.js"></script>
 <script src="https://unpkg.com/satellite.js@5.0.0/dist/satellite.min.js"></script>
+<script src="commands.js"></script>
 <script src="app.js"></script>
+<script src="experience.js"></script>
 </body>
 </html>
